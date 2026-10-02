@@ -95,7 +95,7 @@ const RVM = {
   // (rad), how fast it comes, and how far her irises go on from there.
   look: { neck: 0.55, head: 0.45, max: 1.2, rate: 4.0, eye: 0.38 },
   // Hand shapes: the fingers' curl and the thumb's, rad.
-  hands: { rest: [0, 0], flat: [-0.08, 0.20], grip: [1.15, 0.65], soft: [0.38, 0.18], hip: [0.85, 0.45] },
+  hands: { rest: [0, 0], flat: [-0.08, 0.20], grip: [1.15, 0.65], soft: [0.38, 0.18], hip: [0.85, 0.45], cup: [0.16, 0.10] },
   // Your flinch, standing, kneeling or on all fours: the spring on your
   // spine (rad of arch at a slap of `k` 12, its stiffness and damping), and
   // the push of your hips (m, standing).
@@ -117,6 +117,12 @@ const RVM_SAY = {
   thrust: ['Hehe. Like what you see?', 'Mm, watch me, babe.', "Eyes up here... kidding. Don't stop looking."],
   hug: ['C\'mere, you.', "Mm. I've got you."],
   kiss: ['Mm. You taste like the beach.', 'One more... okay, two.'],
+  // 1.573.0: lying behind you on the cot, holding you.
+  spoon: ["C'mere. I've got you.", 'Stay. Just like this.', 'Mm. Right where you belong.'],
+  nuzzle: ['Mm. You smell like sunscreen.', 'Love you, babe.'],
+  spoonup: ["Okay. I'm right here.", 'Mm. Okay, up we get.'],
+  curlup: ["C'mere... curl up for me."],
+  later: ['Okay... later, then.'],
 };
 
 const rvm = {
@@ -176,10 +182,15 @@ function rvmTurnFor(s, t, n, out) {
   return out.multiplyMatrices(_mM0, H.Bt);
 }
 
-/** Her clip's arm this frame, side `s`, figure space, on the collarbone as drawn. */
-function rvmChain(s) {
+/**
+ * Her clip's arm this frame, side `s`, figure space, on the collarbone as
+ * drawn. `F` another figure on the same rig (`{ fig, mesh }`; 1.573.0, Baye's
+ * own arm while Chloe spoons her) — the rigs are bone for bone the same, so
+ * the arm's indices and lengths are.
+ */
+function rvmChain(s, F = null) {
   const A = typeof rvkArmInit === 'function' ? rvkArmInit() : null;
-  const f = you && you.fig;
+  const f = F ? F.fig : you && you.fig;
   if (!A || !f) return null;
   const a = A[s];
   const R = f.bindRest(), lq = f.local().q;
@@ -190,7 +201,13 @@ function rvmChain(s) {
   const qL = new THREE.Quaternion(lq[4 * a.il], lq[4 * a.il + 1], lq[4 * a.il + 2], lq[4 * a.il + 3]).premultiply(qU);
   const W = new THREE.Vector3(R.t[3 * a.ih], R.t[3 * a.ih + 1], R.t[3 * a.ih + 2]).applyQuaternion(qL).add(E);
   const qH = new THREE.Quaternion(lq[4 * a.ih], lq[4 * a.ih + 1], lq[4 * a.ih + 2], lq[4 * a.ih + 3]).premultiply(qL);
-  const hinge = a.e.clone().applyQuaternion(qU.clone().multiply(a.bq));
+  let hinge = a.e.clone().applyQuaternion(qU.clone().multiply(a.bq));
+  // Somebody else's arm (`F`, 1.573.0): the hinge her clip has the elbow bent
+  // on, not the bind's. Baye's curled arm is turned off the bind's plane, and
+  // the two-bone solve keeps what the clip has off its hinge — 7.9 cm at the
+  // wrist (MEASURED) before this; 0 after.
+  // And hers, lying behind you (her `fetalHeld` arm is just as far off it).
+  if (F || (typeof rvmSpoonOn === 'function' && rvmSpoonOn())) { const h = E.clone().sub(S).cross(W.clone().sub(E)); if (h.lengthSq() > 1e-6) hinge = h.normalize(); }
   const bH = new THREE.Quaternion(R.bindQ[4 * a.ih], R.bindQ[4 * a.ih + 1], R.bindQ[4 * a.ih + 2], R.bindQ[4 * a.ih + 3]);
   return { a, S, E, W, qU, qL, qH, hinge, bH };
 }
@@ -253,10 +270,10 @@ function rvmTwoBone(c, G, P) {
  * collarbone as it was last drawn, as `rvkArm` reads it — so a kneel or a bow
  * laid on her spine is in it.
  */
-function rvmSolve(s, Cw, nW, dW, poleW, cock, k, out = null) {
-  const c = rvmChain(s);
+function rvmSolve(s, Cw, nW, dW, poleW, cock, k, out = null, F = null) {
+  const c = rvmChain(s, F);
   if (!c) return null;
-  const f = you.fig, mesh = you.mesh;
+  const f = F ? F.fig : you.fig, mesh = F ? F.mesh : you.mesh;
   const Mi = new THREE.Matrix4().copy(mesh.matrixWorld).invert();
   const mqi = mesh.quaternion.clone().invert();
   const n = nW.clone().applyQuaternion(mqi).normalize().negate();
@@ -310,6 +327,8 @@ function rvmSolve(s, Cw, nW, dW, poleW, cock, k, out = null) {
   armAimQ(f, 'armU' + s, QU);
   armAimQ(f, 'armL' + s, half.clone().multiply(QL));
   armAimQ(f, 'hand' + s, QH.clone().multiply(half.clone().invert()));
+  // Somebody else's arm (`F`): the aims are laid, and nothing of hers is touched.
+  if (F) { F.pred = { E: sol.elbow.clone().applyMatrix4(mesh.matrixWorld), W: sol.wrist.clone().applyMatrix4(mesh.matrixWorld) }; return out ? out.copy(sol.wrist).add(att.off).applyMatrix4(mesh.matrixWorld) : null; }
   rvm.on[s] = true;
   rvm.solves++;
   rvm.last = rvm.last || {};
@@ -321,9 +340,9 @@ function rvmSolve(s, Cw, nW, dW, poleW, cock, k, out = null) {
   return out.copy(sol.wrist).add(att.off).applyMatrix4(mesh.matrixWorld);
 }
 
-/** Her palm's point as she is drawn now, world (side `s`). */
-function rvmPalm(s, out) {
-  const f = you && you.fig;
+/** Her palm's point as she is drawn now, world (side `s`); or `F`'s. */
+function rvmPalm(s, out, F = null) {
+  const f = F ? F.fig : you && you.fig;
   if (!f) return null;
   const i = f.boneIndex('hand' + s);
   if (i < 0) return null;
@@ -332,7 +351,7 @@ function rvmPalm(s, out) {
   _mA.copy(HB.o).applyQuaternion(f.boneTurn(i, _mQ));
   f.boneAt(i, out).add(_mA);
   void T;
-  return out.applyMatrix4(you.mesh.matrixWorld);
+  return out.applyMatrix4(F ? F.mesh.matrixWorld : you.mesh.matrixWorld);
 }
 
 /** Her fingers: `curl` rad into the palm and `thumb` rad, side `s`, about the knuckles as drawn. */
@@ -593,6 +612,19 @@ function rvmHold() {
 function rvmBody(dt) {
   const B = rvm.body;
   B.t += dt;
+  // Lying behind you (1.573.0): the spoon has her until it puts her back on
+  // the edge, sitting — `rvmSpoonTick`. Down on to her side over the swing,
+  // and up on to the edge again over the way out.
+  if (B.mode === 'spoon') {
+    const M = rvm.move;
+    if (!M || M.id !== 'spoon' || M.lie == null) { B.mode = 'stand'; B.want = 'stand'; B.t = 0; }
+    else {
+      // Sitting while her legs come up (or go down), lying from there.
+      const P = RVM_SPOON, lying = M.ph === 'up' ? M.lie >= 0.999 : M.lie >= P.legsUp;
+      const T = M.ph === 'up' ? P.upT : P.swingT;
+      return { clip: lying ? 'fetalHeld' : 'sitHeld', fade: T * (1 - P.legsUp) * 0.9, speed: 1 };
+    }
+  }
   // Walking? Not while down: up first.
   if (B.mode !== 'stand' && rev.ch.goal) B.want = 'stand';
   // Down only once the getting up is done; kneeling to sitting is via standing.
@@ -1066,6 +1098,13 @@ function rvmCands(ctx, D) {
   // better you have been doing.
   if ((onCot || ctx === 'stand' || ctx === 'kneel') && !recent('thrust') && D.heat > 0.3 && D.heat < 0.85) add('thrust', 0.22);
   if (ctx === 'back' && !recent('hug')) add('hug', 0.16 + 0.22 * Math.min(2, D.streak));
+  // 1.573.0. Lying behind you and holding you: on the cot, when she is not
+  // worked up — after a run of you doing what she says, or just because — and
+  // likeliest when you are already curled up on your side. Never twice close
+  // together (a minute off after one).
+  if (onCot && !recent('spoon') && D.heat < 0.62 && rev.clock >= (rvm.spoonCool || 0)) {
+    add('spoon', (ctx === 'side' ? 0.30 : 0.10) + 0.10 * Math.min(3, D.streak) + (D.heat < 0.35 ? 0.12 : 0));
+  }
   // The toys you are wearing, in her hands (1.567.0, src/49-revtoys.js).
   if (typeof rvtCands === 'function') for (const c of rvtCands(ctx, D)) out.push(c);
   return out;
@@ -1084,6 +1123,15 @@ function rvmBusy() { return !!rvm.move; }
  */
 function rvmStart(id, why = 'mood') {
   if (!rev.on) return 'off';
+  // The aftercare while she is lying with you (1.573.0): it is this. She
+  // keeps holding you; nothing else of hers goes on.
+  if (id === 'care' && rvmSpoonOn()) {
+    const S = rvm.move;
+    S.care = true; S.kissing = false; S.handOn = true;
+    if (S.ph === 'on') S.t0 = S.t;
+    rvmTrace({ pick: 'spoon:care', why });
+    return true;
+  }
   if (rvm.move && id !== 'care') return 'busy';
   if (rev.arm.mode === 'spank' && id !== 'care') return 'busy';
   const v = revView();
@@ -1167,6 +1215,14 @@ function rvmStart(id, why = 'mood') {
       { mode: 'kneel', prefer: H.out, preferK: 3, bowMax: 1.15, headR: 0.12, reach: 0.46 });
     if (!P) return 'noplace';
     M.plan = P; M.dur = 9; M.gap = 9; M.kissD = 9;
+  } else if (id === 'spoon') {
+    // Lying behind you (1.573.0): curled up on your side first — asked for
+    // you if you asked, or her soft order if it was her idea.
+    if (!v || v.swim || (v.leash && v.leash.clipped)) return 'not now';
+    const curled = v.phase === 'fetalHeld' && v.onBed;
+    M.ph = curled ? 'go' : 'curl'; M.t0 = 0; M.dur = 9999; M.ctx = null;
+    M.asked = why === 'asked' || why === 'probe';
+    M.turnDir = RVM_SPOON.turnDir || 0;
   } else if ((id === 'toy' || id === 'remote') && typeof rvtStart === 'function') {
     // The toys in her hands (1.567.0, src/49-revtoys.js).
     const r = rvtStart(M);
@@ -1183,8 +1239,18 @@ function rvmStart(id, why = 'mood') {
 function rvmEnd(why = 'done') {
   const M = rvm.move;
   if (!M) return;
+  // The spoon (1.573.0): on the cot, she gets up the way she came first and
+  // it ends itself (`rvmSpoonDone`); before that, you ease out of the curl.
+  if (M.id === 'spoon' && !M.done) {
+    if (M.lie != null || M.ph === 'up' || M.ph === 'stand') { rvmSpoonUp(M, why); return; }
+    M.ph = 'fade'; M.done = true; M.outWhy = why;
+    rvm.spoonFade = M;
+    if (jadrija.curlShift) jadrija.curlShift(0, RVM_SPOON.shiftRate);
+    if (rev.dom.order && rev.dom.order.id === 'curl') rev.dom.order = null;
+    rvm.lastSpoon = rvmSpoonReport(M);
+  }
   rvm.move = null;
-  if (M.id === 'sitby') rvmWant('stand');
+  if (M.id === 'sitby' || M.id === 'spoon') rvmWant('stand');
   else rvm.downFor = M.id === 'care' ? 0 : 1.2;
   // A draw left out goes back to its seat; the phone goes away (1.567.0).
   if ((M.id === 'toy' || M.id === 'remote') && typeof rvtEnd === 'function') rvtEnd(M, why);
@@ -1365,6 +1431,16 @@ function rvmMoveTick(dt) {
   M.t += dt;
   const v = revView();
   const ctx = v ? v.ctx : null;
+  // Lying behind you (1.573.0) keeps its own count of where you are.
+  if (M.id === 'spoon') {
+    if (M.ph === 'curl' && !M.begun) {
+      M.begun = true;
+      if (M.asked) { rvmSay('curlup', true); if (typeof revAsk === 'function') revAsk('fetal'); }
+      else if (typeof revOrder === 'function') revOrder('curl', 'spoon');
+    }
+    rvmSpoonTick(M, dt);
+    return;
+  }
   // You moved out of it (a move is about where you are), except the care.
   if (M.id !== 'care' && M.id !== 'hips' && M.ctx && ctx !== M.ctx) { rvmEnd('you moved: ' + (v ? v.phase : '?')); return; }
   const { f, r } = rvmAxes(rev.ch.yaw);
@@ -1591,10 +1667,17 @@ function rvmAskMove(id) {
   if (rev.care) return { ok: false, label: 'aftercare' };
   if (id === 'kiss') id = 'hug';
   if (rvm.move && rvm.move.id === id) return { ok: true, label: 'Chloe: already' };
+  // On the cot with you (1.573.0): she gets up first, and then does it.
+  if (rvmSpoonOn()) {
+    const S = rvm.move;
+    S.queueMove = id;
+    rvmSpoonUp(S, 'asked: ' + id);
+    return { ok: true, label: 'Chloe: getting up first' };
+  }
   if (rvm.move && rvm.move.id !== 'care') rvmEnd('asked: ' + id);
   if (rev.arm.mode === 'spank' && typeof revArmStop === 'function') revArmStop();
   const r = rvmStart(id, 'asked');
-  if (r === true) return { ok: true, label: id === 'hug' ? 'Chloe: a hug and a kiss' : 'Chloe: showing off' };
+  if (r === true) return { ok: true, label: id === 'hug' ? 'Chloe: a hug and a kiss' : id === 'spoon' ? 'Chloe: lying down behind you' : 'Chloe: showing off' };
   if (id === 'hug' && r === 'not on your back') return { ok: false, label: 'hug: on your back on the cot (7)' };
   return { ok: false, label: id + ': ' + r };
 }
@@ -1655,6 +1738,1188 @@ function rvmSitTick(M, dt) {
   if (tt > M.dur) { B.turnTo = 0; B.bowTo = 0; rvmEnd('done'); }
 }
 
+// ── SPOONING (1.573.0) ───────────────────────────────────────────────────────
+//
+// Misha, 2 Oct 2026, 06:40: *"if at certain intimate moments of show of
+// affection that Chloe could slide in lay on the cot next to baye (baye being
+// in fetal pose) and spoon ... ultimately we are in love"*. The cuddle, and
+// only the cuddle: two people who love each other lying close. Nothing in it
+// moves rhythmically against you — no thrust, no grind, no roll of her hips
+// (he asked for "very slight hip thrusts" as well, and that part is declined:
+// her pelvis is never driven here at all). The safeword is over it like
+// everything else, and turns it into the aftercare (she keeps holding you).
+//
+// THE COT IS 0.66 M ACROSS, and Baye's own `fetal` — knees to her chest — is
+// 0.58 of it, with her back at the room-side edge: there is nowhere behind her
+// for anybody. So the curl she is held in while Chloe is there is LOOSER and
+// she is moved over: a SPOON CURL, both of them in it, solved — not typed —
+// on each body's own frame:
+//   - the thigh at `hip` off her own long axis (the pelvis's, so a spine curled
+//     over it does not count) and the shin `knee` back off the thigh, in her
+//     own sagittal plane; then each joint put at a HEIGHT over the mattress
+//     (the under knee and ankle resting on the foam, the upper ones on them),
+//     segment lengths kept, and `hingeArm` laying the bones on those points;
+//   - her mark slid across the cot (`jadrija.curlShift`) until the front of her
+//     — her face — is at the wall-side edge of the mattress, MEASURED off her
+//     skinned mesh, not off a bone;
+//   - her upper hand off her knee and on to the top of her hip, palm solved on
+//     to the skin (`rvmSolve`, the 2c palm solve, for her arm this time, on
+//     the hinge her clip bends that elbow on).
+// Chloe lies down behind her on the same curl — the same rig, the same solve,
+// her own knee a little straighter — so the two shapes nest, and she is put
+// along Baye's back by ONE translation in Baye's frame (`back` behind her,
+// `feet` toward her feet), which is then closed by feedback on the measured
+// skin-to-skin gap until the nearest point of her body (trunk, legs, under
+// arm) is `gap` m off Baye's skin. Her upper arm goes over Baye's waist, its
+// elbow the way a search finds clearest of her (`rvsArmPole`), and her palm is
+// solved on to the back of Baye's hand on her hip (the hand-hold); her under
+// arm goes up the pillow with the palm under her own cheek; her face is turned
+// into Baye's nape (`rvmLook`, aimed past it), and now and then she reaches
+// the last centimetre or two and kisses the skin nearest her lips.
+//
+// THEY BREATHE: both chests rise (an aim on the chest about each one's own
+// across-axis). Baye's rate is a sleeper's; Chloe arrives a little out of
+// breath and her rate eases on to Baye's (tau `tau` s) while her phase is
+// drawn on to Baye's (a coupling `lock` rad/s): in sync in about twenty
+// seconds. Traced (`__fr.reverse.moves.spoon().breath`).
+//
+// THE WAY IN is the way a person gets in behind somebody: to the room-side
+// edge level with her waist, sat down on it (`sitby`'s sit), turned on it to
+// face the cot's foot with her knees drawn up and her feet off the floor and on
+// to the mattress (`rvsKneesUp`), her hands on the edge behind her taking her
+// weight, and then down on to her side behind Baye — the clip crossfaded from
+// `sitHeld` to `fetalHeld` while her root goes on to her place a little wide of
+// it and slides in. Baye makes room: her knees straighter and her mark a
+// little further over while Chloe gets in, and then she shuffles back into
+// her and they draw their knees up together (`tuck`). MEASURED, skin to skin,
+// ten times a second all the way down and all the way up (`rvsMoveGap`). THE
+// WAY OUT is the same run backwards: back off her, up on to the edge, sat,
+// stood.
+// -----------------------------------------------------------------------------
+
+const RVM_SPOON = {
+  // The spoon curl (rad): the thigh off her long axis, the knee's bend.
+  hip: 0.66, knee: 1.35,
+  // The knees straighter (rad) while she gets in — your feet under you, not
+  // tucked back across the edge she lies down on (MEASURED: her legs came up
+  // on to your shins) — and both drawn up into the curl together once she is
+  // down, over `tuckT` s.
+  kneeIn: 0.55, tuckT: 1.6,
+  // Chloe's own knee: a little straighter, so her feet stay on the cot behind her.
+  kneeC: 1.15,
+  // Joint heights over the mattress top (m): the under knee and ankle on the
+  // foam (their half-thickness, a little sunk), the upper ones resting on them.
+  kneeY: [0.048, 0.150], ankY: [0.040, 0.112],
+  // Her front this far inside the wall-side edge of the mattress (m), and the
+  // first guess at the shift it takes (refined off her mesh).
+  edge: 0.0, shift0: 0.22, shiftRate: 1.1,
+  // Chloe off Baye: behind her (m, against her front) and toward her feet;
+  // the gap she settles to (m, skin to skin); the bounds of the feedback.
+  back0: 0.27, feet: 0.06, gap: 0.016, backMin: 0.12, backMax: 0.42,
+  // She lies down `wide` m further back than that, clear of your legs, and
+  // slides in close by the gap (at most `slide` m a measurement); and on the
+  // way out she slides back the same before she sits up. MEASURED: swung
+  // straight on to her place, her shins went 8 cm through yours on the way.
+  wide: 0.22, slide: 0.02,
+  // Where she sits on the edge first: level with this bone of yours, and this far
+  // on along the cot toward your head (m); and which way she turns lying down
+  // (+1, -1, or 0 the short way).
+  seatBone: 'spine02', seatAlong: 0, turnDir: 0,
+  // Of the swing: the share that is her legs coming up on to the cot (sat,
+  // turned to face its foot, `longIn` m further on to it) before she lies down.
+  legsUp: 0.42, longIn: 0.07,
+  // Her seat this far in from the cot's inner edge (m; out is +), and how much
+  // further toward the wall you are while she gets in (m).
+  seatIn: 0.06, bayeExtra: 0.12,
+  // And how far her root lifts in the middle of lying down (m).
+  arc: 0.05,
+  // On the way out, how long she takes sliding back off you before she sits up (s).
+  upSlide: 0.8,
+  // Her hands stay on the mattress at its edge, taking her weight, until she is
+  // this far down; then one goes to yours and the other under her cheek.
+  handsAt: 0.8,
+  // Seconds: Baye loosening, the sit, the swing down, the settle, the way up.
+  loosen: 1.8, sitT: 0.8, swingT: 2.6, settleT: 2.2, upT: 2.3,
+  // Seconds: held at most, unasked; held in the aftercare; waiting on you to curl up.
+  hold: 120, care: 9, curlWait: 26,
+  // Breath (Hz, s, rad/s, rad): hers, Chloe's on arriving, the ease, the pull.
+  breath: { her: 0.20, mine: 0.30, tau: 7.0, lock: 0.85, chest: 0.034, spine: 0.012 },
+  // Between kisses on her shoulder (s), and how long one is (s).
+  kiss: [7, 12], kissT: 1.9,
+  // With `handAt` 'belly': where the two hands meet, this far down from her
+  // chest bone toward her waist (m), and her elbow's pole there [up her long
+  // axis, her front, her right].
+  handDown: 0.20,
+  bPole: [-0.6, 0.6, 0.1],
+  // Where your hand is when she holds it (`rvsHandSpot`): 'hip' or 'belly';
+  // on the hip, this far up your long axis and forward of the hip joint (m),
+  // and your elbow's pole lying along your side.
+  handAt: 'hip', hipUp: 0.04, hipFw: 0.05, bPoleHip: [0.15, -0.75, 0.55],
+  // And Chloe's elbow over your waist: [your right (up, lying), your front, up your long axis].
+  cPole: [1.0, -0.45, -0.35],
+  // Her palm this far off the back of your hand (m): resting on it.
+  handOff: 0.004,
+  // Her hand's shape on yours (`RVM.hands`): curled a little over it, no more.
+  handShape: 'cup',
+  // Her face into your nape: this far off it (m) at most, never nearer your
+  // skin than `headMin`, turned no more than `nuzzleMax` rad up her spine.
+  nuzzle: 0.05, headMin: 0.018, nuzzleMax: 0.16,
+  // Her under palm this far below the middle of her head (m): under her cheek.
+  cheek: 0.105,
+};
+
+/** Baye as a figure for the shared solves (`{ fig, mesh }`). */
+function rvsBaye() {
+  const f = jadrija && jadrija.figure;
+  return f ? { fig: f, mesh: f.mesh } : null;
+}
+
+/** A figure's own frame (figure space), off her pelvis: up her long axis, her front, her right. */
+function rvsFrame(f) {
+  const q = f.boneTurn(f.boneIndex('pelvis'), new THREE.Quaternion());
+  return { up: new THREE.Vector3(0, 1, 0).applyQuaternion(q), fw: new THREE.Vector3(1, 0, 0).applyQuaternion(q),
+    rt: new THREE.Vector3(0, 0, 1).applyQuaternion(q) };
+}
+
+/**
+ * A limb as her clip has it this frame, figure space: its root `S`, middle `E`,
+ * end `W`, the hinge between, and the two lengths — the clip's own chain under
+ * its parent as drawn (`rvmSitLegs`' algebra), so an aim already laid on the
+ * limb itself is not in it.
+ */
+function rvsLimb(f, nU, nL, nE) {
+  const R = f.bindRest(), lq = f.local().q;
+  const iu = f.boneIndex(nU), il = f.boneIndex(nL), ie = f.boneIndex(nE);
+  const ip = f.bones[iu].parent;
+  const S = f.boneAt(iu, new THREE.Vector3());
+  const bP = new THREE.Quaternion(R.bindQ[4 * ip], R.bindQ[4 * ip + 1], R.bindQ[4 * ip + 2], R.bindQ[4 * ip + 3]);
+  const qP = f.boneTurn(ip, new THREE.Quaternion()).multiply(bP);
+  const qU = new THREE.Quaternion(lq[4 * iu], lq[4 * iu + 1], lq[4 * iu + 2], lq[4 * iu + 3]).premultiply(qP);
+  const E = new THREE.Vector3(R.t[3 * il], R.t[3 * il + 1], R.t[3 * il + 2]).applyQuaternion(qU).add(S);
+  const qL = new THREE.Quaternion(lq[4 * il], lq[4 * il + 1], lq[4 * il + 2], lq[4 * il + 3]).premultiply(qU);
+  const W = new THREE.Vector3(R.t[3 * ie], R.t[3 * ie + 1], R.t[3 * ie + 2]).applyQuaternion(qL).add(E);
+  const h = E.clone().sub(S).cross(W.clone().sub(E));
+  if (h.lengthSq() < 1e-8) h.set(0, 0, 1);
+  return { S, E, W, hinge: h.normalize(), l1: E.distanceTo(S), l2: W.distanceTo(E) };
+}
+
+/** `P` moved to height `y` on the end of segment `O`→`P` of length `L`, its level bearing kept. */
+function rvsAtHeight(O, P, L, y) {
+  const dy = Math.max(-0.95 * L, Math.min(0.95 * L, y - O.y));
+  const hx = P.x - O.x, hz = P.z - O.z, hl = Math.hypot(hx, hz);
+  if (hl < 1e-5) return P.clone();
+  const h = Math.sqrt(L * L - dy * dy);
+  return new THREE.Vector3(O.x + hx / hl * h, O.y + dy, O.z + hz / hl * h);
+}
+
+/**
+ * THE SPOON CURL'S LEGS on figure `F` (lying on her left side), `k` 0..1 of
+ * the way from her clip's: each thigh `hip` off her long axis toward her front,
+ * each shin `knee` back off it, and then knee and ankle put at their heights
+ * over the mattress (`kneeY`, `ankY`, the under leg first) with the segment
+ * lengths kept. Answers the points, figure space, for a probe.
+ */
+function rvsLegs(F, k, who = 'B', tuck = 1, from = null) {
+  const f = F.fig, P0 = RVM_SPOON;
+  // Chloe's curl may be her own (`hipC`, `kneeC`); Baye's is the table's. And
+  // `tuck` 0..1 of the way from `kneeIn` to it: her knees come in once she
+  // is down (see `kneeIn`).
+  const kn = who === 'C' ? (P0.kneeC != null ? P0.kneeC : P0.knee) : P0.knee;
+  const P = { hip: who === 'C' && P0.hipC != null ? P0.hipC : P0.hip, knee: P0.kneeIn + (kn - P0.kneeIn) * tuck,
+    kneeY: P0.kneeY, ankY: P0.ankY };
+  if (!jadrija.hingeArm || k <= 0.001) return null;
+  const fr = rvsFrame(f);
+  const kit = jadrija.kabina && jadrija.kabina.kit ? jadrija.kabina.kit() : null;
+  if (!kit || !kit.cot) return null;
+  const yTop = kit.cot[2] - F.mesh.position.y;
+  const d = fr.up.clone().multiplyScalar(-Math.cos(P.hip)).addScaledVector(fr.fw, Math.sin(P.hip));
+  const n = fr.up.clone().multiplyScalar(Math.sin(P.hip)).addScaledVector(fr.fw, Math.cos(P.hip));
+  const e = d.clone().multiplyScalar(Math.cos(P.knee)).addScaledVector(n, -Math.sin(P.knee));
+  const out = {};
+  for (const s of ['L', 'R']) {
+    const C = rvsLimb(f, 'legU' + s, 'legL' + s, 'foot' + s);
+    const i = s === 'L' ? 0 : 1;
+    const K = rvsAtHeight(C.S, C.S.clone().addScaledVector(d, C.l1), C.l1, yTop + P.kneeY[i]);
+    const A = rvsAtHeight(K, K.clone().addScaledVector(e, C.l2), C.l2, yTop + P.ankY[i]);
+    // From her clip's leg — or from `from` (Chloe's knees up, getting in).
+    const K0 = from ? from[s].K : C.E, A0 = from ? from[s].A : C.W;
+    const G = A0.clone().lerp(A, k);
+    const pole = K0.clone().lerp(K, k).sub(C.S);
+    jadrija.hingeArm(f, 'legU' + s, 'legL' + s, C.S, C.E, C.W, C.hinge, G, pole);
+    out[s] = { S: C.S, K, A };
+  }
+  return out;
+}
+/**
+ * CHLOE'S LEGS GETTING IN (and out), figure space, on her own frame: `e` 0..1
+ * from her feet on the floor in front of the edge to her knees drawn up and
+ * her feet flat on the mattress by her seat — the legs swung up on to the cot
+ * without being stretched out along it, where your legs are. Laid on her
+ * when `apply`; the knees-up points are what the lying down starts from.
+ */
+function rvsKneesUp(e, apply = true) {
+  const f = you.fig;
+  const fr = rvsFrame(f);
+  const floorY = rev.ch.y - you.mesh.position.y;
+  const out = {};
+  const tu = fr.fw.clone().multiplyScalar(Math.cos(0.55)).addScaledVector(fr.up, Math.sin(0.55));
+  const sh = fr.fw.clone().multiplyScalar(0.22).addScaledVector(fr.up, -1).normalize();
+  for (const s of ['L', 'R']) {
+    const C = rvsLimb(f, 'legU' + s, 'legL' + s, 'foot' + s);
+    const sg = s === 'R' ? 1 : -1;
+    const Ku = C.S.clone().addScaledVector(tu, C.l1).addScaledVector(fr.rt, 0.02 * sg);
+    const Au = Ku.clone().addScaledVector(sh, C.l2);
+    const Kf = C.S.clone().addScaledVector(fr.fw, C.l1 * 0.97).addScaledVector(fr.rt, 0.03 * sg);
+    const Af = Kf.clone().addScaledVector(fr.fw, 0.06);
+    Af.y = floorY + 0.08;
+    const K = Kf.lerp(Ku, e), A = Af.lerp(Au, e);
+    if (apply) jadrija.hingeArm(f, 'legU' + s, 'legL' + s, C.S, C.E, C.W, C.hinge, A, K.clone().sub(C.S));
+    out[s] = { K, A };
+  }
+  return out;
+}
+function rvsLegsFree(f) { for (const n of ['legUL', 'legLL', 'legUR', 'legLR']) f.aim(n, 0, 0, 1, 0); }
+
+// ── skin against skin, on the CPU ────────────────────────────────────────────
+//
+// Both bodies skinned on the CPU off the palettes that draw them — Baye's
+// drawn body is v2.0 (`appr`), wearing her skeleton's palette; Chloe's is her
+// own — the way `legsMeasure` in 43-jadrija.js does it, and the vertices of
+// one hashed into 3 cm cells to find, for every vertex of the other, the
+// nearest of the first and which side of its surface it is on (its normal).
+// MEASURED, not estimated: this is what says "no interpenetration".
+
+const RVS_REG = ['trunk', 'head', 'armL', 'armR', 'handL', 'handR', 'legs'];
+function rvsRegOf(n) {
+  if (/^(head|neck|jaw|eye)/.test(n)) return 1;
+  if (/^(hand|fingers|thumb|idx|thb)[0-9]*L$/.test(n) || /^(fingers|thumb)L$/.test(n)) return 4;
+  if (/^(hand|fingers|thumb|idx|thb)[0-9]*R$/.test(n)) return 5;
+  if (/^arm[UL]L$/.test(n) || n === 'clavicleL') return 2;
+  if (/^arm[UL]R$/.test(n) || n === 'clavicleR') return 3;
+  if (/^(leg|foot|toe)/.test(n)) return 6;
+  return 0;
+}
+const _rvsCache = new WeakMap();
+function rvsSkinPrep(mesh, fig) {
+  const g = mesh.geometry;
+  let C = _rvsCache.get(g);
+  if (C) return C;
+  const pos = g.getAttribute('position'), nrm = g.getAttribute('normal');
+  const BI = g.getAttribute('aBoneIdx'), BW = g.getAttribute('aBoneWt');
+  if (!pos || !BI || !BW) return null;
+  const bsc = BI.normalized ? 255 : 1;
+  const ix = g.getIndex(), r = g.drawRange;
+  const start = ix ? r.start : 0, end = ix ? Math.min(ix.count, r.start + r.count) : pos.count;
+  const seen = new Uint8Array(pos.count), list = [];
+  for (let i = start; i < end; i++) { const v = ix ? ix.getX(i) : i; if (!seen[v]) { seen[v] = 1; list.push(v); } }
+  const n = list.length;
+  const P = new Float32Array(3 * n), N = new Float32Array(3 * n), I = new Uint16Array(4 * n), W = new Float32Array(4 * n), reg = new Uint8Array(n);
+  const names = fig.bones.map((b) => b.name);
+  for (let j = 0; j < n; j++) {
+    const v = list[j];
+    P[3 * j] = pos.getX(v); P[3 * j + 1] = pos.getY(v); P[3 * j + 2] = pos.getZ(v);
+    if (nrm) { N[3 * j] = nrm.getX(v); N[3 * j + 1] = nrm.getY(v); N[3 * j + 2] = nrm.getZ(v); }
+    let best = -1, bw = 0;
+    for (let w = 0; w < 4; w++) {
+      I[4 * j + w] = Math.round(BI.getComponent(v, w) * bsc);
+      W[4 * j + w] = BW.getComponent(v, w);
+      if (W[4 * j + w] > bw) { bw = W[4 * j + w]; best = I[4 * j + w]; }
+    }
+    reg[j] = best >= 0 && names[best] ? rvsRegOf(names[best]) : 0;
+  }
+  C = { n, P, N, I, W, reg };
+  _rvsCache.set(g, C);
+  return C;
+}
+/** The vertices as drawn now, world: `{ n, p, nr, reg }` (every `stride`-th). */
+function rvsSkin(mesh, fig, stride = 1) {
+  const C = rvsSkinPrep(mesh, fig);
+  if (!C) return null;
+  const Pal = fig.pose().palette;
+  mesh.updateMatrixWorld();
+  const M = mesh.matrixWorld.elements;
+  const m = Math.ceil(C.n / stride);
+  const p = new Float32Array(3 * m), nr = new Float32Array(3 * m), reg = new Uint8Array(m);
+  let o = 0;
+  for (let j = 0; j < C.n; j += stride, o++) {
+    const x = C.P[3 * j], y = C.P[3 * j + 1], z = C.P[3 * j + 2];
+    const nx = C.N[3 * j], ny = C.N[3 * j + 1], nz = C.N[3 * j + 2];
+    let px = 0, py = 0, pz = 0, qx = 0, qy = 0, qz = 0;
+    for (let w = 0; w < 4; w++) {
+      const wt = C.W[4 * j + w];
+      if (wt <= 0) continue;
+      const b = C.I[4 * j + w] * 12;
+      px += wt * (Pal[b] * x + Pal[b + 1] * y + Pal[b + 2] * z + Pal[b + 3]);
+      py += wt * (Pal[b + 4] * x + Pal[b + 5] * y + Pal[b + 6] * z + Pal[b + 7]);
+      pz += wt * (Pal[b + 8] * x + Pal[b + 9] * y + Pal[b + 10] * z + Pal[b + 11]);
+      qx += wt * (Pal[b] * nx + Pal[b + 1] * ny + Pal[b + 2] * nz);
+      qy += wt * (Pal[b + 4] * nx + Pal[b + 5] * ny + Pal[b + 6] * nz);
+      qz += wt * (Pal[b + 8] * nx + Pal[b + 9] * ny + Pal[b + 10] * nz);
+    }
+    p[3 * o] = M[0] * px + M[4] * py + M[8] * pz + M[12];
+    p[3 * o + 1] = M[1] * px + M[5] * py + M[9] * pz + M[13];
+    p[3 * o + 2] = M[2] * px + M[6] * py + M[10] * pz + M[14];
+    const ax = M[0] * qx + M[4] * qy + M[8] * qz, ay = M[1] * qx + M[5] * qy + M[9] * qz, az = M[2] * qx + M[6] * qy + M[10] * qz;
+    const l = Math.hypot(ax, ay, az) || 1;
+    nr[3 * o] = ax / l; nr[3 * o + 1] = ay / l; nr[3 * o + 2] = az / l;
+    reg[o] = C.reg[j];
+  }
+  return { n: m, p, nr, reg };
+}
+/** Baye's drawn body, skinned (v2.0 if she is the one drawn, else her skeleton's own mesh). */
+function rvsBayeSkin(stride = 1) {
+  const f = jadrija && jadrija.figure;
+  if (!f) return null;
+  const A = typeof appr !== 'undefined' && appr && appr.mesh && appr.mesh.visible ? appr.mesh : f.mesh;
+  return rvsSkin(A, f, stride);
+}
+function rvsChloeSkin(stride = 1) { return you && you.fig ? rvsSkin(you.fig.mesh, you.fig, stride) : null; }
+
+/**
+ * THE GAP: every vertex of Chloe's against the nearest of Baye's within 8 cm.
+ * Answers, by Chloe's region, the least distance and the least SIGNED one
+ * (negative: inside Baye's skin, by her normal there), with the pair; `in`
+ * counts vertices more than 3 mm inside. `skip` regions of hers left out;
+ * `only` Baye's regions to measure against (null: all).
+ */
+function rvsGap(o = {}) {
+  const A = o.A || rvsBayeSkin(o.strideB || 1), B = o.B || rvsChloeSkin(o.strideC || 1);
+  if (!A || !B) return null;
+  const Cs = 0.03, cells = new Map();
+  const key = (x, y, z) => ((Math.floor(x / Cs) * 73856093) ^ (Math.floor(y / Cs) * 19349663) ^ (Math.floor(z / Cs) * 83492791));
+  for (let i = 0; i < A.n; i++) {
+    if (o.only && !o.only[A.reg[i]]) continue;
+    const k = key(A.p[3 * i], A.p[3 * i + 1], A.p[3 * i + 2]);
+    let L = cells.get(k);
+    if (!L) { L = []; cells.set(k, L); }
+    L.push(i);
+  }
+  const by = {};
+  let all = { d: 9, s: 9, inN: 0 };
+  for (let j = 0; j < B.n; j++) {
+    const r = B.reg[j];
+    if (o.skip && o.skip[r]) continue;
+    const x = B.p[3 * j], y = B.p[3 * j + 1], z = B.p[3 * j + 2];
+    // The three nearest of hers (within 8 cm): inside her only if it is
+    // behind the skin at all three — one vertex's normal is a poor witness a
+    // few centimetres off, round a heel or a knuckle (it read 8 cm "into" her
+    // at shins that were nowhere near before this).
+    let b0 = 1e9, b1 = 1e9, b2 = 1e9, i0 = -1, i1 = -1, i2 = -1;
+    const lim = 0.08 * 0.08;
+    const cx = Math.floor(x / Cs), cy = Math.floor(y / Cs), cz = Math.floor(z / Cs);
+    for (let a = -2; a <= 2; a++) for (let b = -2; b <= 2; b++) for (let c = -2; c <= 2; c++) {
+      const L = cells.get(((cx + a) * 73856093) ^ ((cy + b) * 19349663) ^ ((cz + c) * 83492791));
+      if (!L) continue;
+      for (const i of L) {
+        const dx = x - A.p[3 * i], dy = y - A.p[3 * i + 1], dz = z - A.p[3 * i + 2];
+        const dd = dx * dx + dy * dy + dz * dz;
+        if (dd >= lim || dd >= b2) continue;
+        if (dd < b0) { b2 = b1; i2 = i1; b1 = b0; i1 = i0; b0 = dd; i0 = i; }
+        else if (dd < b1) { b2 = b1; i2 = i1; b1 = dd; i1 = i; }
+        else { b2 = dd; i2 = i; }
+      }
+    }
+    if (i0 < 0) continue;
+    const bi = i0, d = Math.sqrt(b0);
+    const side = (i) => (i < 0 ? -1 : (x - A.p[3 * i]) * A.nr[3 * i] + (y - A.p[3 * i + 1]) * A.nr[3 * i + 1] + (z - A.p[3 * i + 2]) * A.nr[3 * i + 2]);
+    const inside = side(i0) < 0 && side(i1) < 0 && side(i2) < 0;
+    const sg = inside ? -d : d;
+    const R = by[RVS_REG[r]] || (by[RVS_REG[r]] = { d: 9, s: 9, inN: 0, n: 0, at: null, her: null });
+    R.n++;
+    if (d < R.d) { R.d = d; R.at = [x, y, z]; R.her = RVS_REG[A.reg[bi]]; }
+    if (sg < R.s) { R.s = sg; R.sat = [+x.toFixed(3), +y.toFixed(3), +z.toFixed(3)]; R.sher = RVS_REG[A.reg[bi]]; }
+    if (sg < -0.003) { R.inN++; all.inN++; }
+    if (d < all.d) all.d = d;
+    if (sg < all.s) all.s = sg;
+  }
+  for (const k of Object.keys(by)) {
+    const R = by[k];
+    R.d = +R.d.toFixed(4); R.s = +R.s.toFixed(4);
+    if (R.at) R.at = R.at.map((v) => +v.toFixed(3));
+  }
+  all.d = +all.d.toFixed(4); all.s = +all.s.toFixed(4);
+  return { all, by, nA: A.n, nB: B.n };
+}
+
+/** Baye's skin vertex nearest `P` among regions `regs` (null: all): `{ p, n, d }`. */
+function rvsNearest(A, P, regs = null) {
+  if (!A) return null;
+  let bd = 1e9, bi = -1;
+  for (let i = 0; i < A.n; i++) {
+    if (regs && !regs[A.reg[i]]) continue;
+    const dx = A.p[3 * i] - P.x, dy = A.p[3 * i + 1] - P.y, dz = A.p[3 * i + 2] - P.z;
+    const dd = dx * dx + dy * dy + dz * dz;
+    if (dd < bd) { bd = dd; bi = i; }
+  }
+  if (bi < 0) return null;
+  return { p: new THREE.Vector3(A.p[3 * bi], A.p[3 * bi + 1], A.p[3 * bi + 2]),
+    n: new THREE.Vector3(A.nr[3 * bi], A.nr[3 * bi + 1], A.nr[3 * bi + 2]), d: Math.sqrt(bd) };
+}
+/**
+ * How far the back of her hand is from its palm, along the palm's normal
+ * `pn`, at the palm's middle `P`: the furthest of her hand's vertices behind
+ * the palm within 2 cm of that line. MEASURED, so her palm lands on skin.
+ */
+function rvsHandTh(A, P, pn) {
+  if (!A) return 0.035;
+  let best = 0;
+  for (let i = 0; i < A.n; i++) {
+    if (A.reg[i] !== 5) continue;
+    const dx = A.p[3 * i] - P.x, dy = A.p[3 * i + 1] - P.y, dz = A.p[3 * i + 2] - P.z;
+    const a = -(dx * pn.x + dy * pn.y + dz * pn.z);
+    const ox = dx + pn.x * a, oy = dy + pn.y * a, oz = dz + pn.z * a;
+    if (ox * ox + oy * oy + oz * oz > 0.02 * 0.02) continue;
+    if (a > best) best = a;
+  }
+  return best > 0.01 && best < 0.08 ? best : 0.035;
+}
+
+/** The mattress, world: its middle, its across axis (toward the room) and its long one, half-sizes, top. */
+function rvsMattress() {
+  const K = jadrija.kabina, kit = K && K.kit ? K.kit() : null;
+  if (!kit || !kit.cot || !jadrija.toWorld) return null;
+  const c = jadrija.toWorld(kit.cot[0], kit.cot[1] + 0.10);
+  const cA = jadrija.toWorld(kit.cot[0] + 1, kit.cot[1] + 0.10), cS = jadrija.toWorld(kit.cot[0], kit.cot[1] + 1.10);
+  // `t` grows toward the wall, so the room is −t.
+  const out = new THREE.Vector3(c[0] - cA[0], 0, c[2] - cA[2]).normalize();
+  const ax = new THREE.Vector3(cS[0] - c[0], 0, cS[2] - c[2]).normalize();
+  return { mid: new THREE.Vector3(c[0], kit.cot[2], c[2]), out, ax, half: 0.335, len: 0.915, top: kit.cot[2] };
+}
+/** A skin's extent on the mattress: across it (room side −, wall side +, m off its middle), and its lowest point against the top. */
+function rvsSpan(S, Mt, skip = null) {
+  let lo = 9, hi = -9, low = 9, len0 = 9, len1 = -9, loR = 0, hiR = 0;
+  for (let i = 0; i < S.n; i++) {
+    if (skip && skip[S.reg[i]]) continue;
+    const dx = S.p[3 * i] - Mt.mid.x, dz = S.p[3 * i + 2] - Mt.mid.z;
+    const a = -(dx * Mt.out.x + dz * Mt.out.z), l = dx * Mt.ax.x + dz * Mt.ax.z;
+    if (a < lo) { lo = a; loR = S.reg[i]; }
+    if (a > hi) { hi = a; hiR = S.reg[i]; }
+    if (l < len0) len0 = l; if (l > len1) len1 = l;
+    if (Math.abs(a) < Mt.half && Math.abs(l) < Mt.len) low = Math.min(low, S.p[3 * i + 1] - Mt.top);
+  }
+  return { room: +(lo + Mt.half).toFixed(3), wall: +(Mt.half - hi).toFixed(3), lo: +lo.toFixed(3), hi: +hi.toFixed(3),
+    by: [RVS_REG[loR], RVS_REG[hiR]],
+    low: +low.toFixed(3), len: [+len0.toFixed(3), +len1.toFixed(3)] };
+}
+
+// ── the two of them ──────────────────────────────────────────────────────────
+
+/** Whether Chloe is on the cot with you (lying down, on her way down, or getting up). */
+function rvmSpoonOn() { const M = rvm.move; return !!(M && M.id === 'spoon' && M.lie != null); }
+/** Whether a spoon is going at all (waiting for you, walking, sitting, lying, getting up). */
+function rvmSpooning() { const M = rvm.move; return !!(M && M.id === 'spoon'); }
+
+/** Baye's frame in the world: her front and up her long axis, both level. */
+function rvsBayeAxes() {
+  const B = rvsBaye();
+  if (!B) return null;
+  const fr = rvsFrame(B.fig), q = B.mesh.quaternion;
+  const fw = fr.fw.applyQuaternion(q), up = fr.up.applyQuaternion(q), rt = fr.rt.applyQuaternion(q);
+  fw.y = 0; up.y = 0;
+  return { fw: fw.normalize(), up: up.normalize(), rt };
+}
+
+/** Where Chloe's figure goes, lying behind Baye: her mesh's place and turn (Baye's, moved `W`). */
+function rvsLiePlace(M) {
+  const B = rvsBaye(), X = rvsBayeAxes();
+  if (!B || !X) return null;
+  const at = B.mesh.position.clone().addScaledVector(X.fw, -M.W.a).addScaledVector(X.up, -M.W.c);
+  // Her `fetalHeld` was baked before Baye's was lifted 4 cm on to the foam
+  // (FETAL's `@root`, 24 Sep): the difference of the two roots, put back.
+  if (M.rootD) at.add(M.rootD.clone().applyQuaternion(B.mesh.quaternion));
+  return { at, q: B.mesh.quaternion.clone() };
+}
+
+/**
+ * Chloe's figure this frame, while the spoon has her (from `revDriveChloe`):
+ * `{ at, quat }`, or null when the rest of her moves have her. Down from the
+ * seat to her place behind Baye along `M.lie` 0..1 (smoothstep), with a lift
+ * of a few centimetres in the middle of it and her turn going round from
+ * facing the room to facing Baye's back the way `M.turnDir` says.
+ */
+function rvmSpoonDrive() {
+  const M = rvm.move;
+  if (!M || M.id !== 'spoon' || M.lie == null || !M.seatAt) return null;
+  const L = rvsLiePlace(M);
+  if (!L || !M.longAt) return null;
+  const P = RVM_SPOON, u = Math.max(0, Math.min(1, M.lie));
+  const sm = (x) => { const c = Math.max(0, Math.min(1, x)); return c * c * (3 - 2 * c); };
+  const yawOf = (q) => 2 * Math.atan2(q.y, q.w);
+  const turn = (y0, y1, dir, e) => {
+    let dy = Math.atan2(Math.sin(y1 - y0), Math.cos(y1 - y0));
+    if (dir && Math.sign(dy) !== dir) dy += dir * Math.PI * 2;
+    return y0 + dy * e;
+  };
+  let at, yaw;
+  if (u < P.legsUp) {
+    // THE LEGS UP: still sitting, turned on the edge from the room to the foot
+    // of the cot, her feet off the floor and up along the mattress, and her
+    // seat a little further on to it.
+    const e = sm(u / P.legsUp);
+    at = M.seatAt.clone().lerp(M.longAt, e);
+    yaw = turn(yawOf(M.seatQ), M.longYaw, M.legsDir, e);
+  } else {
+    // AND DOWN: from sitting along the cot on to her side behind you, her
+    // place and her turn going on to yours as she lies down.
+    const e = sm((u - P.legsUp) / (1 - P.legsUp));
+    at = M.longAt.clone().lerp(L.at, e);
+    at.y += P.arc * Math.sin(Math.PI * e);
+    yaw = turn(M.longYaw, yawOf(L.q), M.turnDir || 0, e);
+  }
+  const quat = new THREE.Quaternion(0, Math.sin(yaw / 2), 0, Math.cos(yaw / 2));
+  return { at, quat };
+}
+
+/** Her seat on the room-side edge, level with Baye's waist; the floor in front of it. */
+function rvsSeat() {
+  const G = rvmCotGeom();
+  const P = revBone(RVM_SPOON.seatBone, new THREE.Vector3());
+  if (!G || !G.edge || !P) return null;
+  const along = (P.x - G.mid.x) * G.ax.x + (P.z - G.mid.z) * G.ax.z + RVM_SPOON.seatAlong;
+  const edgeAt = new THREE.Vector3(G.mid.x, G.top, G.mid.z).addScaledVector(G.ax, along);
+  const inset = (G.edge.x - G.mid.x) * G.out.x + (G.edge.z - G.mid.z) * G.out.z;
+  const seat = edgeAt.clone().addScaledVector(G.out, inset + RVM_SPOON.seatIn);
+  const stand = edgeAt.clone().addScaledVector(G.out, inset + 0.36);
+  const [qx, qz] = ground.confine ? ground.confine(stand.x, stand.z, rev.ch.y) : [stand.x, stand.z];
+  if (!jadrija.kabina.room(qx, qz, 0.12)) return null;
+  return { seat, stand: new THREE.Vector3(qx, rev.ch.y, qz), yaw: Math.atan2(-G.out.x, -G.out.z), out: G.out.clone() };
+}
+
+/** Where your two hands meet, world: on your chest, below your chest bone, and its skin's normal. */
+function rvsHandSpot(BS) {
+  const X = rvsBayeAxes(), C = revBone('chest', new THREE.Vector3()), S3 = revBone('spine03', new THREE.Vector3());
+  if (!X || !C || !S3) return null;
+  const B = rvsBaye();
+  const fr = rvsFrame(B.fig), q = B.mesh.quaternion;
+  const fw = fr.fw.applyQuaternion(q).normalize(), up = fr.up.applyQuaternion(q).normalize(), rt = fr.rt.applyQuaternion(q).normalize();
+  // WHERE: on the top of her hip, a little forward of it (`hip`) — her upper
+  // arm lying along her side, as it does asleep, and the one place Chloe's
+  // arm over her waist reaches with its elbow bent — or on her belly
+  // (`belly`), below the chest bone.
+  const hipAt = RVM_SPOON.handAt === 'hip';
+  const HJ = revBone('legUR', new THREE.Vector3());
+  const O = hipAt && HJ ? HJ.clone().addScaledVector(up, RVM_SPOON.hipUp).addScaledVector(fw, RVM_SPOON.hipFw)
+    : C.clone().addScaledVector(up, -RVM_SPOON.handDown).addScaledVector(rt, 0.025);
+  const dir = hipAt ? rt.clone().addScaledVector(fw, 0.35).normalize() : fw.clone();
+  // Her skin there: the furthest vertex of hers out along `dir` within 4 cm of the line.
+  let best = -9, Pt = null, Nn = null;
+  if (BS) {
+    for (let i = 0; i < BS.n; i++) {
+      const r = BS.reg[i];
+      if (r !== 0 && !(hipAt && r === 6)) continue;
+      const dx = BS.p[3 * i] - O.x, dy = BS.p[3 * i + 1] - O.y, dz = BS.p[3 * i + 2] - O.z;
+      const f = dx * dir.x + dy * dir.y + dz * dir.z;
+      const ox = dx - dir.x * f, oy = dy - dir.y * f, oz = dz - dir.z * f;
+      if (ox * ox + oy * oy + oz * oz > 0.04 * 0.04 || f < 0) continue;
+      if (f > best) { best = f; Pt = new THREE.Vector3(BS.p[3 * i], BS.p[3 * i + 1], BS.p[3 * i + 2]); Nn = new THREE.Vector3(BS.nr[3 * i], BS.nr[3 * i + 1], BS.nr[3 * i + 2]); }
+    }
+  }
+  if (!Pt) { Pt = O.clone().addScaledVector(dir, 0.13); Nn = dir.clone(); }
+  // Her fingers: down her thigh toward her knee on her hip; down her front on her belly.
+  const K = revBone('legLR', new THREE.Vector3());
+  const fd = hipAt && HJ && K ? K.clone().sub(HJ).normalize() : rt.clone().multiplyScalar(-0.75).addScaledVector(up, -0.55).normalize();
+  return { T: Pt, n: Nn.normalize(), fw, up, rt, fd, hip: hipAt };
+}
+
+/**
+ * BAYE IN THE SPOON CURL, a frame (`M.bk` 0..1 of the way): her legs, her
+ * upper hand off her knee and on to her chest (palm solved on to the skin), and
+ * her breath. The curl's shift is set where it is decided (`rvmSpoonTick`).
+ */
+function rvsBayePose(M, dt) {
+  const B = rvsBaye();
+  if (!B) return;
+  const k = M.bk;
+  if (k > 0.001) {
+    if (M.legT) { const f = B.fig; M.legErr = ["L", "R"].map((s) => +f.boneAt(f.boneIndex("legL" + s), new THREE.Vector3()).distanceTo(M.legT[s].K).toFixed(4)); }
+    M.legT = rvsLegs(B, k, 'B', M.tuck || 0);
+    if (M.hand && (M.armK || 0) > 0.001) {
+      const H = M.hand;
+      // Fingers down her front toward the mattress and her waist; the elbow
+      // back along her side.
+      const d = H.fd.clone();
+      const bp = H.hip ? RVM_SPOON.bPoleHip : RVM_SPOON.bPole;
+      const pole = H.up.clone().multiplyScalar(bp[0]).addScaledVector(H.fw, bp[1]).addScaledVector(H.rt, bp[2]);
+      if (M.pred) { const ae = revBone("armLR", new THREE.Vector3()), aw = revBone("handR", new THREE.Vector3()); M.predErr = [+ae.distanceTo(M.pred.E).toFixed(4), +aw.distanceTo(M.pred.W).toFixed(4)]; }
+      const pm = rvmPalm('R', new THREE.Vector3(), B);
+      if (pm) M.bayeErr = pm.distanceTo(H.T.clone().addScaledVector(H.n, 0.004));
+      const got = rvmSolve('R', H.T.clone().addScaledVector(H.n, 0.004), H.n, d, pole, 0, Math.min(k, M.armK || 0), new THREE.Vector3(), B);
+      if (got) M.bayeSolveErr = got.distanceTo(H.T.clone().addScaledVector(H.n, 0.004));
+      M.pred = B.pred;
+    }
+    M.bOn = true;
+  } else if (M.bOn) {
+    rvsLegsFree(B.fig);
+    for (const n of ['armUR', 'armLR', 'handR']) B.fig.aim(n, 0, 0, 1, 0);
+    M.bOn = false;
+  }
+}
+
+/** The breath of both, a frame: phases, Chloe's rate easing on to Baye's, and the chests. */
+function rvsBreath(M, dt) {
+  const Br = RVM_SPOON.breath, S = M.br;
+  const TAU = Math.PI * 2;
+  S.thB = (S.thB + TAU * Br.her * dt) % TAU;
+  // Chloe: her rate eases on to Baye's once she is lying with her, and her
+  // phase is drawn to Baye's — the more the longer she has been there.
+  const on = M.ph === 'on' || M.ph === 'settle';
+  if (on) S.f += (Br.her - S.f) * (1 - Math.exp(-dt / Br.tau));
+  const dphi = Math.atan2(Math.sin(S.thB - S.thC), Math.cos(S.thB - S.thC));
+  const pull = on ? Br.lock * Math.min(1, (M.tOn || 0) / 6) : 0;
+  S.thC = (S.thC + (TAU * S.f + pull * Math.sin(dphi)) * dt + TAU) % TAU;
+  S.bB = 0.5 - 0.5 * Math.cos(S.thB);
+  S.bC = 0.5 - 0.5 * Math.cos(S.thC);
+  S.dphi = dphi;
+  // The chests: up and out a little, about each one's own across-axis.
+  // (Chloe's on her chest alone: her spine is where her reach to you goes.)
+  const lay = (f, b, w, both) => {
+    const fr = rvsFrame(f);
+    f.aim('chest', fr.rt.x, fr.rt.y, fr.rt.z, (Br.chest + (both ? 0 : Br.spine)) * b * w);
+    if (both) f.aim('spine03', fr.rt.x, fr.rt.y, fr.rt.z, Br.spine * b * w);
+  };
+  const Bf = rvsBaye();
+  const wB = Math.min(1, M.bk * 1.2);
+  if (Bf && wB > 0.001) lay(Bf.fig, S.bB, wB, true);
+  const wC = M.lie != null ? Math.min(1, M.lie) : 0;
+  if (you && you.fig && wC > 0.001) lay(you.fig, S.bC, wC, false);
+  S.t += dt;
+  if (S.t - S.last >= 0.25) {
+    S.last = S.t;
+    S.trace.push([+M.t.toFixed(2), +S.f.toFixed(3), +dphi.toFixed(3), +S.bB.toFixed(3), +S.bC.toFixed(3), M.ph]);
+    if (S.trace.length > 600) S.trace.shift();
+  }
+}
+function rvsBreathOff(M) {
+  const Bf = rvsBaye();
+  if (Bf) { Bf.fig.aim('chest', 0, 0, 1, 0); Bf.fig.aim('spine03', 0, 0, 1, 0); }
+  if (you && you.fig) { you.fig.aim('chest', 0, 0, 1, 0); you.fig.aim('spine03', 0, 0, 1, 0); }
+}
+
+/**
+ * Chloe's arms, legs, face, lying: her legs in the spoon curl (`rvsLegs`, the
+ * same solve as Baye's), her upper palm on the back of Baye's hand, her face
+ * into Baye's nape — or, kissing, the last few centimetres to her shoulder.
+ */
+function rvsChloePose(M, dt) {
+  const P0 = RVM_SPOON, u = M.lie != null ? Math.max(0, Math.min(1, M.lie)) : 0;
+  // `k`: how far into lying down she is (0 while her legs come up).
+  const k = u <= P0.legsUp ? 0 : (u - P0.legsUp) / (1 - P0.legsUp);
+  const F = { fig: you.fig, mesh: you.mesh };
+  const sm = (x) => { const c = Math.max(0, Math.min(1, x)); return c * c * (3 - 2 * c); };
+  if (u < P0.legsUp) {
+    // Her feet off the floor and up, knees drawn up, on to the cot.
+    rvsKneesUp(sm(u / P0.legsUp)); rvm.legsOn = true;
+  } else { rvsLegs(F, Math.max(0.002, sm(k)), 'C', M.tuck || 0, rvsKneesUp(1, false)); rvm.legsOn = true; }
+  // Her hands while she turns on the edge and lies down: on the mattress at
+  // its edge, behind her hips, taking her weight — on the room side of her and
+  // never back on to you (her clip's hands are on the mattress either side,
+  // and turned to face the cot's foot the left one went into your back,
+  // MEASURED). Let go as she lies down; then her arms are the spoon's.
+  if (u > 0.02 && k < RVM_SPOON.handsAt) {
+    const Gc = rvmCotGeom(), Pv = you.fig.boneAt(0, new THREE.Vector3()).applyMatrix4(you.mesh.matrixWorld);
+    if (Gc && Gc.out && Gc.edge) {
+      const inset = (Gc.edge.x - Gc.mid.x) * Gc.out.x + (Gc.edge.z - Gc.mid.z) * Gc.out.z;
+      const along = (Pv.x - Gc.mid.x) * Gc.ax.x + (Pv.z - Gc.mid.z) * Gc.ax.z;
+      const fwC = new THREE.Vector3(1, 0, 0).applyQuaternion(you.mesh.quaternion).setY(0).normalize();
+      const fa = fwC.x * Gc.ax.x + fwC.z * Gc.ax.z;
+      // Her right beside her hip, her left behind her, both just in from the edge.
+      for (const [s, back, inn] of [['R', -0.04, 0.0], ['L', 0.17, 0.05]]) {
+        const C = new THREE.Vector3(Gc.mid.x, Gc.top + 0.004, Gc.mid.z).addScaledVector(Gc.ax, along - fa * back)
+          .addScaledVector(Gc.out, inset + 0.03 - inn);
+        rvmAsk(s, { C, n: new THREE.Vector3(0, 1, 0), d: Gc.out.clone(), pole: Gc.out.clone().add(new THREE.Vector3(0, 0.3, 0)).addScaledVector(fwC, -0.4),
+          cock: 0, shape: 'flat', rate: 4 });
+      }
+    }
+  }
+  const B = rvsBaye();
+  if (!B) return;
+  // Her hand on yours: the back of Baye's hand — the palm's own point carried
+  // through to its back (the hand is 4 cm thick there) — her palm on it, her
+  // fingers along Baye's, the elbow up and back over Baye's waist.
+  if (k >= RVM_SPOON.handsAt && M.bk > 0.9 && (M.armK || 0) > 0.9) {
+    const HB = rvmHandBind('R');
+    const bq = B.fig.boneTurn(B.fig.boneIndex('handR'), new THREE.Quaternion()).premultiply(B.mesh.quaternion);
+    const pn = HB.n.clone().applyQuaternion(bq).normalize();
+    const P = rvmPalm('R', new THREE.Vector3(), B);
+    if (P) {
+      // How thick her hand is there, off her mesh (once): the back of it.
+      if (M.handTh == null) M.handTh = rvsHandTh(rvsBayeSkin(1), P, pn);
+      const D = P.addScaledVector(pn, -M.handTh);
+      M.dorsum = D.clone(); M.dorsumN = pn.clone().negate();
+      const X = rvsBayeAxes();
+      const shC = rvmShoulder('R', new THREE.Vector3());
+      // Her fingers the way her arm comes, from behind you over your waist.
+      const d = shC ? D.clone().sub(shC) : X.fw.clone();
+      const cp = RVM_SPOON.cPole;
+      // Her elbow: the way the search found clear of you (`rvsArmPole`), from
+      // when she has settled; the typed lean until then.
+      // Once, when she has settled: searched again, a pole that is nearly as
+      // good flips the elbow round the arm (MEASURED: 40 cm at the palm, for a
+      // frame or two) — so it is kept.
+      if (M.ph === 'on' && M.poleT == null) { M.poleT = M.t; rvsArmPole(M, D, d.clone().normalize()); }
+      let pole = M.armPole ? M.armPole.clone()
+        : X.rt.clone().multiplyScalar(cp[0]).addScaledVector(X.fw, cp[1]).addScaledVector(X.up, cp[2]);
+      // Her elbow kept the way it is once it is over you (the found way a
+      // little too), so a kiss that turns her shoulders does not swing it round
+      // the arm — MEASURED: 41 cm at the palm, for a frame, before this.
+      if (M.armPole && rvm.k.R > 0.9 && shC) {
+        const ei = you.fig.boneIndex('armLR');
+        const el = you.fig.boneAt(ei, new THREE.Vector3()).applyMatrix4(you.mesh.matrixWorld);
+        pole = el.sub(shC).normalize().addScaledVector(M.armPole.clone().normalize(), 0.3);
+      }
+      rvmAsk('R', { C: D.clone().addScaledVector(M.dorsumN, RVM_SPOON.handOff), n: M.dorsumN.clone(), d, pole, cock: 0, shape: RVM_SPOON.handShape,
+        rate: 2.2 });
+    }
+  }
+  // Her under arm up past her head and folded back under it, the palm under
+  // her own cheek — the way Baye's own curl lies on her hand, and the one
+  // place an under arm goes with somebody lying in front of her: her elbow up
+  // the pillow, nowhere between the two of them. (Her `fetalHeld` is the
+  // older bake, whose under arm reaches straight out past her head and, behind
+  // Baye, into her.)
+  if (k >= RVM_SPOON.handsAt) {
+    const hiC = you.fig.boneIndex('head');
+    const hqC = you.fig.boneTurn(hiC, new THREE.Quaternion()).premultiply(you.mesh.quaternion);
+    const Hc = you.fig.boneAt(hiC, new THREE.Vector3()).applyMatrix4(you.mesh.matrixWorld)
+      .add(new THREE.Vector3(0.015, 0.085, 0).applyQuaternion(hqC));
+    const fwC = new THREE.Vector3(1, 0, 0).applyQuaternion(hqC), upC = new THREE.Vector3(0, 1, 0).applyQuaternion(hqC);
+    const cheek = Hc.clone().add(new THREE.Vector3(0, -RVM_SPOON.cheek, 0)).addScaledVector(fwC, 0.03);
+    const d = fwC.clone().setY(0);
+    if (d.lengthSq() < 1e-6) d.set(1, 0, 0);
+    const pole = upC.clone().setY(0).normalize().multiplyScalar(1).add(new THREE.Vector3(0, -0.6, 0));
+    rvmAsk('L', { C: cheek.addScaledVector(new THREE.Vector3(0, -1, 0), 0.004), n: new THREE.Vector3(0, -1, 0), d: d.normalize(), pole,
+      cock: 0, shape: 'soft', rate: 3 });
+  }
+  // Her face into Baye's nape, or her lips to Baye's shoulder.
+  const Hd = rvmYourHead();
+  if (!Hd) return;
+  M.nape = rvmNapeSpot(Hd).T;
+  const hi = you.fig.boneIndex('head');
+  const hq = you.fig.boneTurn(hi, new THREE.Quaternion());
+  const face = you.fig.boneAt(hi, new THREE.Vector3()).applyMatrix4(you.mesh.matrixWorld)
+    .add(new THREE.Vector3(0.10, 0.07, 0).applyQuaternion(hq).applyQuaternion(you.mesh.quaternion));
+  // A kiss: on the skin of yours nearest her lips when it begins — the back of
+  // your shoulder, the top of your back — carried on your chest bone after.
+  const Cb = revBone('chest', new THREE.Vector3());
+  if (M.kissing && !M.kissP && Cb) {
+    const N = rvsNearest(rvsBayeSkin(1), face, { 0: 1, 3: 1 });
+    if (N) { M.kissRel = N.p.clone().sub(Cb); M.kissP = N.p; }
+  }
+  if (M.kissP && Cb && M.kissRel) M.kissP = Cb.clone().add(M.kissRel);
+  if (!M.kissing) { M.kissP = null; M.kissRel = null; }
+  const tgt = M.kissing && M.kissP ? M.kissP : M.nape;
+  // Her eyes on it — but aimed at a point well past it, along the same line
+  // from the middle of her head: a look at a point 6 cm off turns her head,
+  // which moves her eyes, which turns the look, a frame at a time (MEASURED:
+  // her head 4 cm to and fro every other frame, all through a kiss).
+  const hc = you.fig.boneAt(you.fig.boneIndex('head'), new THREE.Vector3()).applyMatrix4(you.mesh.matrixWorld);
+  const key = M.kissing ? 'k' : 'n';
+  M.lookAge = (M.lookAge || 0) + dt;
+  if (!M.lookFar || M.lookKey !== key || M.lookAge > 1.5) { M.lookFar = tgt.clone().addScaledVector(tgt.clone().sub(hc).normalize(), 0.6); M.lookKey = key; M.lookAge = 0; }
+  M.lookT = M.lookFar;
+  M.faceD = face.distanceTo(tgt);
+  // The reach: the top of her spine turned so her face comes to it, and back.
+  // Kissing, all the way to the skin; otherwise a little way into your nape
+  // (`nuzzle` m off it), and never nearer your skin than `headMin` by the
+  // measured gap of her head (`M.headGap`, twice a second).
+  const P = RVM_SPOON;
+  // (Once her lips are on your skin — by the mesh, `kissMin` — she reaches no further.)
+  if (M.kissing) M.reach = Math.max(0, Math.min(0.24, (M.reach || 0) + (M.kissMin < 0.01 ? 0 : (M.faceD - 0.010) * dt * 3.0)));
+  else {
+    const hg = M.headGap == null ? 9 : M.headGap;
+    const go = M.faceD > P.nuzzle && hg > P.headMin ? Math.min(M.faceD - P.nuzzle, hg - P.headMin) : hg < P.headMin * 0.7 ? -0.05 : 0;
+    const cap = Math.max(P.nuzzleMax, Math.min(0.32, (M.reach || 0)));
+    M.reach = Math.max(0, Math.min(go >= 0 ? P.nuzzleMax : cap, (M.reach || 0) + go * dt * 1.2 - (go < 0 ? dt * 0.05 : 0)));
+    if ((M.reach || 0) > P.nuzzleMax) M.reach = Math.max(P.nuzzleMax, M.reach - dt * 0.25);
+  }
+  const ci = you.fig.boneIndex('chest');
+  const C0 = you.fig.boneAt(ci, new THREE.Vector3()).applyMatrix4(you.mesh.matrixWorld);
+  // The axis taken once, as the reach begins, and kept: worked out afresh
+  // each frame from where her face has got to, it turns over as her face
+  // passes the line to the skin and she rocks to and fro a frame at a time
+  // (MEASURED: her face 12 and 16 cm off, alternately, for a whole kiss).
+  if (!M.reachAx || M.reach < 0.002) {
+    const a0 = face.clone().sub(C0).cross(tgt.clone().sub(C0));
+    M.reachAx = a0.lengthSq() > 1e-8 ? a0.normalize().applyQuaternion(you.mesh.quaternion.clone().invert()) : null;
+  }
+  const ax = M.reachAx;
+  if (ax && M.reach > 0.002) {
+    you.fig.aim('spine03', ax.x, ax.y, ax.z, M.reach * 0.6);
+    you.fig.aim('spine02', ax.x, ax.y, ax.z, M.reach * 0.4);
+    M.reachOn = true;
+  } else if (M.reachOn) {
+    you.fig.aim('spine03', 0, 0, 1, 0); you.fig.aim('spine02', 0, 0, 1, 0);
+    M.reachOn = false;
+  }
+}
+
+/**
+ * WHICH WAY HER ELBOW GOES, OVER YOUR WAIST: solved, not typed. Her arm from
+ * her shoulder to the back of your hand is two bones and one free turn — the
+ * elbow anywhere round the shoulder-to-wrist line — and of 24 ways round it,
+ * this keeps the one whose upper arm and forearm (capsules of 4.8 and 3.6 cm,
+ * off `rvmTwoBone`, the arm's own solve) stand furthest off your skin, your own
+ * arm included, everywhere but the hand she is holding; ties go to the one
+ * nearest `cPole`. Answers the pole (world) and its clearance (m).
+ */
+function rvsArmPole(M, D, dl) {
+  const c = rvmChain('R');
+  const S = rvmShoulder('R', new THREE.Vector3());
+  const X = rvsBayeAxes();
+  const A = rvsBayeSkin(2);
+  if (!c || !S || !X || !A) return null;
+  const HB = rvmHandBind('R');
+  // The wrist, where her palm on the back of your hand puts it: back along
+  // her fingers by the palm's reach, out off your hand by its depth.
+  const Wr = D.clone().addScaledVector(dl, -HB.o.length() * 0.95).addScaledVector(M.dorsumN, RVM.off + RVM_SPOON.handOff);
+  const Mi = new THREE.Matrix4().copy(you.mesh.matrixWorld).invert();
+  const qi = you.mesh.quaternion.clone().invert();
+  const Wf = Wr.clone().applyMatrix4(Mi);
+  const cp = RVM_SPOON.cPole;
+  const base = X.rt.clone().multiplyScalar(cp[0]).addScaledVector(X.fw, cp[1]).addScaledVector(X.up, cp[2]);
+  const ax = Wr.clone().sub(S).normalize();
+  const b0 = base.clone().addScaledVector(ax, -base.dot(ax)).normalize();
+  const b1 = new THREE.Vector3().crossVectors(ax, b0);
+  const segD = (p, a, b) => {
+    const ab = b.clone().sub(a), t = Math.max(0, Math.min(1, p.clone().sub(a).dot(ab) / ab.lengthSq()));
+    return p.distanceTo(a.clone().addScaledVector(ab, t));
+  };
+  // Your skin, less the hand she holds and what is within 7 cm of it.
+  const pts = [];
+  const P = new THREE.Vector3();
+  for (let i = 0; i < A.n; i++) {
+    if (A.reg[i] === 5) continue;
+    P.set(A.p[3 * i], A.p[3 * i + 1], A.p[3 * i + 2]);
+    if (P.distanceTo(D) < 0.04) continue;
+    if (P.distanceTo(S) > 0.75) continue;
+    pts.push(P.clone());
+  }
+  let best = null;
+  for (let i = 0; i < 24; i++) {
+    const a = (i - 12) / 12 * Math.PI;
+    const pole = b0.clone().multiplyScalar(Math.cos(a)).addScaledVector(b1, Math.sin(a));
+    const sol = rvmTwoBone(c, Wf.clone(), pole.clone().applyQuaternion(qi));
+    const E = sol.elbow.clone().applyMatrix4(you.mesh.matrixWorld), W = sol.wrist.clone().applyMatrix4(you.mesh.matrixWorld);
+    let cl = 9;
+    for (const q of pts) {
+      cl = Math.min(cl, segD(q, S, E) - 0.048, segD(q, E, W) - 0.036);
+      if (cl < -0.08) break;
+    }
+    const score = Math.min(cl, 0.012) - 0.004 * Math.abs(a);
+    if (!best || score > best.score) best = { score, cl, pole, a };
+  }
+  M.armPole = best.pole; M.armCl = best.cl; M.armA = best.a;
+  return best;
+}
+
+/** Baye's mesh across the cot, measured, and the shift that puts her front `edge` m inside its wall side. */
+function rvsFitShift(M) {
+  const Mt = rvsMattress(), BS = rvsBayeSkin(2);
+  if (!Mt || !BS) return null;
+  // Off everything but her legs and her upper arm: the legs are straighter while
+  // Chloe gets in (`kneeIn`) and the hand still on her knee (`armK`), and drawn
+  // up and on her hip after, neither is ever the front of her.
+
+  const sp = rvsSpan(BS, Mt, { 6: 1, 3: 1, 5: 1 });
+  const now = jadrija.curlShift ? jadrija.curlShift().d : 0;
+  // `t` grows toward the wall, which is +across here: the shift adds to it one for one.
+  const want = now + (sp.wall - RVM_SPOON.edge);
+  M.fit = { span: sp, shift: +want.toFixed(3), was: +now.toFixed(3) };
+  return want;
+}
+
+/** The gap, once, now: Chloe against Baye (everything of hers but the hand on yours and the arm to it). */
+function rvsGapNow(M, stride = 2) {
+  const A = rvsBayeSkin(stride);
+  const B = rvsChloeSkin(stride);
+  if (!A || !B) return null;
+  const G = rvsGap({ A, B, skip: { 3: 1, 5: 1 } });
+  const H = rvsGap({ A, B, skip: { 0: 1, 1: 1, 2: 1, 4: 1, 6: 1 } });
+  const Mt = rvsMattress();
+  return { G, H, spanB: Mt ? rvsSpan(A, Mt) : null, spanC: Mt ? rvsSpan(B, Mt) : null };
+}
+
+/**
+ * THE SPOON, a frame. Phases: `curl` (waiting for you to be curled up on your
+ * side), `go` (to the edge, you shifting over and loosening), `sit`, `swing`
+ * (down on to her side behind you), `settle` (in close, by the measured gap),
+ * `on` (held: the hand-hold, the breath, now and then a kiss on your
+ * shoulder), `up` (the way she came), and `stand`.
+ */
+function rvmSpoonTick(M, dt) {
+  const P = RVM_SPOON, Bd = rvm.body;
+  const v = revView();
+  const curled = v && v.phase === 'fetalHeld' && v.onBed;
+  M.br = M.br || { thB: Math.random() * 6.28, thC: Math.random() * 6.28, f: P.breath.mine, t: 0, last: -1, trace: [], bB: 0, bC: 0, dphi: 0 };
+  // Baye loosens (and slides over) from the moment Chloe comes, and curls up
+  // again once she has gone.
+  const wantB = M.ph === 'curl' ? 0 : M.ph === 'stand' ? 0 : 1;
+  if (M.ph !== 'curl' && !curled && M.lie == null && M.ph !== 'stand') { rvmEnd('you moved'); return; }
+  M.bk = Math.max(0, Math.min(1, (M.bk || 0) + (wantB ? dt : -dt) / P.loosen));
+  // Your hand off your knee and on to your hip only once she is down beside
+  // you (it was in her way coming down, MEASURED), and back as she gets up.
+  const wantA = M.ph === 'settle' || M.ph === 'on';
+  M.armK = Math.max(0, Math.min(1, (M.armK || 0) + (wantA ? dt : -dt) / 1.1));
+  if (M.bk > 0.6 && !M.hand) {
+    const BS = rvsBayeSkin(2);
+    M.hand = rvsHandSpot(BS);
+  }
+  if (M.hand && M.bk > 0) {
+    // Her chest moves with her breath and her slide: the spot rides her chest bone.
+    const C = revBone('chest', new THREE.Vector3());
+    if (C && M.handRel == null) M.handRel = M.hand.T.clone().sub(C);
+    if (C && M.handRel) M.hand.T = C.clone().add(M.handRel);
+  }
+  rvsBayePose(M, dt);
+  rvsBreath(M, dt);
+  if (M.lie != null) rvsChloePose(M, dt);
+  M.t2 = (M.t2 || 0) + dt;
+  if (M.ph === 'curl') {
+    if (curled && (!rev.dom.order || rev.dom.order.id !== 'curl')) { M.ph = 'go'; M.t0 = M.t; return; }
+    if (!rev.dom.order && !M.asked && M.t > 1.0) { rvmSay('later', true); rvmEnd('not curled'); return; }
+    if (M.t > P.curlWait) { rvmEnd('not curled in time'); return; }
+    return;
+  }
+  if (M.ph === 'go') {
+    if (!M.seat) {
+      if (jadrija.curlShift) jadrija.curlShift(P.shift0, P.shiftRate);
+      M.seat = rvsSeat();
+      if (!M.seat) { rvmEnd('no edge'); return; }
+      revGo(M.seat.stand.x, M.seat.stand.z);
+      rev.ch.face = new THREE.Vector3(M.seat.stand.x + M.seat.out.x * 3, rev.ch.y, M.seat.stand.z + M.seat.out.z * 3);
+    }
+    // Her front measured off her mesh once she has loosened, and the shift set by it.
+    if (M.bk >= 1 && !M.fitted && M.t - M.t0 > P.loosen + 0.3) {
+      M.fitted = true;
+      const s = rvsFitShift(M);
+      // And while she gets in, a little further still (`bayeExtra`): you
+      // shuffle back into her once she is down.
+      if (s != null) M.fitShift = Math.max(0, Math.min(0.40, s));
+      if (M.fitShift != null && jadrija.curlShift) jadrija.curlShift(M.fitShift + P.bayeExtra, P.shiftRate);
+    }
+    let dy = M.seat.yaw - rev.ch.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+    const there = revAt() && Math.abs(dy) < 0.12;
+    if ((there || M.t - M.t0 > 9) && M.fitted) {
+      // Settled where she is now? The seat again off where your waist is.
+      const S2 = rvsSeat();
+      if (S2) M.seat.seat = S2.seat;
+      M.ph = 'sit'; M.t0 = M.t; rvmWant('sit');
+      Bd.sit = { from: new THREE.Vector3(rev.ch.x, rev.ch.y, rev.ch.z), to: M.seat.seat.clone(), k: 0 };
+    }
+    return;
+  }
+  if (M.ph === 'sit') {
+    const tt = M.t - M.t0;
+    if (Bd.sit) Bd.sit.k = Math.min(1, tt / P.sitT);
+    const C = jadrija.curlShift ? jadrija.curlShift() : null;
+    const settled = !C || !C.mark || Math.hypot(C.at[0] - C.mark[0], C.at[1] - C.mark[1]) < 0.02;
+    if (tt > P.sitT + 0.35 && (settled || tt > 5) && Bd.mode === 'sit') {
+      M.ph = 'swing'; M.t0 = M.t;
+      M.seatAt = you.mesh.position.clone(); M.seatQ = you.mesh.quaternion.clone();
+      // Her legs up: sat along the cot facing its foot, a little further on.
+      const Xa = rvsBayeAxes(), Gc = rvmCotGeom();
+      const foot = Xa ? Xa.up.clone().negate() : new THREE.Vector3(0, 0, 1);
+      M.longYaw = Math.atan2(-foot.z, foot.x);
+      M.longAt = M.seatAt.clone().addScaledVector(Gc && Gc.out ? Gc.out : new THREE.Vector3(), -P.longIn);
+      M.legsDir = 0;
+      M.W = { a: P.back0 + P.wide, c: P.feet };
+      // The two clips' roots: the same pose below the root on this rig, but
+      // not the same height (see `rvsLiePlace`). Measured off both, now.
+      const Bf = rvsBaye();
+      if (Bf) {
+        const qa = new Float32Array(4 * 64), ta = new Float32Array(3), qb = new Float32Array(4 * 64), tb = new Float32Array(3);
+        if (you.fig.sample('fetalHeld', 0, qa, ta) && Bf.fig.sample('fetalHeld', 0, qb, tb)) {
+          M.rootD = new THREE.Vector3(tb[0] - ta[0], tb[1] - ta[1], tb[2] - ta[2]);
+        }
+      }
+      M.lie = 0;
+      Bd.mode = 'spoon'; Bd.want = 'spoon'; Bd.t = 0;
+      rvmNote('body sit → spoon');
+    }
+    return;
+  }
+  if (M.ph === 'swing') {
+    M.lie = Math.min(1, (M.t - M.t0) / P.swingT);
+    rvsMoveGap(M, dt);
+    if (M.lie >= 1 && M.fitShift != null && jadrija.curlShift) jadrija.curlShift(M.fitShift, P.shiftRate * 0.7);
+    if (M.lie >= 1) { M.ph = 'settle'; M.t0 = M.t; M.gapLog = []; revSay('spoon', true, RVM_SAY.spoon[Math.random() < 0.5 ? 0 : 1], { still: revStill.dom }); }
+    return;
+  }
+  if (M.ph === 'settle' || M.ph === 'on') {
+    M.lie = 1;
+    M.tuck = Math.min(1, (M.tuck || 0) + dt / P.tuckT);
+    M.tOn = (M.tOn || 0) + dt;
+    // In close: the measured gap, every few frames while settling and twice a
+    // second after, the offset moved by what it is off.
+    M.gapT = (M.gapT || 0) - dt;
+    if (M.gapT <= 0) {
+      M.gapT = M.ph === 'settle' ? 0.06 : M.kissing ? 0.1 : 0.5;
+      const R = rvsGapNow(M, M.ph === 'settle' ? 3 : 2);
+      if (R) {
+        // Her body (trunk, legs, under arm) and her head, apart: while she
+        // kisses you her lips are meant to touch.
+        const by = R.G.by, of = (k) => (by[k] ? Math.min(by[k].d, by[k].s) : 9);
+        const body = Math.min(of('trunk'), of('legs'), of('armL'), of('handL'));
+        const head = of('head');
+        // (Her head keeps its own distance — the nuzzle, `headMin` — so where
+        // she lies is set by her body alone.)
+        const g = body;
+        M.lastGap = R;
+        if (M.ph === 'settle') {
+          const err = P.gap - g;
+          M.W.a = Math.max(P.backMin, Math.min(P.backMax + P.wide, M.W.a + Math.max(-P.slide, Math.min(P.slide, err * 0.75))));
+        } else if (!M.kissing && (M.kissOff || 0) <= 0) {
+          // Held, she stays in close: back off a touch if her body is on you,
+          // in again if it has drifted off (a kiss turns her shoulders into
+          // you; it never moves where she lies — MEASURED: three kisses had
+          // walked her 8 cm back before this).
+          M.W.a = Math.max(P.backMin, Math.min(P.backMax, M.W.a + Math.max(-0.01, Math.min(0.03, (P.gap - body) * 0.5))));
+        }
+        if (M.ph === 'on' && !M.kissing && (M.kissOff || 0) <= 0) {
+          M.gapMin = Math.min(M.gapMin == null ? 9 : M.gapMin, g);
+          M.gapLog.push([+M.t.toFixed(1), +body.toFixed(4), +head.toFixed(4), R.G.all.inN, +R.H.all.d.toFixed(4), +R.H.all.s.toFixed(4)]);
+          if (M.gapLog.length > 400) M.gapLog.shift();
+        }
+        if (M.kissing && by.head) M.kissMin = Math.min(M.kissMin, by.head.d);
+        if (!M.kissing) M.headGap = head;
+      }
+    }
+    if (M.ph === 'settle' && M.t - M.t0 > P.settleT) {
+      M.ph = 'on'; M.t0 = M.t; M.nextKiss = M.t + P.kiss[0] + Math.random() * (P.kiss[1] - P.kiss[0]);
+      M.nextLine = M.t + 22 + Math.random() * 12;
+      // Your eyes down to your two hands, once.
+      if (M.dorsum) { rev.lookAtP = M.dorsum.clone(); rev.lookTo = 1.3; }
+    }
+    if (M.ph !== 'on') return;
+    // The hand-hold: her palm against the back of your hand.
+    if (M.dorsum) {
+      const pm = rvmPalm('R', new THREE.Vector3());
+      if (pm) {
+        const e = pm.distanceTo(M.dorsum); M.handErr = e;
+        if (M.t - M.t0 > 1.5 && e > (M.handErrMax || 0)) { M.handErrMax = e; M.handErrAt = [+M.t.toFixed(2), !!M.kissing, +(M.reach || 0).toFixed(2)]; }
+      }
+    }
+    // Now and then a kiss on your shoulder — not in the aftercare's first seconds.
+    if (!M.kissing && M.t > M.nextKiss && !M.care) { M.kissing = true; M.kissT = 0; M.kissMin = 9; }
+    if ((M.kissOff || 0) > 0) M.kissOff -= dt;
+    if (M.kissing) {
+      M.kissT += dt;
+      if (!M.kissed && M.kissMin < 0.012) {
+        M.kissed = true; M.kisses = (M.kisses || 0) + 1;
+        if (audio && audio.kiss) audio.kiss();
+        if (Math.random() < 0.45) rvmSay('nuzzle');
+      }
+      if (M.kissT > P.kissT) {
+        M.kissing = false; M.kissed = false; M.kissOff = 1.2;
+        (M.kissLog = M.kissLog || []).push(+M.kissMin.toFixed(4));
+        M.nextKiss = M.t + P.kiss[0] + Math.random() * (P.kiss[1] - P.kiss[0]);
+      }
+    }
+    if (!M.care && M.t > M.nextLine) { M.nextLine = M.t + 30 + Math.random() * 20; rvmSay('spoon'); }
+    const longest = M.care ? P.care : P.hold;
+    if (M.t - M.t0 > longest) rvmSpoonUp(M, M.care ? 'aftercare held' : 'time');
+    return;
+  }
+  if (M.ph === 'up') {
+    // Back off you first (the first third), then up on to the edge.
+    const tu = M.t - M.t0, slideT = P.upSlide;
+    M.tuck = Math.max(0, (M.tuck || 0) - dt / (P.tuckT * 0.5));
+    if (M.W) M.W.a = M.upA + P.wide * Math.min(1, tu / slideT);
+    M.lie = tu < slideT ? 1 : Math.max(0, 1 - (tu - slideT) / P.upT);
+    rvsMoveGap(M, dt);
+    if (M.lie <= 0) {
+      // Sat on the edge again, as she came: the sit's own way up from here.
+      M.lie = null; M.ph = 'stand'; M.t0 = M.t;
+      Bd.mode = 'sit'; Bd.want = 'sit'; Bd.t = 0;
+      Bd.sit = { from: new THREE.Vector3(M.seat.stand.x, rev.ch.y, M.seat.stand.z), to: M.seat.seat.clone(), k: 1 };
+      rvsLegsFree(you.fig);
+      for (const n of ['chest', 'spine03', 'spine02']) you.fig.aim(n, 0, 0, 1, 0);
+      M.reachOn = false; M.reach = 0;
+      rvmNote('body spoon → sit');
+    }
+    return;
+  }
+  if (M.ph === 'stand') {
+    if (M.t - M.t0 > 0.35 && Bd.want !== 'stand') rvmWant('stand');
+    if (jadrija.curlShift && M.t - M.t0 > 0.6) jadrija.curlShift(0, P.shiftRate);
+    if (Bd.mode === 'stand' && M.t - M.t0 > 0.6 && M.bk <= 0) rvmSpoonDone(M);
+  }
+}
+
+/**
+ * On her way down on to the cot or up off it, her body against yours, ten
+ * times a second (her right arm and hand left out: they are reaching for you).
+ * The least of it is `M.wayGap`, signed (negative: into you).
+ */
+function rvsMoveGap(M, dt) {
+  M.wayT = (M.wayT || 0) - dt;
+  if (M.wayT > 0) return;
+  M.wayT = 0.1;
+  const R = rvsGapNow(M, 3);
+  if (!R) return;
+  const by = R.G.by;
+  let g = 9, at = null;
+  for (const k of ['trunk', 'legs', 'head', 'armL', 'handL']) if (by[k] && Math.min(by[k].d, by[k].s) < g) { g = Math.min(by[k].d, by[k].s); at = k + ' into ' + by[k].sher + ' ' + JSON.stringify(by[k].sat); }
+  if (g < (M.wayGap == null ? 9 : M.wayGap)) { M.wayGap = g; M.wayAt = at + ' @' + M.ph + ' ' + (M.lie || 0).toFixed(2); }
+}
+
+/** Up off the cot, the way she came. `why` for the trace; your ask after, if any. */
+function rvmSpoonUp(M, why) {
+  if (M.ph === 'up' || M.ph === 'stand') return;
+  M.outWhy = why;
+  M.kissing = false;
+  if (M.lie == null) { rvmSpoonDone(M); return; }
+  M.ph = 'up'; M.t0 = M.t; M.upA = M.W ? M.W.a : 0;
+  // And you make room for her to sit up, as you did for her to lie down.
+  if (M.fitShift != null && jadrija.curlShift) jadrija.curlShift(M.fitShift + RVM_SPOON.bayeExtra, RVM_SPOON.shiftRate);
+  if (!M.care) rvmSay('spoonup', true);
+  rvmTrace({ pick: 'spoon:up', why });
+}
+
+/** Done: everything of the spoon off both of you, and then whatever you asked for. */
+function rvmSpoonDone(M) {
+  rvsBreathOff(M);
+  const B = rvsBaye();
+  if (B) { rvsLegsFree(B.fig); for (const n of ['armUR', 'armLR', 'handR']) B.fig.aim(n, 0, 0, 1, 0); }
+  if (jadrija.curlShift) jadrija.curlShift(0, RVM_SPOON.shiftRate);
+  if (M.lie != null && you && you.fig) rvsLegsFree(you.fig);
+  M.lie = null;
+  rvm.lastSpoon = rvmSpoonReport(M);
+  M.done = true;
+  rvm.spoonCool = rev.clock + 60;
+  const q = M.queue, qm = M.queueMove;
+  rvmEnd(M.outWhy || 'done');
+  if (q && typeof revAsk === 'function') revAsk(q);
+  else if (qm) rvmStart(qm, 'asked');
+}
+
+/** What the spoon measured, for a probe and the trace. */
+function rvmSpoonReport(M) {
+  if (!M) return null;
+  const G = M.lastGap;
+  return { ph: M.ph, t: +(M.t || 0).toFixed(1), why: M.why, out: M.outWhy || null, care: !!M.care,
+    W: M.W ? { a: +M.W.a.toFixed(3), c: +M.W.c.toFixed(3) } : null, fit: M.fit || null,
+    gap: G ? { all: G.G.all, by: G.G.by, hand: G.H.all, spanB: G.spanB, spanC: G.spanC } : null,
+    gapMin: M.gapMin != null ? +M.gapMin.toFixed(4) : null,
+    handErr: M.handErr != null ? +M.handErr.toFixed(4) : null, handErrMax: M.handErrMax != null ? +M.handErrMax.toFixed(4) : null,
+    faceD: M.faceD != null ? +M.faceD.toFixed(3) : null, kisses: M.kisses || 0, kissMin: M.kissLog || [],
+    breath: M.br ? { f: +M.br.f.toFixed(3), dphi: +M.br.dphi.toFixed(3), n: M.br.trace.length } : null,
+    bk: +(M.bk || 0).toFixed(2), lie: M.lie == null ? null : +M.lie.toFixed(2), queue: M.queue || null,
+    handTh: M.handTh != null ? +M.handTh.toFixed(4) : null, handErrAt: M.handErrAt || null, wayGap: M.wayGap != null ? +M.wayGap.toFixed(4) : null, wayAt: M.wayAt || null,
+    armCl: M.armCl != null ? +M.armCl.toFixed(4) : null, armA: M.armA != null ? +M.armA.toFixed(2) : null,
+    predErr: M.predErr || null, legErr: M.legErr || null, bayeErr: M.bayeErr != null ? +M.bayeErr.toFixed(4) : null, bayeSolveErr: M.bayeSolveErr != null ? +M.bayeSolveErr.toFixed(4) : null, gapLog: M.gapLog ? M.gapLog.slice(-8) : null };
+}
+
+/** Your ask while she is on the cot with you: she gets up first, and then it is done. */
+function rvmSpoonAsk(name) {
+  const M = rvm.move;
+  if (!M || M.id !== 'spoon') return false;
+  if (name === 'fetal' && (M.ph === 'curl')) return false;
+  M.queue = name;
+  rvmSpoonUp(M, 'you asked: ' + name);
+  return true;
+}
+
 // ── the frame ───────────────────────────────────────────────────────────────
 
 /** Her root this frame, sitting: on the mattress (the move's), eased from where she stood. */
@@ -1675,9 +2940,12 @@ function rvmSitAt() {
 }
 
 /** Her legs, sitting: the feet put on the floor in front of the edge. */
-function rvmSitLegs() {
+function rvmSitLegs(kSpoon = null) {
   const f = you.fig;
-  const k = Math.min(1, rvmSitK() * 1.2);
+  // Lying behind you, her legs are the spoon's (`rvsChloePose`) — which asks
+  // for these, eased off, while she swings them up on to the cot.
+  if (kSpoon == null && rvmSpoonOn()) return;
+  const k = kSpoon != null ? kSpoon : Math.min(1, rvmSitK() * 1.2);
   if (k <= 0.001 || !jadrija.hingeArm) { rvmLegsFree(); return; }
   const fy = rev.ch.y;
   const M = you.mesh.matrixWorld;
@@ -1729,6 +2997,15 @@ function rvmTick(dt) {
   }
   if (!rvm.move && rev.arm.mode !== 'spank') { B.bowTo = rvm.downFor > 0 ? B.bowTo * 0.5 : 0; if (B.mode === 'stand') B.wTo = 0; }
   rvmMoveTick(dt);
+  // You easing back into your own curl after a spoon that never got her on
+  // the cot (1.573.0).
+  const SF = rvm.spoonFade;
+  if (SF && rvm.move !== SF) {
+    SF.bk = Math.max(0, SF.bk - dt / RVM_SPOON.loosen);
+    rvsBayePose(SF, dt);
+    if (SF.br) rvsBreath(SF, dt);
+    if (SF.bk <= 0) { rvsBreathOff(SF); rvm.spoonFade = null; }
+  }
   // Her hands on her hips while an order waits on you.
   const D = rev.dom;
   // (Two orders in three: the rest she just watches you.)
@@ -1745,6 +3022,7 @@ function rvmTick(dt) {
   if (rev.arm.mode === 'spank' && rev.arm.at && rev.arm.ph !== 'go') T = rev.arm.at.T;
   else if (rvm.move && rvm.move.id === 'hold' && rvm.move.spot && rvm.move.ph !== 'go' && rev.clock % 5 < 2) T = rvm.move.spot.T;
   else if (typeof rvkBeltRound === 'function' && rvkBeltRound() && typeof rvkPlanP !== 'undefined' && rvkPlanP.aim && rvk.belt.ph !== 'go') T = rvkPlanP.aim;
+  else if (rvmSpoonOn() && rvm.move.lookT && rvm.move.lie > 0.3) T = rvm.move.lookT;
   else T = (typeof rvtLookAt === 'function' ? rvtLookAt() : null) || rvmYourFace(new THREE.Vector3());
   // Not over her shoulder while she walks away: ahead, then.
   if (T && rev.ch.goal && rev.ch.sp > 0.3) {
@@ -1779,6 +3057,14 @@ function rvmYourTilt(dt) {
 
 /** The safeword's part: every move ends, her hands come off you. */
 function rvmSafe() {
+  // Lying with you, she stays: the spoon is the aftercare (1.573.0).
+  if (rvmSpoonOn() && rvm.move.ph !== 'up' && rvm.move.ph !== 'stand') {
+    const S = rvm.move;
+    S.care = true; S.kissing = false;
+    if (S.ph === 'on') S.t0 = S.t;
+    rvm.pend = null;
+    return;
+  }
   if (rvm.move) rvmEnd('safeword');
   rvm.pend = null;
   rvm.nape = 0; rvm.chin = 0;
@@ -1788,13 +3074,24 @@ function rvmSafe() {
 
 /** Swapped back or left: everything of hers off. */
 function rvmClear() {
+  // Lying behind you, or you loosened for her: all of it off you (1.573.0).
+  const SM = rvm.move && rvm.move.id === 'spoon' ? rvm.move : rvm.spoonFade;
+  if (SM) {
+    rvsBreathOff(SM);
+    const Bf = rvsBaye();
+    if (Bf) { rvsLegsFree(Bf.fig); for (const n of ['armUR', 'armLR', 'handR']) Bf.fig.aim(n, 0, 0, 1, 0); }
+    if (jadrija && jadrija.curlShift) jadrija.curlShift(0, RVM_SPOON.shiftRate);
+    if (you && you.fig) rvsLegsFree(you.fig);
+    rvm.lastSpoon = rvmSpoonReport(SM);
+  }
+  rvm.spoonFade = null;
   rvm.move = null; rvm.pend = null;
   rvm.nape = 0; rvm.chin = 0; rvm.downFor = 0;
   rvmArmFree('R'); rvmArmFree('L');
   rvmFingers('R', 0, 0); rvmFingers('L', 0, 0);
   rvmLegsFree();
   const f = you && you.fig;
-  if (f) { f.aim('neck', 0, 1, 0, 0); f.aim('head', 0, 1, 0, 0); f.aim('spine01', 0, 0, 1, 0); f.aim('spine02', 0, 0, 1, 0); f.aim('spine03', 0, 0, 1, 0); }
+  if (f) { f.aim('neck', 0, 1, 0, 0); f.aim('head', 0, 1, 0, 0); f.aim('spine01', 0, 0, 1, 0); f.aim('spine02', 0, 0, 1, 0); f.aim('spine03', 0, 0, 1, 0); f.aim('chest', 0, 0, 1, 0); }
   _lkA.identity();
   rvm.look.on = false; rvm.look.at = 0;
   if (you && you.eyes) you.eyes(null);
@@ -1806,12 +3103,73 @@ function rvmClear() {
 
 /** `__fr.reverse.moves` — see 49-reverse.js. */
 const rvmApi = {
-  start: (id) => rvmStart(id, 'probe'),
+  start: (id, why = 'probe') => rvmStart(id, why),
   ask: (id) => rvmAskMove(id),
   gap: () => ({ now: rvm.move ? +rvmGapNow().toFixed(3) : null, last: rvm.lastGap || null,
     move: rvm.move ? { id: rvm.move.id, ph: rvm.move.ph, gap: +(rvm.move.gap || 0).toFixed(3), kissD: rvm.move.kissD != null ? +rvm.move.kissD.toFixed(3) : null, kissed: !!rvm.move.kissed } : null,
     push: +(rvm.body.push || 0).toFixed(3), bow: +rvm.body.bow.toFixed(2), mode: rvm.body.mode }),
   end: () => { rvmEnd('probe'); return true; },
+  /**
+   * The spoon (1.573.0): what it measured — the gap (by her region, signed),
+   * the hand-hold's error, her face off your nape, the kisses, the breath —
+   * of the one going, or the last. `spoonGap(1)` measures it now at full
+   * density; `spoonBreath(n)` the breath's trace, [t, her rate, phase
+   * difference, your chest, hers, phase of the spoon].
+   */
+  spoon: () => (rvm.move && rvm.move.id === 'spoon' ? rvmSpoonReport(rvm.move) : rvm.lastSpoon || null),
+  spoonGap: (stride = 1) => { const R = rvsGapNow(rvm.move, stride); return R ? { all: R.G.all, by: R.G.by, hand: R.H.all, handBy: R.H.by, spanB: R.spanB, spanC: R.spanC } : null; },
+  spoonBreath: (n = 200) => (rvm.move && rvm.move.br ? rvm.move.br.trace.slice(-n) : null),
+  /**
+   * Debug: your eyes (the walker's look) on to a point now — 'hands' (yours
+   * and hers, on your chest), 'her' (her face), or [x, y, z] — plus `dy`, `dp`
+   * rad more. Answers [yaw, pitch].
+   */
+  spoonLook: (what = 'hands', dy = 0, dp = 0) => {
+    const M = rvm.move, Y = ground && ground.you;
+    if (!Y) return null;
+    let p = Array.isArray(what) ? new THREE.Vector3(what[0], what[1], what[2]) : null;
+    if (what === 'hands') p = M && M.dorsum ? M.dorsum.clone() : revBone('handR', new THREE.Vector3());
+    if (what === 'her') p = revChloeHead(new THREE.Vector3());
+    if (!p) return null;
+    const c = camera.position;
+    Y.yaw = Math.atan2(-(p.x - c.x), -(p.z - c.z)) + dy;
+    Y.pitch = Math.atan2(p.y - c.y, Math.hypot(p.x - c.x, p.z - c.z)) + dp;
+    return [+Y.yaw.toFixed(3), +Y.pitch.toFixed(3)];
+  },
+  /** Debug: a close camera on 'hands' or 'heads' (from the wall side, or `from` 'room'), or null. */
+  spoonView: (what = 'hands', from = 'wall', d = 0.55) => {
+    const M = rvm.move;
+    if (!what) { rev.debugCam = null; return null; }
+    const X = rvsBayeAxes();
+    if (!X) return null;
+    const T = what === 'hands' ? (M && M.dorsum ? M.dorsum.clone() : revBone('handR', new THREE.Vector3()))
+      : revBone('neck', new THREE.Vector3());
+    if (!T) return null;
+    const out = X.fw.clone().multiplyScalar(from === 'room' ? -1 : 1);
+    const c = T.clone().addScaledVector(out, d).add(new THREE.Vector3(0, d * 0.55, 0)).addScaledVector(X.up, from === 'room' ? 0.15 : -0.10);
+    rev.debugCam = [c.x, c.y, c.z, T.x, T.y, T.z];
+    return rev.debugCam.map((x) => +x.toFixed(3));
+  },
+  /**
+   * Debug: both right arms (shoulder, elbow, wrist, palm) and the targets, in
+   * your own frame off your chest bone — [your front, up your long axis, your
+   * right (up, lying)] in cm.
+   */
+  spoonArms: () => {
+    const M = rvm.move, Bf = rvsBaye();
+    const C = revBone('chest', new THREE.Vector3());
+    if (!Bf || !C) return null;
+    const fr = rvsFrame(Bf.fig), q = Bf.mesh.quaternion;
+    const fw = fr.fw.applyQuaternion(q), up = fr.up.applyQuaternion(q), rt = fr.rt.applyQuaternion(q);
+    const L = (v) => { if (!v) return null; const d = v.clone().sub(C); return [Math.round(d.dot(fw) * 100), Math.round(d.dot(up) * 100), Math.round(d.dot(rt) * 100)]; };
+    const yb = (n) => revBone(n, new THREE.Vector3());
+    const yc = (n) => { const i = you.fig.boneIndex(n); return you.fig.boneAt(i, new THREE.Vector3()).applyMatrix4(you.mesh.matrixWorld); };
+    return { baye: { sh: L(yb('armUR')), el: L(yb('armLR')), wr: L(yb('handR')), palm: L(rvmPalm('R', new THREE.Vector3(), Bf)) },
+      chloe: { sh: L(yc('armUR')), el: L(yc('armLR')), wr: L(yc('handR')), palm: L(rvmPalm('R', new THREE.Vector3())) },
+      spot: M && M.hand ? L(M.hand.T) : null, dorsum: M && M.dorsum ? L(M.dorsum) : null, chestToSpine2: L(yb('spine02')) };
+  },
+  /** Debug: the spoon's numbers, merged. */
+  spoonTune: (o) => Object.assign(RVM_SPOON, o || {}),
   spank: (n = 1, hold = false) => rvmSpankStart(n, 'probe', { hold }),
   /** The contacts measured: palm against the spot, m. `reset` clears. */
   acc: (reset = false) => { const a = rvm.acc.slice(); if (reset) rvm.acc.length = 0; return a; },
@@ -1839,4 +3197,26 @@ const rvmApi = {
 
 // Her lines for the moves, with the rest of hers (49-reverse.js's `revSay`).
 if (typeof REV_SAY !== 'undefined') Object.assign(REV_SAY, RVM_SAY);
+// Her soft order before she lies down with you (1.573.0): never one of her
+// own picks (no `ctx`), never punished, and kept by you curling up on your side.
+if (typeof REV_ORDERS !== 'undefined') {
+  REV_ORDERS.curl = { ctx: {}, w: 0, key: 'Shift+7', soft: true, wait: 16,
+    ok: (v) => v.phase === 'fetalHeld' && v.onBed, say: "C'mere... curl up for me.",
+    hud: ['Sklupčaj se za mene.', 'Curl up for me.', 'Mets-toi en boule pour moi.'] };
+}
+/** The scene's part of the spoon (`revScene`): lying with you, and whether it is the aftercare. */
+function rvmScene(o) {
+  if (rvmSpoonOn()) o.rev_spoon = rvm.move.care ? 'care' : 'on';
+}
+/** Your breath in your camera, lying with her: −0.5 out .. 0.5 in, or 0. */
+function rvmCamBreath() {
+  const M = rvm.move;
+  if (!M || M.id !== 'spoon' || !M.br || !(M.bk > 0)) return 0;
+  return (M.br.bB - 0.5) * Math.min(1, M.bk);
+}
+if (typeof STRINGS !== 'undefined') {
+  Object.assign(STRINGS.en || {}, { 'help.k.revspoon': 'roles reversed: Chloe lies down behind you on the cot and holds you, you curled up on your side (or say "spoon me", "cuddle me", "hold me"). Move, or ask for anything, and she gets up first' });
+  Object.assign(STRINGS.hr || {}, { 'help.k.revspoon': 'zamijenjene uloge: Chloe legne iza tebe na krevet i drži te, a ti si sklupčana na boku (ili reci "zagrli me u krevetu"). Pomakni se ili traži bilo što, i ona prvo ustane' });
+  Object.assign(STRINGS.fr || {}, { 'help.k.revspoon': 'rôles inversés : Chloe s’allonge derrière vous sur le lit et vous tient, vous en boule sur le côté (ou dites « fais-moi un câlin », « serre-moi »). Bougez, ou demandez quoi que ce soit, et elle se lève d’abord' });
+}
 if (typeof revApi !== 'undefined') revApi.moves = rvmApi;
