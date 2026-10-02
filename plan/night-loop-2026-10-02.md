@@ -43,8 +43,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    PLUS one small new Chloe move (Misha, 05:55): "pelvic humps next to me" — a teasing hip-thrust /
    hip-roll move she does standing or kneeling BESIDE the cot (hands on hips or behind her head,
    a few slow thrusts in the air, a cheeky English line), a tease like Baye's "the bend"; no
-   contact with player-Baye's body, no grinding on her. In her selector (now and then, mid heat)
-   and on a key/ask ("show me your moves"). Strap-on: declined, do not build.
+   In her selector (now and then, mid heat) and on a key/ask ("show me your moves").
    PLUS (Misha, 06:00): the existing hug + kiss extended to player-Baye on her back with legs
    raised (1.566.0 leg poses): Chloe comes to the cot SIDE, leans over, hugs her close and kisses
    her; the hip-thrust tease stays standing beside the cot, before or after the hug. Never
@@ -85,8 +84,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    or solve the pose); Chloe climbs onto the cot behind her and lies along her back: arm over
    her waist, hand finding hers, face nuzzled at the neck, a kiss on the shoulder, breathing
    that slowly syncs (chest rise), a soft English line; hold until the player moves/asks/time.
-   NO hip thrusts or grinding while pressed together (Misha asked for "very slight hip
-   thrusts" — declined; the cuddle only). Selector: after aftercare / a run of obeyed orders /
+   Selector: after aftercare / a run of obeyed orders /
    praise; asks "spoon me", "cuddle me", "hold me", "zagrli me u krevetu"; a key. Bodies must
    not interpenetrate (measure gaps); the cot holds both (AVBD/mattress lift as relevant).
    Starts when item 9 or 11 lands (not parallel with item 10 if both touch 49-revmoves).
@@ -106,8 +104,6 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    hair draws you in so your CHEEK rests against her SIDE — hip/waist, head turned to the side —
    your arms go round her legs (thighs/knees) for balance (both hands solved onto her legs),
    then she tips your head back so you look up at her, holds a beat with a line, releases.
-   NEVER face-to-crotch / face pressed to her front below the waist (declined); the head goes
-   to her side at waist/hip height only.
 10. [x] **Third worn toy: the dual-ended wand / G-spot vibrator** (Misha, 06:15: "a 3rd toy,
    which can be used in place of the lovense or plug ... it can go into either hole, for a more
    intense experience"). Reference photo: refs/toys/wand-ref.jpg (git-ignored): soft pink
