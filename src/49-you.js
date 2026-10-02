@@ -1417,5 +1417,18 @@ async function buildYou(scene) {
     /** Debug: hold her jaw open by `k` (0..1) for a photograph, or null to
      *  let her voice drive it again. */
     gape: (k) => { lip.hold = k == null ? null : +k; if (look && lip.hold != null) look.jaw.uniforms.uGape.value = lip.hold; return lip.hold; },
+    /**
+     * Where her irises point, in her head's BIND frame (+x ahead, +y up, +z
+     * her right) — 1.565.0, so her eyes follow whoever she is watching while
+     * the roles are reversed (src/49-revmoves.js). The eyeball shader draws
+     * the iris round this direction (`uEyeF` in v5Parts); null puts them
+     * straight ahead again. Nothing else writes it on her.
+     */
+    eyes: (d) => {
+      if (!look) return null;
+      const u = look.eye.uEyeF.value;
+      if (!d) u.set(1, 0, 0); else u.set(d[0], d[1], d[2]).normalize();
+      return u.toArray();
+    },
   };
 }

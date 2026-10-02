@@ -257,6 +257,16 @@ function rvkArm(s, goalW, poleW, k, out) {
 
 /** Her fingers closed (a fist round a buckle or a loop) or open again. */
 function rvkGrip(s, on, k = 1) {
+  // 1.565.0: her hand's own grip (src/49-revmoves.js), curled about the
+  // knuckles' line measured off her mesh. The turn below was about the
+  // elbow's hinge as the hand carries it, and on this rig that axis is the
+  // palm's normal (MEASURED, 14 degrees off it): it swung her fingers sideways
+  // across the buckle instead of closing them round it.
+  if (typeof rvmFingers === 'function' && typeof RVM !== 'undefined') {
+    const g = RVM.hands.grip, kk = on ? Math.max(0, Math.min(1, k)) : 0;
+    rvmFingers(s, g[0] * kk, g[1] * kk);
+    return;
+  }
   const A = rvkArmInit(), f = you && you.fig;
   if (!A || !f) return;
   if (!on || k < 0.02) {

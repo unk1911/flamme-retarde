@@ -30,11 +30,15 @@
 //
 // CHLOE IS THE NPC. Her figure (49-you.js) is driven through `you.drive`
 // from where you stood. She walks with a steer-and-slide against the room's
-// own collider (`ground.confine`), turns to face, crouches by the cot the way
-// you do (`crouchSolve`), and spanks with her right arm — measured: the hand
-// is closed on the spot by feedback before the swing, so the strike lands
-// where her hand was, and the slap is `buttSlap`'s path with her hand as its
-// side (`cotSpank`, the mark, your reflex, the scene's record).
+// own collider (`ground.confine`), turns to face, and spanks with her right
+// arm; the slap is `buttSlap`'s path with her hand as its side (`cotSpank`,
+// the mark, your reflex, the scene's record). Since 1.565.0 (phase 2c,
+// src/49-revmoves.js) she goes where her arm reaches the spot from, KNEELS
+// by the cot (her own `submit` clip, held), her palm is solved on to the spot
+// (within a few millimetres, measured), standing, kneeling and on all fours
+// as well as on the cot; her head and eyes follow you; and she has more moves
+// than the spank (circling, your hair, holding you down, sitting by you, your
+// chin, your nape, hands on her hips while she waits).
 //
 // SHE GIVES ORDERS (`domDecide`, the autonomous mode's selector turned
 // round): every few seconds she scores what she could do where you are — an
@@ -77,10 +81,11 @@ const REV = {
   keep: 120,            // decisions kept in the trace
   heatTau: 90, heatRest: 0.2,
   joltK: 0.03,          // m the camera drops at a slap
-  // Standing, she comes round behind you: built (`revBehindFree`, `revSpot`)
-  // and off in phase one — her wrist got to 8-19 cm of the cheek and from
-  // the side it read as a hand on your hip. The cot is where she spanks.
-  standSpank: false,
+  // Off the cot too — standing, kneeling, on all fours. Off in phase one
+  // (her wrist got to 8-19 cm of the cheek, and from the side it read as a
+  // hand on your hip); on since 1.565.0, when her palm is solved on to the
+  // spot and she goes where her arm reaches it from (src/49-revmoves.js).
+  standSpank: true,
 };
 
 /**
@@ -159,17 +164,17 @@ const REV_ORDERS = {
 if (typeof STRINGS !== 'undefined') {
   Object.assign(STRINGS.en || {}, {
     'help.k.reverse': 'in the kabina, say or type "reverse roles" — you are in Baye\'s body and Chloe gives the orders (and spanks). Do what she says: the keys below, or type it ("lie on the cot", "spread my legs"). "red" or "crvena" ends it at once; "reverse roles" again swaps back',
-    'help.k.revkeys': 'roles reversed: 1 stand up · 2 lie on the cot · 3 on your front · 4 kneel · 5 legs apart / together · 6 arms out / in · 7 on your back · \\ her belt (off, or back on) · = her collar (on, or off). Look at her with the mouse; W gets you up; type the rest ("lotus", "on my side", "use the belt", "collar me")',
+    'help.k.revkeys': 'roles reversed: 1 stand up · 2 lie on the cot · 3 on your front · 4 kneel · 5 legs apart / together · 6 arms out / in · 7 on your back · \\ her belt (off, or back on) · = her collar (on, or off). Look at her with the mouse; W gets you up; type the rest ("lotus", "on my side", "bend over", "use the belt", "collar me")',
     'rev.hud': 'ROLES REVERSED', 'rev.order': 'she wants',
   });
   Object.assign(STRINGS.hr || {}, {
     'help.k.reverse': 'u kabini reci ili utipkaj "zamijenimo uloge" — ti si u Bayeinom tijelu, a Chloe zapovijeda (i udara). Radi što kaže: tipke ispod, ili utipkaj ("lezi na krevet", "raširi noge"). "crvena" odmah završava; "zamijenimo uloge" opet vraća',
-    'help.k.revkeys': 'zamijenjene uloge: 1 ustani · 2 lezi na krevet · 3 na trbuh · 4 klekni · 5 noge raširi / skupi · 6 ruke u stranu / uz tijelo · 7 na leđa · \\ njezin remen · = njezina ogrlica. Pogledaj je mišem; W te diže; ostalo utipkaj ("lotos", "na bok", "remen", "ogrlica")',
+    'help.k.revkeys': 'zamijenjene uloge: 1 ustani · 2 lezi na krevet · 3 na trbuh · 4 klekni · 5 noge raširi / skupi · 6 ruke u stranu / uz tijelo · 7 na leđa · \\ njezin remen · = njezina ogrlica. Pogledaj je mišem; W te diže; ostalo utipkaj ("lotos", "na bok", "sagni se", "remen", "ogrlica")',
     'rev.hud': 'ZAMIJENJENE ULOGE', 'rev.order': 'želi',
   });
   Object.assign(STRINGS.fr || {}, {
     'help.k.reverse': 'dans la cabine, dites ou tapez « inverser les rôles » — vous êtes dans le corps de Baye et Chloe donne les ordres (et la fessée). Faites ce qu’elle dit : les touches ci-dessous, ou tapez-le (« sur le lit », « écarte les jambes »). « rouge » arrête tout de suite ; « inverser les rôles » à nouveau rend les rôles',
-    'help.k.revkeys': 'rôles inversés : 1 debout · 2 sur le lit · 3 sur le ventre · 4 à genoux · 5 jambes écartées / serrées · 6 bras écartés / le long du corps · 7 sur le dos · \\ sa ceinture · = son collier. Regardez-la à la souris ; W vous relève ; tapez le reste (« lotus », « sur le côté », « ceinture », « collier »)',
+    'help.k.revkeys': 'rôles inversés : 1 debout · 2 sur le lit · 3 sur le ventre · 4 à genoux · 5 jambes écartées / serrées · 6 bras écartés / le long du corps · 7 sur le dos · \\ sa ceinture · = son collier. Regardez-la à la souris ; W vous relève ; tapez le reste (« lotus », « sur le côté », « penche-toi », « ceinture », « collier »)',
     'rev.hud': 'RÔLES INVERSÉS', 'rev.order': 'elle veut',
   });
 }
@@ -362,6 +367,7 @@ function revOn(src = 'typed') {
   rev.last = null;
   rev.walk = v.phase === 'dwell';
   Object.assign(rev.arm, { mode: null, ph: 'idle', t: 0, w: 0, lift: 0, n: 0, posed: false });
+  if (typeof rvmClear === 'function') rvmClear();
   Object.assign(rev.dom, { on: rev.dom.on, next: rev.clock + 3.0, order: null, obey: 0, miss: 0, streak: 0,
     heat: REV.heatRest, punish: 0, last: [], moved: 0, stillFrom: null });
   // You into her: the walker where she stands, looking where she looks.
@@ -379,6 +385,8 @@ function revOff(why = 'asked') {
   if (!rev.on) return 'not on';
   // Her belt back on her and the collar off you, now (1.564.0).
   if (typeof rvkClear === 'function') rvkClear(why);
+  // Her moves, hands, knees and look (1.565.0).
+  if (typeof rvmClear === 'function') rvmClear();
   rev.on = false;
   if (jadrija && jadrija.ride) jadrija.ride(null);
   revArmClear();
@@ -418,6 +426,8 @@ function revSafe(who = 'you') {
   // And her belt and the collar (1.564.0): a swing stops where it is and she
   // lets go of the strap; the collar comes off at once.
   if (typeof rvkSafe === 'function') rvkSafe();
+  // And her moves (1.565.0): a hold, a grip, a hand on your chin — all off.
+  if (typeof rvmSafe === 'function') rvmSafe();
   revTrace({ pick: 'SAFEWORD', why: who });
   revHud();
   return 'stopped';
@@ -468,6 +478,8 @@ function revWords(text) {
   if (/^(look at (her|chloe|you)|i'?m looking( at you)?|pogledaj je|gledam te|je te regarde)$/.test(t)) return 'rev.ask:look';
   if (/^(look down|eyes down|spusti pogled|baisse les yeux)$/.test(t)) return 'rev.ask:look.down';
   if (/^(turn( around| over)?|roll over|okreni se|retourne[- ]toi)$/.test(t)) return 'rev.ask:turn';
+  // Bent over the cot's edge (1.565.0: she spanks you there too).
+  if (/^(bend over( the (cot|bed|edge))?|over the edge|(na rub|preko ruba)( kreveta)?|sagni se|penche[- ]toi)$/.test(t)) return 'rev.ask:flat.edge';
   return null;
 }
 
@@ -574,11 +586,17 @@ function revAt() { return !rev.ch.goal; }
 function revSteer(dt) {
   const C = rev.ch, G = C.goal;
   let want = 0;
+  // Kneeling, sitting, or on her way up (1.565.0): turned, never walked. And
+  // a slow walk when a move asks for one (her circles round the cot).
+  const held = typeof rvmHold === 'function' && rvmHold();
+  const slow = typeof rvm !== 'undefined' && rvm.slow ? rvm.slow : 1;
+  if (typeof rvm !== 'undefined') rvm.slow = 0;
   if (G) {
     const dx = G.x - C.x, dz = G.z - C.z, d = Math.hypot(dx, dz);
     if (d < 0.06) { C.goal = null; }
+    else if (held) { want = 0; }
     else {
-      want = Math.min(REV.walk, d * 2.2);
+      want = Math.min(REV.walk * slow, d * 2.2);
       // Turned on to the way first, then walking.
       const yw = Math.atan2(-dx, -dz);
       let dy = yw - C.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
@@ -614,35 +632,49 @@ function revSteer(dt) {
   }
 }
 
-/** Put her figure where she is, her crouch and her arm on it. */
+/**
+ * Put her figure where she is: her body (`rvmBody` in src/49-revmoves.js —
+ * standing, walking, kneeling, sitting on the cot's edge), the bend of her
+ * knees standing (`crouchSolve`, the player's own crouch), and her bow and
+ * the turn of her trunk laid up her spine. Her arms are solved after this
+ * (`rvmTick`, `rvkTick`), on the pose this leaves.
+ */
+const REV_SPINE = ['spine01', 'spine02', 'spine03'];
+const REV_BOW = [0.40, 0.35, 0.25], REV_TURN = [0.30, 0.35, 0.35];
+const _rvT = new THREE.Quaternion(), _rvW = new THREE.Quaternion();
+const _rvY = new THREE.Vector3(0, 1, 0), _rvZ = new THREE.Vector3(0, 0, -1);
 function revDriveChloe(dt) {
   if (!you || !you.drive) return;
   const C = rev.ch, A = rev.arm;
+  const Bd = typeof rvmBody === 'function' ? rvmBody(dt)
+    : { clip: C.sp > 0.2 ? 'walk' : 'idle', fade: 0.2, speed: C.sp > 0.2 ? Math.min(2, Math.max(0.6, C.sp / 0.92)) : 1 };
+  const B = typeof rvm !== 'undefined' ? rvm.body : null;
+  const w = B && B.mode === 'stand' && !(B.was && B.was !== 'stand' && B.t < 1) ? B.w : 0;
   let cr = null;
-  if (A.w > 0.003 && typeof crouchSolve === 'function') {
+  if (w > 0.003 && typeof crouchSolve === 'function') {
     const st = you.fig.state;
-    cr = crouchSolve(A.w, 'idle', st && st.curT ? st.curT : 0);
+    cr = crouchSolve(w, 'idle', st && st.curT ? st.curT : 0);
   }
-  if (cr) {
-    crouchAims(cr, 0, 0, 0, 0, 0);
-    // And over further than a crouch bows, to reach across the cot.
-    const bw = (A.bow || 0) * A.lift;
-    if (bw > 0.003) {
-      you.fig.aim('spine01', 0, 0, -1, cr.b * 0.45 + bw * 0.40);
-      you.fig.aim('spine02', 0, 0, -1, cr.b * 0.33 + bw * 0.35);
-      you.fig.aim('spine03', 0, 0, -1, cr.b * 0.22 + bw * 0.25);
+  if (cr) { crouchAims(cr, 0, 0, 0, 0, 0); A.posed = true; } else if (A.posed) revArmClear();
+  // The bow (over the cot, down to you) and the turn of her trunk.
+  const bow = B ? B.bow : 0, turn = B ? B.turn : 0, cb = cr ? cr.b : 0;
+  if (bow > 0.003 || Math.abs(turn) > 0.003) {
+    for (let i = 0; i < 3; i++) {
+      _rvW.setFromAxisAngle(_rvZ, (cr ? cb * [0.45, 0.33, 0.22][i] : 0) + bow * REV_BOW[i]);
+      _rvT.setFromAxisAngle(_rvY, turn * REV_TURN[i]);
+      armAimQ(you.fig, REV_SPINE[i], _rvT.multiply(_rvW));
     }
-    const base = cr.b + CROUCH_YOU.arm * A.w;
-    you.fig.aim('armUR', 0, 0, 1, base + A.A * A.lift);
-    you.fig.aim('armLR', 0, 0, 1, CROUCH_YOU.elbow * A.w + A.E * A.lift);
-    A.posed = true;
-  } else if (A.posed) revArmClear();
-  const cd = cr ? cr.drop : 0, cb = cr ? cr.back : 0;
+    A.bowed = true;
+  } else if (A.bowed) {
+    if (!cr) for (const n of REV_SPINE) you.fig.aim(n, 0, 0, 1, 0);
+    A.bowed = false;
+  }
+  const sit = typeof rvmSitAt === 'function' ? rvmSitAt() : null;
+  const cd = cr ? cr.drop : 0, cbk = cr ? cr.back : 0;
   rev.lastDrive = you.drive({
-    at: [C.x + Math.sin(C.yaw) * cb, C.y - cd, C.z + Math.cos(C.yaw) * cb],
+    at: sit ? [sit.x, sit.y, sit.z] : [C.x + Math.sin(C.yaw) * cbk, C.y - cd, C.z + Math.cos(C.yaw) * cbk],
     yaw: C.yaw + Math.PI / 2, pitch: 0, seen: true, wet: false,
-    clip: C.sp > 0.2 ? 'walk' : 'idle',
-    speed: C.sp > 0.2 ? Math.min(2, Math.max(0.6, C.sp / 0.92)) : 1,
+    clip: Bd.clip, fade: Bd.fade, speed: Bd.speed,
   });
 }
 
@@ -651,91 +683,23 @@ function revArmClear() {
   if (!you || !you.fig) return;
   if (A.posed && typeof CROUCH_BONES !== 'undefined') for (const b of CROUCH_BONES) you.fig.aim(b, 0, 0, 1, 0);
   A.posed = false;
+  A.bowed = false;
   if (typeof crouchPosed !== 'undefined') crouchPosed = false;
 }
 
 // ── Chloe's hand ─────────────────────────────────────────────────────────────
 //
-// The swing. Down by the cot (the crouch, `w`), her hand laid on the spot
-// and held there while the angle that puts it there is found by feedback
-// (`aim`), up (`wind`), down on to it accelerating (`strike`), the slap on
-// the frame it arrives, a moment on you (`hold`), and up off you (`lift`).
-// Then the next of the round, or she stands.
+// Since 1.565.0 the swing is src/49-revmoves.js's (`rvmSpankStart`,
+// `rvmSpankTick`): the place planned and gone to, her knees or a bend, her
+// palm solved on to the spot and the slap on the frame it lands. `rev.arm`
+// is still its state.
 
-const REV_ARM = { aim: 0.55, wind: 0.30, strike: 0.11, hold: 0.10, lift: 0.30, rise: 0.45,
-  windA: 1.15, windE: 1.0, crouch: 0.85, maxAim: 2.0 };
-
-/** Where on you she is going for, world, and the cot's `hit` for it. */
-function revSpot(v) {
-  const P = revBone('pelvis', new THREE.Vector3());
-  if (!P) return null;
-  if (v.ctx === 'stand') {
-    const r = jadrija.rideFrom();
-    const fx = -Math.sin(r.yaw), fz = -Math.cos(r.yaw);
-    const side = Math.random() < 0.5 ? 1 : -1;
-    const B = jadrija.butt ? jadrija.butt() : null;
-    const c = B && B.find((b) => b.side === side);
-    const T = c ? new THREE.Vector3(c.x, c.y, c.z) : P.clone().add(new THREE.Vector3(-fx * 0.12, -0.05, -fz * 0.12));
-    return { T, hit: null, side, from: [r.x - fx * REV.behind, r.z - fz * REV.behind], face: P };
-  }
-  // On the cot: beside you, level with your seat, on the side the room is.
-  const hf = jadrija.headFrame ? jadrija.headFrame() : null;
-  const ax = hf ? hf.ax : 1, az = hf ? hf.az : 0;
-  const px = -az, pz = ax;
-  let best = null;
-  for (const sgn of [1, -1]) {
-    const sx = P.x + px * REV.side * sgn, sz = P.z + pz * REV.side * sgn;
-    const [cx, cz] = ground.confine ? ground.confine(sx, sz, rev.ch.y) : [sx, sz];
-    const bad = Math.hypot(cx - sx, cz - sz) + (jadrija.kabina.room(cx, cz, 0.15) ? 0 : 5);
-    const score = bad * 4 + 0.2 * Math.hypot(cx - rev.ch.x, cz - rev.ch.z);
-    if (!best || score < best.score) best = { score, x: cx, z: cz };
-  }
-  // Aimed at your seat from her eye there, with a hand's width of play.
-  const o = new THREE.Vector3(best.x, rev.ch.y + 1.25, best.z);
-  const jit = (Math.random() - 0.35) * 0.16;
-  const aim = P.clone().add(new THREE.Vector3(-ax * jit, 0.05, -az * jit));
-  const d = aim.clone().sub(o);
-  const hit = jadrija.cotAim ? jadrija.cotAim(o, d) : null;
-  const ok = hit && !hit.miss;
-  const T = ok ? new THREE.Vector3(hit.x, hit.y, hit.z) : P.clone().add(new THREE.Vector3(0, 0.08, 0));
-  rev.spotDbg = { P: P.toArray().map((x) => +x.toFixed(2)), ax: +ax.toFixed(2), az: +az.toFixed(2), from: [+best.x.toFixed(2), +best.z.toFixed(2)], T: T.toArray().map((x) => +x.toFixed(2)), reg: ok ? hit.reg : null };
-  // Square on to the cot, and not on to the spot: a hand reaches across a
-  // bed from the side of it, and a body turned at a slant slides her along
-  // the frame when she leans in (MEASURED, 0.46 m towards your head).
-  const nx = P.x - best.x, nz = P.z - best.z, nl = Math.hypot(nx, nz) || 1;
-  const face = new THREE.Vector3(best.x + nx / nl * 2, P.y, best.z + nz / nl * 2);
-  return { T, hit: ok ? hit : null, side: ok && hit.side ? hit.side : 1, from: [best.x, best.z], face };
-}
-
-/**
- * Room behind you, standing, for her to spank you from: the spot clear of
- * the walls and the furniture. With your back to a wall she came at you
- * from the side instead and her hand found your hip (photographed).
- */
-function revBehindFree() {
-  const r = jadrija.rideFrom ? jadrija.rideFrom() : null;
-  if (!r) return false;
-  const fx = -Math.sin(r.yaw), fz = -Math.cos(r.yaw);
-  const bx = r.x - fx * REV.behind, bz = r.z - fz * REV.behind;
-  const [cx, cz] = ground.confine ? ground.confine(bx, bz, rev.ch.y) : [bx, bz];
-  return Math.hypot(cx - bx, cz - bz) < 0.04 && jadrija.kabina.room(bx, bz, 0.15);
-}
-
-/** Start a round: `n` slaps, how hard. */
+/** Start a round: `n` slaps, how hard. On the cot, standing, kneeling, on all fours. */
 function revSpankRound(n, why) {
   if (!rev.on) return 'off';
   const v = revView();
-  if (!v || !(v.ctx === 'front' || v.ctx === 'stand')) return 'notthere';
-  if (v.ctx === 'stand' && !revBehindFree()) return 'wall';
-  const S = revSpot(v);
-  if (!S) return 'nospot';
-  const A = rev.arm;
-  Object.assign(A, { mode: 'spank', ph: 'go', t: 0, n, at: S, tgt: S.T.clone(), err: 0, lift: 0, bow: 0 });
-  A.k = 9 + 7 * rev.dom.heat + (Math.random() < rev.dom.heat * 0.4 ? 4 : 0);
-  revGo(S.from[0], S.from[1]);
-  rev.ch.face = S.face;
-  revTrace({ pick: 'spank x' + n, why, heat: +rev.dom.heat.toFixed(2) });
-  return true;
+  if (!v || !(v.ctx === 'front' || (REV.standSpank && (v.ctx === 'stand' || v.ctx === 'kneel' || v.ctx === 'fours')))) return 'notthere';
+  return rvmSpankStart(n, why);
 }
 
 function revArmStop() {
@@ -767,136 +731,13 @@ function revSlap(S, k) {
   rev.slaps++;
   rev.jolt = Math.min(1.4, rev.jolt + 0.6 + 0.4 * (last ? last.u : 0.5));
   rev.dom.heat = Math.min(1, rev.dom.heat + 0.03);
-  revTrace({ pick: 'slap', why: (hit ? hit.reg : 'cheek') + (on ? ' (cot)' : ''), k: +k.toFixed(1),
-    u: last ? +last.u.toFixed(2) : null, miss: +rev.arm.err.toFixed(3) });
+  revTrace({ pick: 'slap', why: (hit ? hit.reg : 'cheek') + (on ? ' (cot)' : ' (' + (rev.arm.ctx || '?') + ')'), k: +k.toFixed(1),
+    u: last ? +last.u.toFixed(2) : null });
 }
 
+/** The swing a frame (`rvmSpankTick`); the aftercare's hand is a move of hers now. */
 function revArmTick(dt) {
-  const A = rev.arm, R = REV_ARM;
-  const ease = (a, b, k) => a + (b - a) * (1 - Math.exp(-k * dt));
-  if (A.mode === 'care') {
-    // Down to you, her hand on your hair, slowly round.
-    // (Down only to a head that is down: off the collar at a safeword you
-    // are on your feet but not on your own walk yet — 1.564.0.)
-    const H = revBone('head', new THREE.Vector3());
-    const low = !rev.walk && !(H && H.y - rev.ch.y > 1.25);
-    A.w = ease(A.w, low ? R.crouch * 0.7 : 0, 6);
-    A.lift = ease(A.lift, 1, 5);
-    if (H) { A.tgt = H.add(new THREE.Vector3(0, 0.10, 0)); revArmFit(dt, 1.6); }
-    A.A += Math.sin(rev.clock * 2.4) * 0.12 * dt;
-    return;
-  }
-  if (A.mode !== 'spank') {
-    // Up again, the arm down.
-    A.w = ease(A.w, 0, 5);
-    A.lift = ease(A.lift, 0, 6);
-    if (A.w < 0.004) A.w = 0;
-    if (A.lift < 0.004) A.lift = 0;
-    return;
-  }
-  A.t += dt;
-  // The spot, again: you move under her (the cot's ragdoll, your own asks).
-  const v = revView();
-  if (!v || !(v.ctx === 'front' || v.ctx === 'stand' || A.ph === 'hold' || A.ph === 'lift')) {
-    revTrace({ pick: 'spank off', why: 'you moved: ' + (v ? v.phase : '?') });
-    A.mode = null; A.ph = 'rise'; return;
-  }
-  if (A.ph === 'go') {
-    A.w = ease(A.w, 0, 6);
-    if (revAt() || A.t > 6) { A.ph = 'aim'; A.t = 0; A.lift = 0; }
-    return;
-  }
-  const crouchTo = v.ctx === 'stand' ? 0.35 : R.crouch;
-  if (A.ph === 'aim') {
-    A.w = ease(A.w, crouchTo, 7);
-    A.lift = ease(A.lift, 1, 5);
-    A.E = ease(A.E, 0.30, 6);
-    revArmFit(dt, 3.0);
-    if (rev.armStop === 'aim') return;
-    if (A.t > R.aim && (A.err < 0.05 || A.t > R.aim + 1.4)) { A.ph = 'wind'; A.t = 0; A.base = A.A; A.baseE = A.E; }
-    return;
-  }
-  const u = (x) => Math.min(1, Math.max(0, x));
-  if (A.ph === 'wind') {
-    const e = u(A.t / R.wind), s = e * e * (3 - 2 * e);
-    A.A = A.base + R.windA * s; A.E = A.baseE + R.windE * s;
-    if (A.t >= R.wind) { A.ph = 'strike'; A.t = 0; if (Math.random() < 0.6) revSay('spank', false, null, { still: revStill.dom }); }
-    return;
-  }
-  if (A.ph === 'strike') {
-    const e = u(A.t / R.strike), s = e * e;
-    A.A = A.base + R.windA * (1 - s); A.E = A.baseE + R.windE * (1 - s);
-    if (A.t >= R.strike) {
-      revSlap(A.at, A.k);
-      A.ph = 'hold'; A.t = 0;
-    }
-    return;
-  }
-  if (A.ph === 'hold') { if (A.t >= R.hold) { A.ph = 'lift'; A.t = 0; } return; }
-  if (A.ph === 'lift') {
-    const e = u(A.t / R.lift);
-    A.A = A.base + 0.35 * e;
-    if (A.t >= R.lift) {
-      A.n -= 1;
-      if (A.n > 0) { A.ph = 'aim'; A.t = R.aim * 0.6; A.at = revSpot(v) || A.at; A.tgt = A.at.T.clone(); }
-      else { A.mode = null; A.ph = 'rise'; A.t = 0; }
-    }
-  }
-}
-
-/**
- * Her hand on to the spot by feedback: the arm's swing for the height, her
- * feet for the rest. `gain` how quickly. `A.err` what is left, m.
- */
-function revArmFit(dt, gain) {
-  const A = rev.arm, C = rev.ch;
-  const H = revHand(new THREE.Vector3());
-  const S = revShoulder(new THREE.Vector3());
-  if (!H || !S || !A.tgt) return;
-  // The wrist a palm's breadth above the skin.
-  const T = _rvB.copy(A.tgt).add(_rvU.set(0, 0.055, 0));
-  const fx = -Math.sin(C.yaw), fz = -Math.cos(C.yaw);
-  const ex = T.x - H.x, ey = T.y - H.y, ez = T.z - H.z;
-  A.err = Math.hypot(ex, ey, ez);
-  // The swing, in her own fore-and-aft plane: the angle from straight down
-  // of shoulder-to-hand against shoulder-to-spot, and the difference taken.
-  const hx = H.x - S.x, hy = H.y - S.y, hz = H.z - S.z;
-  const tx = T.x - S.x, ty = T.y - S.y, tz = T.z - S.z;
-  const ph = Math.atan2(hx * fx + hz * fz, -hy), pt = Math.atan2(tx * fx + tz * fz, -ty);
-  const k = Math.min(1, gain * dt * 2.5);
-  A.A = Math.min(REV_ARM.maxAim, Math.max(-0.3, A.A + (pt - ph) * k));
-  // Out of reach: lean in over it (her back, `bow`), and step where the
-  // room lets her - across, mostly, since the cot stops her coming nearer.
-  const far = Math.hypot(tx, ty, tz) - Math.hypot(hx, hy, hz);
-  A.bow = Math.min(0.5, Math.max(0, (A.bow || 0) + far * k * 0.8));
-  const rx = -fz, rz = fx;
-  const across = ex * rx + ez * rz;
-  const step = Math.min(1, gain * dt * 0.8);
-  let nx = C.x + rx * across * step, nz = C.z + rz * across * step;
-  if (ground.confine) [nx, nz] = ground.confine(nx, nz, C.y);
-  // Nearer, only where the frame lets her come in straight.
-  if (far > 0.01) {
-    const qx = nx + fx * far * step, qz = nz + fz * far * step;
-    const [cx, cz] = ground.confine ? ground.confine(qx, qz, C.y) : [qx, qz];
-    if (Math.hypot(cx - qx, cz - qz) < 0.002) { nx = qx; nz = qz; }
-  }
-  C.x = nx; C.z = nz;
-  // And still facing it.
-  const F = rev.ch.face;
-  if (F) {
-    const yw = Math.atan2(-(F.x - C.x), -(F.z - C.z));
-    let dy = yw - C.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
-    C.yaw += dy * (1 - Math.exp(-5 * dt));
-  }
-}
-
-/** Her right shoulder, world. */
-function revShoulder(out) {
-  if (!you || !you.fig) return null;
-  const i = you.fig.boneIndex('armUR');
-  if (i < 0) return null;
-  you.mesh.updateMatrixWorld();
-  return you.fig.boneAt(i, out).applyMatrix4(you.mesh.matrixWorld);
+  if (rev.arm.mode === 'spank' && typeof rvmSpankTick === 'function') rvmSpankTick(dt);
 }
 
 // ── Chloe's choices ──────────────────────────────────────────────────────────
@@ -991,14 +832,19 @@ function revDecide() {
     s *= recent(id) ? 0.25 : 1;
     cands.push({ id: 'order:' + id, s });
   }
-  // On her front on the cot, or standing — Chloe comes round behind you.
-  // Not with her belt or the leash in that hand (1.564.0).
+  // On her front on the cot — and since 1.565.0 standing, kneeling or on all
+  // fours, where she comes to your side to do it. Not with her belt or the
+  // leash in that hand (1.564.0).
   const full = typeof rvkHandFull === 'function' && rvkHandFull();
-  const canSpank = !full && (ctx === 'front' || (REV.standSpank && ctx === 'stand' && revBehindFree()));
+  const floorW = { stand: 0.6, kneel: 0.5, fours: 0.75 };
+  const canSpank = !full && (ctx === 'front' || (REV.standSpank && !!floorW[ctx]));
   if (canSpank) {
-    cands.push({ id: 'spank', s: (D.punish ? 4 : (ctx === 'front' ? 1.0 : 0.5) + 1.2 * D.heat + 0.25 * D.streak)
+    cands.push({ id: 'spank', s: (D.punish ? 4 : (ctx === 'front' ? 1.0 : floorW[ctx]) + 1.2 * D.heat + 0.25 * D.streak)
       * (recent('spank') > 1 ? 0.5 : 1) });
   }
+  // Her moves (1.565.0, src/49-revmoves.js): circling the cot, her hand in
+  // your hair, holding you down, sitting by you, your chin, your nape.
+  if (typeof rvmCands === 'function') for (const c of rvmCands(ctx, D)) cands.push(c);
   const toys = revToys();
   if (toys.length && D.obey >= 1) cands.push({ id: 'buzz', s: 0.25 + 0.6 * D.heat });
   if (rev.walk && revGap() > 2.2) cands.push({ id: 'prowl', s: 0.6 });
@@ -1014,7 +860,7 @@ function revDecide() {
   let x = Math.random() * tot, pick = cands[cands.length - 1];
   for (const c of cands) { x -= c.s; if (x <= 0) { pick = c; break; } }
   const alt = cands.slice().sort((a, b) => b.s - a.s).slice(0, 4).map((c) => c.id + ' ' + c.s.toFixed(2)).join(', ');
-  D.last.push(pick.id.startsWith('order:') ? pick.id.slice(6) : pick.id);
+  D.last.push(pick.id.replace(/^(order|move):/, ''));
   if (D.last.length > 8) D.last.shift();
   D.next = rev.clock + REV.gap[0] + (REV.gap[1] - REV.gap[0]) * Math.random();
   if (pick.id.startsWith('order:')) {
@@ -1026,6 +872,10 @@ function revDecide() {
     D.punish = 0;
     if (r !== true) revTrace({ pick: 'spank:' + r });
     D.next = rev.clock + 4 + n * 1.2;
+  } else if (pick.id.startsWith('move:')) {
+    const r = rvmStart(pick.id.slice(5), 'mood | alt: ' + alt);
+    if (r !== true) revTrace({ pick: pick.id + ':' + r });
+    D.next = rev.clock + 3;
   } else if (pick.id === 'buzz') {
     const k = toys[Math.floor(Math.random() * toys.length)];
     const secs = 5 + Math.round(6 * D.heat);
@@ -1059,6 +909,8 @@ function revTick(dt) {
   const Y = ground.you;
   const v = revView();
   if (!v || !v.inKab || v.swim) { revOff('left'); return; }
+  // Her last contact, measured against her palm as it was drawn (1.565.0).
+  if (typeof rvmMeasure === 'function') rvmMeasure();
   const r = jadrija.rideFrom();
   // ── you, in her ──
   const walk = v.phase === 'dwell' && !v.ask;
@@ -1128,17 +980,21 @@ function revTick(dt) {
     rev.dom.heat += (REV.heatRest - rev.dom.heat) * (1 - Math.exp(-dt / REV.heatTau));
     revOrderTick(dt, v);
   }
+  const busy = typeof rvmBusy === 'function' && rvmBusy();
   if (!rev.care && rev.dom.on) {
-    if (!rev.dom.order && rev.arm.mode !== 'spank' && rev.clock >= rev.dom.next) revDecide();
+    if (!rev.dom.order && rev.arm.mode !== 'spank' && !busy && rev.clock >= rev.dom.next) revDecide();
   }
   // Idling: facing you — not while she stands square to the cot with her
-  // belt, and not with you on her leash (she leads, or faces your neck).
+  // belt, and not with you on her leash (she leads, or faces your neck), and
+  // not in the middle of a move of hers, which turns her itself.
   const kitFace = typeof rvkBeltRound === 'function' && (rvkBeltRound() || rvkCollarOn());
-  if (!rev.care && !rev.ch.goal && rev.arm.mode == null && !kitFace) rev.ch.face = revBone('pelvis', new THREE.Vector3()) || rev.ch.face;
+  if (!rev.care && !rev.ch.goal && rev.arm.mode == null && !kitFace && !busy) rev.ch.face = revBone('pelvis', new THREE.Vector3()) || rev.ch.face;
   if (kitFace && !rev.ch.goal && !rev.ch.face) rev.ch.face = revBone('pelvis', new THREE.Vector3());
   revDriveChloe(dt);
   // Her belt and the collar (1.564.0): her arms solved, the strap stepped.
   if (typeof rvkTick === 'function') rvkTick(dt);
+  // Her moves, her hands, her look (1.565.0).
+  if (typeof rvmTick === 'function') rvmTick(dt);
   revCamera(dt);
   revHud();
 }
@@ -1147,29 +1003,18 @@ function revTick(dt) {
 function revCareTick(dt, v) {
   const K = rev.care;
   K.t += dt;
-  {
-    if (!K.go) {
-      K.go = true;
-      const H = revBone('head', new THREE.Vector3());
-      if (H) {
-        const r = jadrija.rideFrom();
-        // Beside your head, on the open side.
-        let best = null;
-        for (const a of [0, 1.2, -1.2, 2.4, -2.4, Math.PI]) {
-          const yaw = r.yaw + a;
-          const gx = H.x - Math.sin(yaw) * 0.55, gz = H.z - Math.cos(yaw) * 0.55;
-          const [cx, cz] = ground.confine ? ground.confine(gx, gz, rev.ch.y) : [gx, gz];
-          const bad = Math.hypot(cx - gx, cz - gz) + (jadrija.kabina.room(cx, cz, 0.15) ? 0 : 5);
-          if (!best || bad < best.bad) best = { bad, x: cx, z: cz };
-        }
-        revGo(best.x, best.z);
-        rev.ch.face = H;
-      }
-    }
+  if (!K.go) {
+    // To your head — kneeling by it if it is down — and her hand on your hair
+    // (1.565.0: a move of hers, `care`, with her palm solved on to it and
+    // her fingers soft; it says when her hand is there).
+    K.go = true;
+    rev.arm.mode = 'care';
+    K.how = typeof rvmStart === 'function' ? rvmStart('care', 'safeword') : 'none';
   }
   if (!K.said && K.t > 0.4) { K.said = true; revSay('care', true, null, { still: revStill.care }); }
-  if (K.go && revAt() && rev.arm.mode !== 'care') { rev.arm.mode = 'care'; rev.arm.lift = 0; K.handAt = K.t; }
-  if (rev.arm.mode === 'care' && jadrija.petTouch) jadrija.petTouch(Math.min(1, (K.t - K.handAt) / 0.8));
+  const M = typeof rvm !== 'undefined' ? rvm.move : null;
+  if (K.handAt == null && ((M && M.id === 'care' && M.handOn) || (K.how !== true && K.t > 1.5))) K.handAt = K.t;
+  if (K.how !== true && K.handAt != null && jadrija.petTouch) jadrija.petTouch(Math.min(1, (K.t - K.handAt) / 0.8));
   // Four and a half seconds of her hand, then the roles go back — and not in
   // the middle of her saying it's over (1.563.0: her line is a round trip
   // now, a second or three), up to fourteen seconds in all.
@@ -1207,6 +1052,10 @@ function revCamera(dt) {
     camera.rotateX(-0.05 * rev.jolt);
     camera.rotateZ(0.02 * rev.jolt * Math.sin(rev.clock * 40));
   }
+  // Her hand lifting your chin, or holding your hair at the nape (1.565.0):
+  // your head tipped up toward her, a little rolled.
+  const tl = typeof rvmCamTilt === 'function' ? rvmCamTilt() : null;
+  if (tl && (tl[0] > 0.002 || tl[1] > 0.002)) { camera.rotateX(tl[0]); camera.rotateZ(tl[1]); }
   camera.updateMatrixWorld();
 }
 

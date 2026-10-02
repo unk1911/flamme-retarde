@@ -8,6 +8,206 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.565.0] — 2026-10-02 (baye 1.57.0)
+
+### Roles reversed, phase 2c: Chloe's palm on the spot, her knees, her eyes, and more of her
+
+The night-loop plan, item 3: *"standing spanks done properly + more Chloe
+moves. Fix the 8–19 cm misses (solve the arm to the target with the same
+two-bone hinge solver as 1.561.1), kneel-by-the-cot instead of squat, head
+tracking you, hand poses (open palm, grip), circling, hair stroke, hand on
+your back holding you down, sitting on the cot edge."*
+
+The same two adults and the same game as 1.561.0–1.564.0, and the safeword
+over all of it. The new file is `src/49-revmoves.js`, with hooks in
+49-reverse.js, 49-revkit.js, 49-you.js and 43-jadrija.js.
+
+**Her palm is solved on to the spot** (`rvmSolve`). Phase one swung her arm
+about one axis and leaned her in until the wrist was near the spot. Now the
+spot comes first and everything is worked back from it:
+- **the hand's attitude:** the flat of the palm against the skin's own
+  normal, the fingers along the skin, and the wrist cocked back while she
+  winds up;
+- **the wrist** is where that palm puts it. The palm's middle is 75 mm down
+  the hand from the wrist and its skin 19 mm off the bone line, measured off
+  her mesh: the vertices skinned to `fingersR` in the first 115 mm past the
+  wrist, their plane's normal by its smallest spread (4.1 cm thick against
+  9.3 wide), and which face is the palm by the thumb's side of it;
+- **the arm** is 1.561.1's two-bone hinge solve (`hingeArm`'s algebra, here
+  handing back its two turns), from her clip's own arm;
+- **the hand** gets the turn that is left, with its twist about the forearm
+  shared half and half between the forearm and the hand, which is how this
+  rig carries pronation;
+- **which way the fingers lie** is the one thing a palm on skin leaves free,
+  and it is chosen: of eleven ways round the skin's normal, the one whose
+  hand turn off the forearm is least.
+
+**Making it land** (MEASURED, palm against the spot on the frame of
+contact, off the bones as drawn):
+- First cut: 2–5 cm off everywhere, standing 4.5 cm, almost all of it short
+  of the skin. The solve reads her collarbone as it was last drawn, and her
+  bow was still easing in under the arm. So the palm was drawn a frame
+  behind where it was sent.
+- **The fix is the lag taken off** (`fb`). Where the palm was drawn against
+  where it was sent is that lag, and it changes slowly, so the next goal is
+  sent that much the other way. Also, from the wind-up on her back and knees
+  stay where they are.
+- **And one frame on the spot before it counts.** At full stretch kneeling,
+  the frame the palm first arrives was still up to 5 cm off; the next is the
+  spot's own (17 ms).
+- **Out of reach after all her bowing,** she moves nearer or takes the next
+  spot. Before this, one stroke in 80 was a swing at the air, 22 cm off.
+- **Final, 16 strikes each:**
+
+| you | mean | worst |
+|---|---|---|
+| standing | 1.1 mm | 1.5 mm |
+| kneeling | 3.6 mm | 13.5 mm |
+| on all fours | 1.6 mm | 2.0 mm |
+| face down on the cot | 1.8 mm | 2.1 mm |
+| bent over the cot's edge | 1.5 mm | 2.4 mm |
+
+**She goes where her arm reaches from** (`rvmPlan`), and then reaches. She
+looks round the spot in rings (0.40 to 0.88 m), 32 bearings each. A place is
+kept only if:
+- the room and the furniture leave it free (`ground.confine`, `kabina.room`);
+- your body does too: your feet and hands, and, kneeling, her shins behind
+  her;
+- her head, bowed as far as it needs, stays 27 cm off your trunk and head.
+  Kneeling close behind you, it went into your back (photographed).
+
+She is turned so the spot sits a little to her right hand's side. The
+places are scored by the bow her back needs to bring that shoulder within
+0.44 m, by whether her shoulder is on the skin's side of the spot, and by
+the walk. Then, while her hand waits 15 cm over the spot, the bow is closed
+by feedback on her real shoulder.
+
+**She kneels.** For a spot under 0.74 m (you on the cot, kneeling, on all
+fours) she kneels to it: her own `submit` clip, held at its KNEEL key, both
+knees down and her back upright. Getting up is the idle faded in over
+0.85 s. Higher spots (you standing) she takes standing, with the player's
+crouch solve for a bend of the knees and a bow. She stays down a moment
+after a round, and stays put for the next one if her hand still reaches. A
+knee is never walked on: `revSteer` turns her but does not move her while
+she is down or getting up.
+
+**Standing spanks are back on** (`REV.standSpank`). Standing, kneeling, on
+all fours and bent over the cot's edge, as well as face down on it. She
+weights them by where you are, and a punishment wants them too. Off the
+cot there is no ragdoll to take a slap, so your body flinches:
+- a spring on your spine, your back arching away from her hand (`rvmFlinch`);
+- standing, your hips pushed 4–6 cm forward;
+- your camera's jolt, as on the cot.
+
+The sound, the mark and the scene's record are `buttSlap`'s path, as
+before. "bend over" / "sagni se" / "penche-toi" is the cot's edge.
+
+**Her head and eyes follow you** (`rvmLook`). This is 43-jadrija.js's gaze,
+on her:
+- the turn takes her nose as the clip holds it (last frame's own aim taken
+  back off) on to the way to your face;
+- her neck takes 0.55 of it and her head 0.45, up to 1.2 rad;
+- her irises take what is left, up to 0.38 rad, in her head's bind frame
+  (`you.eyes`, new in 49-you.js: her eyeball shader's `uEyeF`);
+- while her hand goes to you she watches where it goes; with the belt, where
+  the strap goes;
+- walking away from you, she looks ahead.
+
+MEASURED standing, kneeling and from across the room: her head 0.0° off your
+face, her eyes 0.0°.
+
+**Her hands have shapes** (`rvmFingers`): her fingers curled about the
+knuckles' own line, off the same measurement as the palm.
+- `flat` for a slap: the fingers straight and together, the thumb in;
+- `grip` for your hair, the belt and the leash;
+- `soft` for a caress;
+- `hip` for her hands on her hips.
+
+**Her belt grip was not a grip.** 1.564.0 curled her fingers about the
+elbow's hinge as the hand carries it, and on this rig that axis is the
+palm's normal (14° off it). It swung her fingers sideways across the buckle.
+`rvkGrip` is the new grip now.
+
+**Her moves** (`rvmStart`). Her selector (`revDecide`) picks them by where
+you are and how warm she is, and each has a line (new beats on the service,
+below):
+- **Circling the cot**, slowly, round an ellipse in the room's space, her
+  eyes on you ("Polako... gledam te sa svih strana.").
+- **Stroking your hair.** She kneels by your head on the cot, or stands by
+  you kneeling. Her soft hand goes from your crown to the back of your head
+  and up again, and your face answers it (`petTouch`). "Tako... dobra si."
+- **Holding you down.** She kneels by the cot with her LEFT hand flat on the
+  small of your back, pressing (70 N down on the ragdoll's back, new
+  `jadrija.cotPress`). The reflexes from your slaps are damped by 85% while
+  she does (arch and kicks). Now and then her right hand spanks you while the
+  left holds you, from the same place. "Ostani dolje."
+- **Sitting on the cot's edge beside you.** She walks to the inner edge
+  level with your thighs and turns out to the room. She sits down on to it
+  (`sitHeld` faded in while her root goes from the floor to the mattress),
+  with her legs solved so her feet stay on the floor. Then she turns to you
+  and leans over, her nearer hand on your back, your bottom or your hair,
+  whichever is nearest.
+- **Your chin**, when you kneel. She stands in front of you with her hand
+  under your chin and lifts. Your head comes up to her (Baye's own gaze, at
+  "you", who is Chloe), and your camera comes up to her face. "Gore glavu.
+  Pogledaj me." It keeps a "look at me" order.
+- **Your nape**: a light hold of your hair, her hand in a grip at the back
+  of your head. Your chest eases back and your camera tilts up and rolls a
+  little. "Mm. Ovako ostani."
+- **Hands on her hips.** While an order waits on you (2.6 s in, two orders
+  in three), she stands over you, a stride off and facing you, with both
+  hands on her hips, until it is kept or missed. "Čekam."
+- **Aftercare** is a move now: kneeling by your head if it is down, her soft
+  hand in your hair, palm solved on to it.
+
+The safeword ends every move at once (`rvmSafe`), before the aftercare.
+
+**A three-and-a-half-minute run** with her choices on and a test player who
+obeys about two orders in three: orders, waits with her hands on her hips,
+standing spanks, cot spanks, the belt (rounds, stowed), a hair stroke, two
+circles, two cot-edge sits, a hold with a spank under it, then the safeword,
+her aftercare and the swap back.
+
+**Her voice** (`server/baye/baye.py` 1.57.0, **needs deploying on mpcn0**):
+new `CHLOE_BEAT`s `circle`, `stroke`, `hold`, `sitby`, `chin`, `grip`,
+`wait`. Undeployed, the page's captions show, as before.
+
+**Found on the way:**
+- An object literal with `press` twice: the palm's 4 mm and the hold's 70 N.
+  The later won, and her hand was sent 70 m into you for the 80 ms of every
+  hold. It is `holdN` now.
+- `rvmPalm` handed its own scratch vector to itself as the output, and the
+  lag estimate read a palm at twice its height.
+
+**Regression:**
+- Normal roles: three hand spanks flat on the cot (3 of 3 landed), the belt
+  out and red, the collar on and red, the autonomous mode on and off, 9 and
+  8.
+- Reversed: her belt out with a round and back on, her collar on you with a
+  tug and off, and phase one's cot spanks.
+- People 100, blockers 820, no console errors. RULE 4: no `rng()` draw
+  added (her choices use `Math.random`, as before).
+
+**Rough, still:**
+- Standing spanks need the hand turned a long way from her clip's (about
+  110° off it, half of that in the forearm). It reads, but the wrist is
+  working hard.
+- Kneeling close behind you kneeling, her bow goes to 0.8 rad to reach past
+  your hands behind your back.
+- Her circles and her approaches are the phase-one steer-and-slide; she can
+  be slow round the cot's end.
+- She sits beside you facing the room and twists to you; there is no
+  getting her legs up on to the cot.
+- Your camera's chin and nape tilt is a camera move; your own look stays
+  yours.
+
+Debug: `__fr.reverse.moves`: `start(id)` ('circle' | 'stroke' | 'hold' |
+'sitby' | 'chin' | 'grip' | 'hips' | 'care'), `end()`, `spank(n, hold)`,
+`acc()` (every contact, palm against spot), `stats()` (by pose), `state()`
+(her body, the plan, both arms, the lag, the hand shapes, the look). Also
+`__fr.reverse.armStop('aim' | 'hold')` holds her hand over the spot or on
+it, for photographs.
+
 ## [1.564.0] — 2026-10-02 (baye 1.56.0)
 
 ### Roles reversed, phase 2b: her belt and the collar, in Chloe's hands
