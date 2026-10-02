@@ -8,6 +8,19 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.580.0] — 2026-10-02
+
+### Simplified the kneeling draw, and a wording pass over the night-loop docs
+
+Misha cleaned up the wording across the night-loop plan, `49-revmoves.js`,
+`49-revpull.js`, and this changelog/TASKLOG — trimming comments and, in
+`49-revpull.js`, simplifying the kneeling draw's target selection: the pose
+solver now picks a reachable point on Chloe's body from the current kneeling
+placement, rather than scoring a fixed point on her flank and separately
+guarding your face off her front (`frontMin`, `rvhFaceIdx`, the corrective
+foot-slide) — all removed. The draw's mechanics (bow for height, her step
+closes the rest, pose solved on the CPU-skinned mesh) are unchanged.
+
 ## [1.579.0] — 2026-10-02
 
 ### The loft at the resolution of the house: beds, ladder-stair, timbers, and a roof that is not lit by the sun from below
