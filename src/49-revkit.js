@@ -771,6 +771,12 @@ function rvkCollarEnd(why = 'done') {
  * A tug of hers, `gest` 'up' / 'down' / null (toward the cot), firm or not
  * (`u`). If the chain is slack she steps off first, and tugs once it is out.
  */
+/** Her line with a tug, by which way it goes. */
+const RVK_TUG_SAY = {
+  up: ['Up. Up you get.', 'Up, babe.', 'Come on, up.'],
+  down: ['Down, girl.', 'Down. Stay low.'],
+  cot: ['Over here.', 'On the cot. Come on.'],
+};
 function rvkTug(gest = null, u = 0.85, why = 'mood') {
   const C = rvk.col;
   const s = typeof collarState === 'function' ? collarState() : null;
@@ -805,7 +811,13 @@ function rvkTugTick(dt, s) {
     if (typeof collarTug === 'function' && collarTug(T.u, T.gest)) {
       T.sent = true; T.t = 0; C.tugs++;
       T.landed0 = typeof colLog !== 'undefined' ? colLog.landed : 0;
-      if (T.gest || T.why === 'cot') revSay('tug', false, null, { still: revStill.dom });
+      // The caption is the line for THIS tug (1.575.0): the table's three
+      // were drawn at random, and "Down, girl." went with tugs up, five
+      // times in one playtest.
+      if (T.gest || T.why === 'cot') {
+        const L = RVK_TUG_SAY[T.gest || 'cot'];
+        revSay('tug', false, L ? L[Math.floor(Math.random() * L.length)] : null, { still: revStill.dom });
+      }
     } else { C.tug = null; return; }
   }
   if (T.sent && (typeof colYank === 'undefined' || !colYank) && T.t > 0.2) {

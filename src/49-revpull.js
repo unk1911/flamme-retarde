@@ -17,8 +17,9 @@
 // arms, her look; this file asks for them):
 //
 //   THE PULL FROM BEHIND (`pull`). You face down on the cot, on all fours,
-//   kneeling or standing. (Not bent over the cot's edge: your head lies on
-//   the far side of the cot by the wall, out of her reach from any floor.)
+//   kneeling or standing. (Bent over the cot's edge your head lies on the
+//   far side of the cot by the wall, out of her reach from any floor; since
+//   1.575.0 she has you up on your knees on the cot first, then takes it.)
 //   She goes where her arm reaches the back of your head from (`rvmPlan`,
 //   checked to be behind you or beside your shoulders), her hand closes on
 //   your hair where the player's own hand closes on Baye's (`hairGrab`,
@@ -65,6 +66,8 @@ const RVH = {
     spank: 0.40,             // chance (plus heat) her other hand spanks you while she holds
     fist: 0.27,              // m her fist is kept off her shoulder as she pulls (she leans back for it)
     reachT: 7,               // s to get there before she gives up
+    leanAfter: 0.6,          // s into the hold before she leans back with it
+    spankAfter: 1.3,         // s into the hold before her other hand starts (your head up by then)
   },
   draw: {
     // Your trunk bowed toward her (rad, the most), your head turned to lay the
@@ -75,6 +78,16 @@ const RVH = {
     gap: 0.015, band: [0.86, 1.08],
     // Her step in to you as you come to her: m at most, m/s.
     slide: 0.35, slideV: 0.25,
+    // Her stand spot moved by what that step and the guard on her front
+    // always did (m along your forward, along her facing) — see `rvhDrawPlan`.
+    planFl: -0.06, planF: 0.13, dead: 0.015,
+    // The look up: how much of your bow toward her you keep (0..1). None
+    // since 1.575.0: your head comes up off her side, upright, before you
+    // look up at her. Keeping half of it left your eye under her armpit and
+    // her upper arm level across your view between you and her face
+    // (photographed, first person, three draws in three); upright, her face
+    // is clear and her arm is below it.
+    upKeep: 0,
     // How far along her your turned head carries your cheek from your own middle line, m.
     turnShift: 0.10,
     // Your face at least this far (m) from the middle of her front below the
@@ -458,7 +471,7 @@ function rvhCands(ctx, D) {
   if (!ctx || rvhFree(false) !== true) return out;
   if (rev.clock - rvh.last < RVH.cool) return out;
   const recent = (id) => D.last.slice(-5).includes(id);
-  if (recent('hair:pull') || recent('hair:draw') || recent('hair:kneel')) return out;
+  if (recent('hair:pull') || recent('hair:draw') || recent('hair:kneel') || recent('hair:upcot')) return out;
   const v = revView();
   const edge = v && v.phase === 'edgeHeld';
   // Spanked or toyed with just now: the slaps counter and her toy moves.
@@ -468,6 +481,9 @@ function rvhCands(ctx, D) {
   if (!edge && (ctx === 'front' || ctx === 'fours' || ctx === 'kneel' || ctx === 'cotKneel' || ctx === 'stand')) {
     out.push({ id: 'hair:pull', s: (ctx === 'stand' ? 0.5 : 1) * (0.15 + 0.6 * ex) });
   }
+  // Bent over the edge, your head is out of her reach (1.575.0): up on your
+  // knees on the cot first, then her fist in your hair from beside you.
+  if (edge && !(rev.dom.order)) out.push({ id: 'hair:upcot', s: 0.8 * (0.15 + 0.6 * ex) });
   if (ctx === 'kneel') out.push({ id: 'hair:draw', s: 0.12 + 0.5 * ex });
   // Standing, and warm: on your knees first, then the draw.
   if (ctx === 'stand' && D.heat > 0.55) out.push({ id: 'hair:kneel', s: 0.10 + 0.3 * ex });
@@ -481,6 +497,22 @@ function rvhChoose(id, why) {
     rvh.after = { what: 'draw', until: rev.clock + 16 };
     return typeof revOrder === 'function' ? revOrder('kneel', 'hair: ' + why) : 'no order';
   }
+  if (k === 'upcot') return rvhUpCot('hair: ' + why);
+  return rvhStart(k, why);
+}
+
+/**
+ * Bent over the cot's edge, her fist cannot reach your hair: your head lies
+ * on the far side by the wall, 0.6-0.8 m from every floor she can stand on
+ * (MEASURED, 1.574.0). Since 1.575.0 she does not give up on it: she has you
+ * up on your knees on the cot (4), and once you are, she takes it from
+ * beside your shoulders (MEASURED: her palm 0.4 mm median on the fist). Not
+ * on your tummy: from the edge that lays you along the cot with your head at
+ * its wall end, 60 cm from her again.
+ */
+function rvhUpCot(why) {
+  rvh.after = { what: 'pull', until: rev.clock + 18, asked: /^asked/.test(why) };
+  return typeof revOrder === 'function' ? revOrder('upcot', why) : 'no order';
   return rvhStart(k, why);
 }
 
@@ -507,7 +539,7 @@ function rvhStart(kind, why = 'mood') {
     // wall: from the floor her arm does not reach it (0.6-0.8 m short of
     // it, MEASURED from every place the room has), and she is not climbing
     // on to the cot to get it.
-    if (v.phase === 'edgeHeld') return 'your head is out of her reach over the cot — face down, on all fours or kneeling';
+    if (v.phase === 'edgeHeld') return 'edge';
     const g = jadrija.hairGrab();
     const Hd = rvmYourHead();
     if (!g || !Hd) return 'no hair to take';
@@ -602,9 +634,16 @@ function rvhPullPlan(ctx, Hd, reach) {
   if (ctx === 'stand' || ctx === 'kneel') {
     if (back.lengthSq() > 0.05) tries.push({ prefer: back.clone().normalize(), K: 3 });
   } else if (ctx === 'fours' || ctx === 'cotKneel') {
+    // Upright on your knees on the cot: behind your back first, as kneeling
+    // on the floor (1.575.0); then beside your shoulders as on all fours.
+    if (ctx === 'cotKneel' && back.lengthSq() > 0.05) tries.push({ prefer: back.clone(), K: 3, behind: true });
     // Her side of you first.
     const sd = (rev.ch.x - pv.x) * across.x + (rev.ch.z - pv.z) * across.z >= 0 ? 1 : -1;
     tries.push({ prefer: across.clone().multiplyScalar(sd), K: 3 }, { prefer: across.clone().multiplyScalar(-sd), K: 3 });
+    // And toward your head, either side (1.575.0): knelt up on the cot from
+    // its edge the best place beside you scored by your hips, the only plan
+    // asked for was refused there, and she gave up ('no room', MEASURED).
+    for (const sg of [sd, -sd]) tries.push({ prefer: across.clone().multiplyScalar(sg).addScaledVector(ax, 1.2).normalize(), K: 4 });
   } else {
     tries.push({ prefer: rvhBehind(ctx, Hd), K: 1.5 }, { prefer: null, K: 0 });
   }
@@ -613,7 +652,7 @@ function rvhPullPlan(ctx, Hd, reach) {
     const P = rvmPlan(reach, { prefer: t.prefer, preferK: t.K });
     if (!P) continue;
     const dx = P.x - T.x, dz = P.z - T.z;
-    if (ctx === 'stand' || ctx === 'kneel') {
+    if (ctx === 'stand' || ctx === 'kneel' || t.behind) {
       const d = Math.hypot(dx, dz) || 1;
       if ((dx * back.x + dz * back.z) / d / (back.length() || 1) < 0.35) continue;
     } else if (ctx === 'fours' || ctx === 'cotKneel') {
@@ -705,6 +744,12 @@ function rvhDrawPlan() {
       // And your head turned on to her carries your cheek a hand along her
       // front-to-back from your middle (`turnShift`, MEASURED).
       const Q = new THREE.Vector3(H1.x, 0, H1.z).addScaledVector(X.fl, 0.072 + D.gap + extra).addScaledVector(fC, D.turnShift);
+      // Where she will END UP, not where the bind says (1.575.0): measured
+      // over three draws her feet then slid 4-9 cm back along your forward
+      // to close on your cheek and 12-16 cm on along her own facing to keep
+      // your face off her front — up to 35 cm of sliding feet. Both were
+      // the same way every time, so she stands there to begin with.
+      Q.addScaledVector(X.fl, D.planFl).addScaledVector(fC, D.planF);
       const x = Q.x - off.x, z = Q.z - off.z;
       const [qx, qz] = ground.confine ? ground.confine(x, z, rev.ch.y) : [x, z];
       if (Math.hypot(qx - x, qz - z) > 0.015 || !jadrija.kabina.room(x, z, 0.12)) continue;
@@ -738,6 +783,17 @@ function rvhTick(dt) {
   const M = rvh.M;
   // Ended from outside (the safeword, an ask, you moving out of it).
   if (M && rvm.move !== M) rvhDone(M, 'ended');
+  // Her order up on to your knees on the cot kept (1.575.0): now the pull.
+  if (rvh.after && rvh.after.what === 'pull') {
+    const v = revView();
+    if (rev.clock > rvh.after.until) rvh.after = null;
+    else if (v && v.ctx === 'cotKneel' && !rev.dom.order && !rvm.move && rev.arm.mode !== 'spank' && !rev.care) {
+      const asked = rvh.after.asked;
+      rvh.after = null;
+      const r = rvhStart('pull', asked ? 'asked' : 'up on the cot');
+      if (r !== true) rvhTrace({ pick: 'hair:pull:' + r, why: 'up on the cot' });
+    }
+  }
   // Her order to kneel kept: now the draw.
   if (rvh.after && rvh.after.what === 'draw') {
     const v = revView();
@@ -815,6 +871,14 @@ function rvhHairHand(s, T, n, d, pole, errs, k = 1) {
     const p = rvmPalm(s, _rvhD);
     if (p) {
       errs.push(p.distanceTo(rvh.sent.T));
+      // Per frame, with what her other hand is doing (`__fr.reverse.hair.errs()`).
+      const shD = rvmShoulder(s, _rvhE);
+      const dSh = shD && rvh.shWas ? +(shD.distanceTo(rvh.shWas) * 1000).toFixed(0) : null;
+      const dT = rvh.tWas ? +(rvh.sent.T.distanceTo(rvh.tWas) * 1000).toFixed(0) : null;
+      if (shD) rvh.shWas = shD.clone();
+      rvh.tWas = rvh.sent.T.clone();
+      (rvh.errTr = rvh.errTr || []).push([+rev.clock.toFixed(3), +(errs[errs.length - 1] * 1000).toFixed(1), rev.arm.mode ? rev.arm.ph : '-', dSh, dT]);
+      if (rvh.errTr.length > 600) rvh.errTr.shift();
       // For a probe: the miss, how far her shoulder was from it, and the
       // solve's own shortfall (past her reach), now and then.
       if (errs.length % 6 === 1) {
@@ -824,7 +888,10 @@ function rvhHairHand(s, T, n, d, pole, errs, k = 1) {
       }
     }
   }
-  rvmAsk(s, { C: T.clone(), n: n.clone(), d: d.clone(), pole, cock: 0.05, shape: 'grip', rate: 9 * k, fb: true });
+  // A softer correction (1.575.0): at the full 0.8 it rang with a
+  // three-frame period while her other hand swung, 5/13/19 mm round and
+  // round (MEASURED); at 0.5 it settles.
+  rvmAsk(s, { C: T.clone(), n: n.clone(), d: d.clone(), pole, cock: 0.05, shape: 'grip', rate: 9 * k, fb: true, fbK: 0.5 });
   rvh.sent = { s, T: T.clone() };
 }
 
@@ -894,9 +961,17 @@ function rvhPullTick(M, dt) {
       // arm shut like a wing). Not while her other hand is swinging, which
       // closes her bow on your bottom itself.
       const sh = rvmShoulder(s, _rvhB);
-      if (sh && rev.arm.mode !== 'spank') {
+      // And not through the yank (1.575.0): the fist comes 26 cm in 0.18 s,
+      // and her bow chasing it moved the shoulder her arm is solved from by
+      // as much again — her palm was 5-10 cm off the fist for a third of a
+      // second at every pull, MEASURED. She leans once she has you.
+      // Her other hand waiting over your bottom ('ready') does not stop it — the
+      // fist is still coming toward her then, and with her bow held it went
+      // past her reach: 55 mm off it, every frame of the strike (MEASURED).
+      const swing = rev.arm.mode === 'spank' && rev.arm.ph !== 'ready' && rev.arm.ph !== 'go';
+      if (sh && !swing && tt > RVH.pull.leanAfter) {
         const d = sh.distanceTo(T);
-        rvm.body.bowTo = Math.max(-0.22, Math.min(M.plan.bow + 0.1, rvm.body.bowTo + (d - RVH.pull.fist) * dt * 4));
+        rvm.body.bowTo = Math.max(-0.22, Math.min(M.plan.bow + 0.1, rvm.body.bowTo + Math.max(-0.5, Math.min(0.5, (d - RVH.pull.fist) * 4)) * dt));
         M.fistD = d;
       }
     }
@@ -906,20 +981,21 @@ function rvhPullTick(M, dt) {
     const yk = tt < 0.12 ? tt / 0.12 : tt < 0.30 ? 1 : Math.max(0, 1 - (tt - 0.30) / 0.4);
     rvh.cam = 1 + (RVH.pull.yank / RVH.pull.cam) * yk;
     M.camMax = Math.max(M.camMax || 0, rvhCamTilt()[0]);
+    // And your eyes go where your head is pulled (1.575.0): looking round at
+    // her behind you when she took it, the first-person view stayed on her
+    // face, a neck turned 180 degrees, with the tip-up laid on top of that
+    // (photographed). Eased to your head's own forward, level part only —
+    // the tip is `rvhCamTilt`'s.
+    rvhLookAlong(dt);
     rvhBrace(M, dt);
     // Her other hand, while this one holds you.
-    if (M.spank && !M.spanked && tt > 0.7 && rev.arm.mode == null) {
+    if (M.spank && !M.spanked && tt > RVH.pull.spankAfter && rev.arm.mode == null) {
       M.spanked = true;
       const n = 1 + Math.floor(Math.random() * (1 + rev.dom.heat * 2));
-      const keep = rvm.goal;
-      const rr = typeof rvmSpankStart === 'function' ? rvmSpankStart(n, 'hair held') : 'none';
-      if (rr === true && !(rev.arm.plan && rev.arm.plan.here)) {
-        // It wanted her somewhere else: not while her fist is in your hair.
-        if (typeof revArmStop === 'function') revArmStop();
-        rev.arm.mode = null; rev.ch.goal = null; rvm.goal = keep;
-        rvhTrace({ pick: 'hair+spank:out of reach' });
-        M.spanked = false; M.spank = false;
-      } else if (rr !== true) rvhTrace({ pick: 'hair+spank:' + rr });
+      // From where she is, or not at all: never a step while her fist is in
+      // your hair (`stay`, checked before anything of hers moves).
+      const rr = typeof rvmSpankStart === 'function' ? rvmSpankStart(n, 'hair held', { stay: true }) : 'none';
+      if (rr !== true) { rvhTrace({ pick: 'hair+spank:' + rr }); M.spank = false; }
     }
     if (tt > M.dur && rev.arm.mode !== 'spank') {
       jadrija.hairPull(false);
@@ -1251,7 +1327,10 @@ function rvhDrawTick(M, dt) {
     let mx = -M.place.fl.x * efl, mz = -M.place.fl.z * efl;
     if (-efc > 0 || (M.frontNow != null && M.frontNow > D.frontMin + 0.02)) { mx -= f.x * efc; mz -= f.z * efc; }
     const ml = Math.hypot(mx, mz);
-    if (ml > 0.002 && el > 0.002 && (M.slid || 0) < D.slide) {
+    // Not for the last centimetre and a half (1.575.0): the error is read off
+    // skin that breathes, and chasing it walked her feet to and fro — 16-21
+    // cm of sliding for 8 cm of net step, MEASURED.
+    if (ml > 0.002 && el > D.dead && (M.slid || 0) < D.slide) {
       const st = Math.min(ml, D.slideV * dt, D.slide - (M.slid || 0));
       rev.ch.x += mx / ml * st; rev.ch.z += mz / ml * st;
       M.slid = (M.slid || 0) + st;
@@ -1274,7 +1353,7 @@ function rvhDrawTick(M, dt) {
     // her shoulders to you and looks down, or from beside her hip all you see
     // looking up is the side of her shirt (photographed, first person).
     const u = sm((M.t - M.t3) / D.upT);
-    M.up = u; M.bow = M.bow0 * (1 - 0.5 * u); M.turn = 1 - 0.55 * u; M.lat = M.lat0 * (1 - u);
+    M.up = u; M.bow = M.bow0 * (1 - (1 - D.upKeep) * u); M.turn = 1 - 0.55 * u; M.lat = M.lat0 * (1 - u);
     rvm.body.turnTo = D.herTurn * M.place.sg * u; rvm.body.bowTo = D.herBow * u + (M.herBow || 0);
     if (u >= 1) { M.ph = 'look'; M.t4 = M.t; rvhSay('kneel_look', true); }
   } else if (M.ph === 'look') {
@@ -1282,7 +1361,7 @@ function rvhDrawTick(M, dt) {
     if (M.t - M.t4 > D.look) { M.ph = 'out'; M.t5 = M.t; }
   } else if (M.ph === 'out') {
     const u = sm((M.t - M.t5) / D.outT);
-    M.bow = M.bow0 * 0.5 * (1 - u); M.turn = 0.45 * (1 - u); M.up = 1 - u;
+    M.bow = M.bow0 * D.upKeep * (1 - u); M.turn = 0.45 * (1 - u); M.up = 1 - u;
     rvm.body.turnTo = D.herTurn * M.place.sg * (1 - u); rvm.body.bowTo = (D.herBow + (M.herBow || 0)) * (1 - u);
     if (u >= 1) { rvh.bk = 1; rvhDone(M, 'done'); return; }
   }
@@ -1322,6 +1401,20 @@ function rvhDrawTick(M, dt) {
   }
   // Your eyes: where your head points while it rests on her, then up to her face.
   rvhLook(M, dt);
+}
+
+/** The walker's yaw eased round to your head's forward, and its pitch to level. */
+function rvhLookAlong(dt) {
+  const Y = ground && ground.you, f = jadrija.figure;
+  if (!Y || !f) return;
+  const hi = f.boneIndex('head');
+  if (hi < 0) return;
+  const d = new THREE.Vector3(1, 0, 0).applyQuaternion(f.boneTurn(hi, _rvhQ)).applyQuaternion(f.mesh.quaternion);
+  if (Math.hypot(d.x, d.z) < 0.2) return;
+  let dy = Math.atan2(-d.x, -d.z) - Y.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+  const k = 1 - Math.exp(-RVH.look * dt);
+  Y.yaw += dy * k;
+  Y.pitch += (0 - Y.pitch) * k;
 }
 
 /** The walker's look (your first-person view) eased to where your head is. */
@@ -1411,6 +1504,11 @@ function rvhAsk(kind) {
     if (typeof revOrder === 'function') revOrder('kneel', 'asked: draw');
     return { ok: true, label: 'Chloe: on your knees first (4)' };
   }
+  // Asked bent over the edge: up on your knees on the cot first (1.575.0).
+  if (kind === 'pull' && v && v.phase === 'edgeHeld') {
+    rvhUpCot('asked: pull');
+    return { ok: true, label: 'Chloe: up on your knees on the cot first (4)' };
+  }
   const r = rvhStart(kind, 'asked');
   if (r === true) return { ok: true, label: kind === 'pull' ? 'Chloe: her fist in your hair' : 'Chloe: draws you in to her side' };
   return { ok: false, label: 'hair ' + kind + ': ' + r };
@@ -1426,16 +1524,23 @@ function rvhWords(t) {
 // The help sheet, in the three languages — kept with the feature.
 if (typeof STRINGS !== 'undefined') {
   Object.assign(STRINGS.en || {}, {
-    'help.k.revhair': 'roles reversed: . Chloe pulls your hair from behind (face down, on all fours, kneeling or standing — or say "pull my hair") · , kneeling, she draws you in to her side and you hold on to her (or say "draw me in"). She does both on her own when she is excited',
+    'help.k.revhair': 'roles reversed: . Chloe pulls your hair from behind (face down, on all fours, kneeling or standing; bent over the edge she has you kneel up on the cot first — or say "pull my hair") · , kneeling, she draws you in to her side and you hold on to her (or say "draw me in"). She does both on her own when she is excited',
   });
   Object.assign(STRINGS.hr || {}, {
-    'help.k.revhair': 'zamijenjene uloge: . Chloe te vuče za kosu odostraga (na trbuhu, na sve četiri, na koljenima ili stojeći — ili reci "povuci me za kosu") · , na koljenima, privuče te uz svoj bok i držiš se za nju (ili reci "privuci me"). Radi oboje i sama kad se uzbudi',
+    'help.k.revhair': 'zamijenjene uloge: . Chloe te vuče za kosu odostraga (na trbuhu, na sve četiri, na koljenima ili stojeći; sagnutu preko ruba prvo te digne na koljena na krevetu — ili reci "povuci me za kosu") · , na koljenima, privuče te uz svoj bok i držiš se za nju (ili reci "privuci me"). Radi oboje i sama kad se uzbudi',
   });
   Object.assign(STRINGS.fr || {}, {
-    'help.k.revhair': 'rôles inversés : . Chloe vous tire les cheveux par derrière (sur le ventre, à quatre pattes, à genoux ou debout — ou dites « tire-moi les cheveux ») · , à genoux, elle vous attire contre sa hanche et vous vous tenez à elle (ou « attire-moi »). Elle le fait aussi d’elle-même quand elle est excitée',
+    'help.k.revhair': 'rôles inversés : . Chloe vous tire les cheveux par derrière (sur le ventre, à quatre pattes, à genoux ou debout ; penchée sur le bord, elle vous fait d’abord mettre à genoux sur le lit — ou dites « tire-moi les cheveux ») · , à genoux, elle vous attire contre sa hanche et vous vous tenez à elle (ou « attire-moi »). Elle le fait aussi d’elle-même quand elle est excitée',
   });
 }
 if (typeof REV_SAY !== 'undefined') Object.assign(REV_SAY, RVH_SAY);
+// Her order off the edge and up on to the cot, for the pull (1.575.0): never
+// one of her own picks as an order (no `ctx`); `hair:upcot` gives it.
+if (typeof REV_ORDERS !== 'undefined') {
+  REV_ORDERS.upcot = { ctx: {}, w: 0, key: '4', wait: 12,
+    ok: (v) => v.onBed && v.phase === 'bedKneel', say: 'Up. On your knees, on the cot. I want that hair.',
+    hud: ['Gore. Na koljena, na krevetu.', 'Up on your knees, on the cot.', 'Debout. À genoux sur le lit.'] };
+}
 
 /**
  * A debug camera on the move: at `d` m, `az` rad round from her facing (0 in
@@ -1469,6 +1574,8 @@ const rvhApi = {
   cands: () => { const v = revView(); return rvhCands(v ? v.ctx : null, rev.dom); },
   view: (az, d, h, at) => rvhView(az, d, h, at),
   last: () => rvh.stats,
+  /** The palm-to-fist miss per frame: [t, mm, her other hand's swing phase]; `reset` clears. */
+  errs: (reset = false) => { const a = (rvh.errTr || []).slice(); if (reset) rvh.errTr = []; return a; },
   /** Debug: RVH's numbers merged (`tune({ pull: { spank: 1 } })`); answers the table. */
   tune: (o) => {
     for (const [k, v] of Object.entries(o || {})) {
