@@ -758,7 +758,7 @@ const ears = (() => {
           // And WHERE, when it is not the obvious place (1.559.1): "in the
           // hammock", "right where she is" — see `askWhere` in 43-jadrija.js.
           const where = ok && J.askWhere ? J.askWhere(name) : '';
-          const label = (DOES[base] || base) + (what ? ' — ' + what : '') + (where ? ', ' + where : '');
+          const label = (DOES[base + '.' + what] || DOES[base] || base) + (what ? ' — ' + what : '') + (where ? ', ' + where : '');
           note('baye: ' + (ok ? label
             : (WHY[got] || 'cannot do that here')), ok ? 'did' : 'meta');
         }
@@ -867,6 +867,9 @@ const ears = (() => {
     // on. The label says where she is going, like the recons, because the
     // first two seconds of it are her walking to the stool.
     wear: 'over to the stool for it',
+    // And the plug, which is on the shelf by the television (1.560.1). Looked
+    // up on base and key before base alone — see the label in `send`.
+    'wear.plug': 'up to the shelf for it',
     // The two that are with you rather than at you.
     kiss: 'coming over to kiss you', hug: 'coming over for a hug',
     // The errand that comes back holding something. The panel says where she

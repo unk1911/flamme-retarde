@@ -21,6 +21,23 @@ cfg 1, so the negative prompt is inert (see restyle-prompt-dominates) and the
 positive prompt is the whole text conditioning. The README asks for one or two
 sentences describing the finished shot and never the words clay/3D/Unreal.
 
+Knobs added for the 1 Oct sweep (all default to the shipped graph):
+
+    --ctl union      Lightricks' Union Control IC-LoRA (depth / canny / pose,
+                     LTX-2.3 weights, used by their 2.5 workflow) instead of
+                     Layout-to-Render. --frames is then the depth or canny
+                     sequence. As shipped it re-adds no guide in stage 2.
+    --first P        open on P (an image, or a PNG directory with --first-n
+                     frames) through LTXVImgToVideoInplace: those frames are
+                     encoded into the latent and held, in both stages. This is
+                     how a long shot is chained — the next pass opens on the
+                     last --first-n frames of the one before — and how a look
+                     image that is ALIGNED with layout frame 0 (a Wan restyle
+                     of frame 0) is used as frame 0 rather than beside it.
+    --cfg 3 --neg …  real CFG on the distilled model (2x the compute).
+    --steps1 12      stage 1 resampled to N steps along the distilled curve.
+    --no-s2guide     stage 2 without the layout re-added at full size.
+
 LICENCE: LTX-2.x Community License + Lightricks AUP forbid sexually explicit
 content in running the model and in its outputs. Exterior, non-explicit shots
 only — never the kabina footage.
@@ -47,7 +64,18 @@ AP.add_argument("--skip", type=int, default=0)
 AP.add_argument("--w", type=int, default=1024, help="final width, /64")
 AP.add_argument("--h", type=int, default=640, help="final height, /64")
 AP.add_argument("--fps", type=float, default=16.0)
-AP.add_argument("--look", required=True, help="box-side look still (art direction)")
+AP.add_argument("--look", default="", help="box-side look still, IC guide at -1 "
+                "(art direction, as shipped); empty = none")
+AP.add_argument("--first", default="", help="box-side image or PNG dir held as "
+                "the opening frame(s) (LTXVImgToVideoInplace), both stages")
+AP.add_argument("--first-n", type=int, default=1, help="frames of a --first dir, 8k+1")
+AP.add_argument("--first-skip", type=int, default=0)
+AP.add_argument("--first-str", type=float, default=1.0)
+AP.add_argument("--ctl", choices=("l2r", "union"), default="l2r")
+AP.add_argument("--cfg", type=float, default=1.0)
+AP.add_argument("--steps1", type=int, default=0, help="resample stage 1 to N steps")
+AP.add_argument("--s2guide", dest="s2guide", action="store_true", default=None)
+AP.add_argument("--no-s2guide", dest="s2guide", action="store_false")
 AP.add_argument("--pos", required=True)
 AP.add_argument("--neg", default="")
 AP.add_argument("--seed", type=int, default=42)
@@ -71,6 +99,22 @@ if _n != A.n:
 if A.w % 64 or A.h % 64:
     sys.exit("--w/--h must divide by 64 (stage 1 runs at half of it, /32)")
 W1, H1 = (A.w // 2, A.h // 2) if A.stage2 else (A.w, A.h)
+if not A.look and not A.first:
+    sys.exit("give --look and/or --first: the art direction has to come from somewhere")
+if A.s2guide is None:
+    A.s2guide = A.ctl == "l2r"           # what each shipped workflow does
+LORA = {"l2r": "ltx-2.5-22b-ic-lora-layout-to-render-1.0.safetensors",
+        "union": "ltx-2.3-22b-ic-lora-union-control-ref0.5.safetensors"}[A.ctl]
+if A.steps1:
+    # the distilled curve, resampled in step-index space: same start and end,
+    # same shape, N steps instead of 8
+    _s = [float(x) for x in A.sigmas1.split(",")]
+    _o = []
+    for k in range(A.steps1 + 1):
+        x = k * (len(_s) - 1) / A.steps1
+        i = min(int(x), len(_s) - 2)
+        _o.append(_s[i] + (_s[i + 1] - _s[i]) * (x - i))
+    A.sigmas1 = ", ".join(f"{v:.6f}" for v in _o)
 
 G = {}
 
@@ -89,8 +133,7 @@ node("clip", "CLIPLoader", {"clip_name":
      "device": "default"})
 node("iclora", "LTXICLoRALoaderModelOnly",
      {"model": ["unet", 0], "lora_name":
-      "ltx-2.5-22b-ic-lora-layout-to-render-1.0.safetensors",
-      "strength_model": A.lora})
+      LORA, "strength_model": A.lora})
 node("upm", "LatentUpscaleModelLoader", {"model_name":
      "ltx-2.5-latent-spatial-upscaler-x2-bf16-1.0.safetensors"})
 
@@ -102,8 +145,28 @@ node("cond", "LTXVConditioning", {"positive": ["tpos", 0],
 node("src", "VHS_LoadImagesPath",
      {"directory": A.frames, "image_load_cap": A.n,
       "skip_first_images": A.skip, "select_every_nth": 1})
-node("look", "VHS_LoadImagePath",
-     {"image": A.look, "custom_width": A.w, "custom_height": A.h})
+if A.look:
+    node("look", "VHS_LoadImagePath",
+         {"image": A.look, "custom_width": A.w, "custom_height": A.h})
+if A.first:
+    if A.first.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
+        node("first", "VHS_LoadImagePath",
+             {"image": A.first, "custom_width": A.w, "custom_height": A.h})
+    else:
+        node("first", "VHS_LoadImagesPath",
+             {"directory": A.first, "image_load_cap": A.first_n,
+              "skip_first_images": A.first_skip, "select_every_nth": 1})
+
+
+def inplace(prefix, latent):
+    """Hold the opening frame(s) — before any IC guide is appended, as in
+    Lightricks' Union Control graph."""
+    if not A.first:
+        return latent
+    node(prefix + "ff", "LTXVImgToVideoInplace", {"vae": ["vae", 0],
+         "image": ["first", 0], "latent": latent, "strength": A.first_str,
+         "bypass": False})
+    return [prefix + "ff", 0]
 
 
 def guides(prefix, pos, neg, latent, dsf):
@@ -114,10 +177,25 @@ def guides(prefix, pos, neg, latent, dsf):
          positive=pos, negative=neg, latent=latent, image=["src", 0],
          frame_idx=0, strength=A.guide, latent_downscale_factor=dsf,
          crop="disabled"))
+    if not A.look:
+        return prefix + "lay"
     node(prefix + "lk", "LTXAddVideoICLoRAGuide", dict(g,
          positive=[prefix + "lay", 0], negative=[prefix + "lay", 1],
          latent=[prefix + "lay", 2], image=["look", 0],
          frame_idx=-1, strength=A.lookstr, latent_downscale_factor=dsf,
+         crop="center"))
+    return prefix + "lk"
+
+
+def look_only(prefix, pos, neg, latent):
+    """Stage 2 without the layout: only the look still, if there is one."""
+    if not A.look:
+        return None
+    g = {"vae": ["vae", 0], "use_tiled_encode": False, "tile_size": 256,
+         "tile_overlap": 64}
+    node(prefix + "lk", "LTXAddVideoICLoRAGuide", dict(g,
+         positive=pos, negative=neg, latent=latent, image=["look", 0],
+         frame_idx=-1, strength=A.lookstr, latent_downscale_factor=1.0,
          crop="center"))
     return prefix + "lk"
 
@@ -128,7 +206,7 @@ def sample(prefix, pos_neg_lat, sigmas):
     node(prefix + "sig", "ManualSigmas", {"sigmas": sigmas})
     node(prefix + "cfg", "CFGGuider", {"model": ["iclora", 0],
          "positive": [pos_neg_lat, 0], "negative": [pos_neg_lat, 1],
-         "cfg": 1.0})
+         "cfg": A.cfg})
     node(prefix + "samp", "SamplerCustomAdvanced", {
          "noise": [prefix + "noise", 0], "guider": [prefix + "cfg", 0],
          "sampler": [prefix + "ks", 0], "sigmas": [prefix + "sig", 0],
@@ -140,13 +218,23 @@ def sample(prefix, pos_neg_lat, sigmas):
 
 node("empty", "EmptyLTXVLatentVideo",
      {"width": W1, "height": H1, "length": A.n, "batch_size": 1})
-g1 = guides("s1", ["cond", 0], ["cond", 1], ["empty", 0], ["iclora", 1])
+g1 = guides("s1", ["cond", 0], ["cond", 1], inplace("s1", ["empty", 0]),
+            ["iclora", 1])
 lat = sample("s1", g1, A.sigmas1)
 
 if A.stage2:
     node("ups", "LTXVLatentUpsampler", {"samples": lat,
          "upscale_model": ["upm", 0], "vae": ["vae", 0]})
-    g2 = guides("s2", ["cond", 0], ["cond", 1], ["ups", 0], 1.0)
+    up = inplace("s2", ["ups", 0])
+    if A.s2guide:
+        g2 = guides("s2", ["cond", 0], ["cond", 1], up, 1.0)
+    else:
+        g2 = look_only("s2", ["cond", 0], ["cond", 1], up)
+    if g2 is None:
+        # no guide at all: sample straight on the held latent, nothing to crop
+        node("s2pass", "LTXVCropGuides", {"positive": ["cond", 0],
+             "negative": ["cond", 1], "latent": up})
+        g2 = "s2pass"
     lat = sample("s2", g2, A.sigmas2)
 
 node("dec", "VAEDecodeTiled", {"samples": lat, "vae": ["vae", 0],
@@ -182,8 +270,10 @@ def validate():
     return not bad
 
 
-print(f"LTX-2.5 L2R · {W1}x{H1}" + (f" -> {A.w}x{A.h}" if A.stage2 else "")
-      + f" n={A.n} · guide {A.guide} look {A.lookstr} lora {A.lora} · seed {A.seed}")
+print(f"LTX-2.5 {A.ctl} · {W1}x{H1}" + (f" -> {A.w}x{A.h}" if A.stage2 else "")
+      + f" n={A.n} · guide {A.guide} look {A.lookstr if A.look else '-'} lora {A.lora}"
+      + f" · first {A.first_n if A.first else '-'} · cfg {A.cfg}"
+      + f" · s1 {len(A.sigmas1.split(',')) - 1} steps · s2guide {A.s2guide} · seed {A.seed}")
 if A.check and not validate():
     sys.exit("graph does not match this server's schema — nothing queued")
 req = urllib.request.Request(A.host + "/prompt",

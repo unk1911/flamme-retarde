@@ -1019,6 +1019,10 @@ html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
   background: #d6336c; border: 0; border-radius: .5rem;
 }
 #cell .cell-buzz.on { background: #7fd6a0; color: #10241a; }
+/* The second channel, the plug (1.560.1): its own colour, the base's. */
+#cell .cell-toy { font-size: .36rem; color: #b9a6d6; letter-spacing: .12em;
+  text-transform: uppercase; margin-top: .3rem; }
+#cell .cell-plug { background: #5b2a86; }
 #cell .cell-buzz:hover { filter: brightness(1.12); }
 #cell .cell-note { font-size: .38rem; color: #8fb3c0; }
 

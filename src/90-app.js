@@ -2760,6 +2760,7 @@ function sceneTalk() {
   if (her) Object.assign(o, her);
   if (o.worn && !o.worn.length) delete o.worn;
   if (!o.buzz) delete o.buzz;
+  if (!o.buzz_plug) delete o.buzz_plug;
   if (!o.on_cot) delete o.on_cot;
   // The hand and the belt, each: how many in the last minute, the last one's
   // seconds, the hardest, and where on her — most-hit first.
@@ -13791,7 +13792,8 @@ window.__fr = {
       }
       phoneToggle(true); phoneApp = k; phoneDraw(); return phoneStats();
     },
-    press: () => { phonePress(); return phoneStats(); },
+    // `press('plug')` is the second channel's button (1.560.1).
+    press: (key) => { phonePress(key || 'lovense'); return phoneStats(); },
   }),
   satchel: {
     put: (key, n) => satchelPut(key, n == null ? 1 : n),

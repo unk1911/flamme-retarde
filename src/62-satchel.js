@@ -152,6 +152,15 @@ const CARRY = [
   { key: 'lovense', label: 'a Lovense remote-control toy',
     give: true, worn: true, box: [0.04, 0.12, 0.04], col: [0.62, 0.12, 0.18],
     radio: true, wear: 'pelvis' },
+  // AND THE OTHER ONE, which is the same row for the other entrance. Misha,
+  // 1 Oct 2026: *"a butt plug that can stand on that shelf by the tv, and can
+  // be used, to stimulate, similar to lovense"*. Pre-placed on the kabina's
+  // shelf the way the Lovense is on the tabouret, so it is not in the bag
+  // either; `radio` puts it on the phone's second channel and `wear` on the
+  // pelvis bone, at the back — see PLUG in 43-jadrija.js.
+  { key: 'plug', label: 'a remote-control plug',
+    give: true, worn: true, box: [0.046, 0.11, 0.046], col: [0.19, 0.07, 0.27],
+    radio: true, wear: 'pelvis' },
   // ── AND A BALL ────────────────────────────────────────────────────────
   //
   // Misha, 26 Sep 2026: the ball for the Slow Doodle. A 22 cm beach ball in
