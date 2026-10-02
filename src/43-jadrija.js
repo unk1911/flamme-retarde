@@ -57818,6 +57818,32 @@ async function buildJadrija(scene) {
   let resetWant = 0;
 
   /**
+   * RIDDEN (1.561.0, the role swap — src/49-reverse.js). While the player is
+   * in her body, `dwell` is not hers: she stands where the walker stands and
+   * faces where it faces, `{ x, z, yaw, sp }` in world terms (`yaw` the
+   * walker's, `sp` its ground speed), with her walk off that speed. Every
+   * other phase — anything asked of her, the cot, the kneel — is hers as
+   * ever, which is what lets the asks drive the body unchanged.
+   */
+  let bayeRide = null, rideN = 0;
+  function bayeRideStep(dt, f, S) {
+    const R = bayeRide;
+    rideN++;
+    const [t, s] = local(R.x, R.z);
+    const st = at(t);
+    const fx = -Math.sin(R.yaw), fz = -Math.cos(R.yaw);
+    const ang = Math.atan2(fx * st.nx + fz * st.nz, fx * st.ux + fz * st.uz);
+    show.t = t; show.s = s;
+    show.ang = ang; show.want = ang; show.rate = 0;
+    show.vel = R.sp || 0;
+    show.gait = null;
+    const want = (R.sp || 0) > 0.25 ? walkClip() : 'idle';
+    if (f.playing() !== want) f.play(want, { fade: 0.25 });
+    S.speed = want === 'idle' ? 1
+      : clamp(R.sp / (want === 'stroll' ? STRIDE.strollV : SHOW.walk), 0.55, 1.75);
+  }
+
+  /**
    * HER FACE, A FRAME OF IT — the water in her mouth, her lips when she
    * talks, "open wide", your thumb, the petting, your hand, the toy, and the
    * chin the water lifts. Out of `stepShow` (1.560.0) so the leash's own step
@@ -59672,6 +59698,8 @@ async function buildJadrija(scene) {
       // dozen frames of her wandering off through a wall, and standing there
       // is the honest end of what has been built.
       case 'dwell':
+        // Ridden: the player is in her body (1.561.0, see `bayeRide`).
+        if (bayeRide && inside) { bayeRideStep(dt, f, S); break; }
         // At you — or, asked to turn around, half a turn from you, re-aimed
         // every frame all the same. See `TURN_HOLD`.
         show.want = Math.atan2(ps - show.s, pt - show.t)
@@ -70454,7 +70482,9 @@ async function buildJadrija(scene) {
     // Only while she is actually drawn: `stepShow` stops being called past
     // 250 m and a collider standing where she was left is a person-shaped hole
     // in the promenade you would walk into with nobody in it.
-    if (show && skinFig && skinFig.mesh.visible
+    // Not while the player is in her (1.561.0, `bayeRide`): the walker IS her
+    // then, and a walker pushed out of its own body walks off up the room.
+    if (show && skinFig && skinFig.mesh.visible && !bayeRide
       && show.t > t - band && show.t < t + band) {
       const p = toWorld(show.t, show.s);
       // A SMALLER CIRCLE WHILE SHE IS KISSING YOU, and not no circle at all.
@@ -76234,6 +76264,12 @@ async function buildJadrija(scene) {
     },
     kabina: special && {
       inside: (x, z) => kabinaInside(x, z),
+      /** Inside the room's walls with `inset` m to spare (1.561.0, the swap's lens). */
+      room: (x, z, inset = 0.3) => {
+        const [t, s] = local(x, z);
+        return t > special.t0 + inset && t < special.t1 - inset
+          && s > special.face + 0.25 + inset && s < special.s1 - inset;
+      },
       // Where in the resort's own frame it is, for anything that has to walk
       // there — and for the tests, which otherwise have to find a door by eye.
       // The big room's, which is the one you are in once you are in it — see
@@ -77217,6 +77253,19 @@ async function buildJadrija(scene) {
     },
     /** Whether she could be asked for `name` now — `askWhy`, null when she could. */
     autoWhy: (name) => (show ? askWhy(name) : 'gone'),
+    /**
+     * THE ROLE SWAP's hold on her `dwell` (1.561.0, src/49-reverse.js):
+     * `{ x, z, yaw, sp }` each frame while the player walks her, null to give
+     * her back. See `bayeRide`.
+     */
+    ride: (o) => { bayeRide = o || null; return !!bayeRide; },
+    rideNow: () => ({ ride: bayeRide, n: rideN }),
+    /** Her root in the world and her heading as a walker's yaw — for the swap. */
+    rideFrom: () => {
+      if (!show || !skinFig) return null;
+      const w = toWorld(show.t, show.s), y = rigYaw(show.t, show.ang);
+      return { x: w[0], y: w[1], z: w[2], yaw: Math.atan2(-Math.cos(y), Math.sin(y)) };
+    },
     /**
      * HER OWN SMALL MOVES (1.560.0) — the autonomous mode's hands on the
      * things below the asks: `cot` a ragdoll move (`cotMove`: 'heels',

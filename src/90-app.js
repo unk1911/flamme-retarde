@@ -256,6 +256,8 @@ addEventListener('keydown', (e) => {
     }
     return;
   }
+  // Roles reversed (1.561.0, src/49-reverse.js): 1-7 are her poses.
+  if (typeof revKey === 'function' && revKey(e)) return;
   if (comp) {
     e.preventDefault();
     if (e.code !== 'Escape') return;
@@ -2805,6 +2807,9 @@ function sceneTalk() {
   // And her own mode (1.560.0): on, held still, what she just chose to do.
   const A = typeof autoScene === 'function' ? autoScene() : null;
   if (A) Object.assign(o, A);
+  // And the role swap (1.561.0): `roles: 'reversed'`.
+  const RV = typeof revScene === 'function' ? revScene() : null;
+  if (RV) Object.assign(o, RV);
   return o;
 }
 
@@ -3979,6 +3984,9 @@ const HELP = [
     ['CLICK + ↑ / ↓', 'help.k.yank'],
     // Her autonomous mode (1.560.0, src/49-auto.js) — a typed or spoken line.
     ['I · “autonomous”', 'help.k.selfmode'],
+    // The role swap (1.561.0, src/49-reverse.js).
+    ['I · “reverse roles”', 'help.k.reverse'],
+    ['1 – 7', 'help.k.revkeys'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
@@ -6783,6 +6791,9 @@ function clearCrouch() {
 
 function poseSwimBody(dt) {
   if (!you) return;
+  // Roles reversed (1.561.0, src/49-reverse.js): she is somebody else's to
+  // drive — an NPC in the room — and this hands her nothing.
+  if (typeof revOwnsYou === 'function' && revOwnsYou()) return;
   // The shot owns her while it is running, and it puts her on a jetty rather
   // than in the water. Nothing here may touch that — including, in
   // particular, the tidy-up below, which would otherwise take her off the
@@ -9724,8 +9735,10 @@ function tick(wall, draw) {
     // thumb on her lip is what opens her mouth. First person only —
     // the view-model arm is the only arm there is to send; in the third
     // person the branch behaves as it always has.
-    const pressing = mouseDrop || (keys.has('Space') && !spaceLeapt)
-      || TOUCH.gjet || debugJet;
+    // Not while roles are reversed (1.561.0): you are in her body, and your
+    // hands are hers.
+    const pressing = !(typeof revActive === 'function' && revActive())
+      && (mouseDrop || (keys.has('Space') && !spaceLeapt) || TOUCH.gjet || debugJet);
     // IN THE KABINA THERE IS NO HOSE. Misha, 23 Sep 2026: *"sometimes it
     // still breaks and becomes hose. in kabine it should just not be a hose
     // at all. it should be a thumb no matter what."* Every gate below was a
@@ -10548,7 +10561,7 @@ function tick(wall, draw) {
     beltHandTick(dt);
     collarHandTick(dt);
     spankHandTick(dt);
-    arms.update(dt, chaseCut || bodyCam ? null
+    arms.update(dt, chaseCut || bodyCam || (typeof revActive === 'function' && revActive()) ? null
       // The belt — see `beltHandTick`. A fist round the buckle, the strap
       // hanging out of the bottom of it; ahead of everything, because while
       // it is in your hand that hand is not free for anything else.
@@ -10643,9 +10656,12 @@ function tick(wall, draw) {
     // the person's own yaw is where her feet point, and you can stand still and
     // turn your head. Distance is decided against the walker and attention
     // against the eye, and they are two different questions.
+    // Roles reversed (1.561.0): the player is in her body, and the person
+    // she is with — whom she faces, looks at, answers — is Chloe, the NPC.
+    const revW = typeof revWho === 'function' ? revWho() : null;
     jadrija.update(dt, camera.position,
-      state.phase === 'ground' && ground && ground.ok
-        ? { x: ground.you.x, y: ground.you.y, z: ground.you.z } : null,
+      revW || (state.phase === 'ground' && ground && ground.ok
+        ? { x: ground.you.x, y: ground.you.y, z: ground.you.z } : null),
       camera.getWorldDirection(_look));
     // The crabs, which run from YOU — the walker or the swimmer, not the
     // camera, which in the third person is somewhere else — and from the
@@ -11267,6 +11283,9 @@ function tick(wall, draw) {
   // Before the frame, not after: the reflection is of this frame's world, and
   // it renders into a target of its own, so the order that matters is that the
   // glass has something in it by the time the room it is hanging in is drawn.
+  // Roles reversed (1.561.0, src/49-reverse.js): Chloe as the NPC, her
+  // orders, and the camera in Baye's head — after both walkers have moved.
+  if (typeof revTick === 'function') revTick(dt);
   if (you) you.tick(dt, camera);
   // `?pose` takes the camera AFTER your body has been put where you are — the
   // body hangs off the camera — and before anything draws. See 93-poser.js.
@@ -14133,6 +14152,8 @@ window.__fr = {
    * `moves()`, `words(text)`.
    */
   auto: autoApi,
+  /** The role swap (1.561.0) — see src/49-reverse.js. */
+  reverse: revApi,
   collar: {
     cmd: (what) => collarCmd(what),
     key: () => collarCmd('collar.key'),
