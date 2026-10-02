@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.64.0"
+VERSION = "1.65.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4640,6 +4640,27 @@ CHLOE_BEAT = {
               "and warm, not an order",
     "later": "you wanted to lie down with them and hold them, and they did not "
              "curl up. Let it go lightly, fondly; maybe later",
+    # 1.65.0 (page 1.574.0, src/49-revpull.js): your fist in their hair.
+    # Consensual play between the two of them; the safeword ends it at once.
+    "hair_pulled": "you have just taken a fistful of their hair from behind "
+                   "and pulled their head back, firm but playful, and they "
+                   "gasped. A short, wicked, in-charge line",
+    "kneel_draw": "they are kneeling and you have drawn them in by their hair "
+                  "until their cheek rests against your hip, at your side, "
+                  "and they are holding on to your leg for balance. A short, "
+                  "possessive, affectionate line",
+    "kneel_look": "they are kneeling against your side and you have tipped "
+                  "their head back by the hair so they look up at your face. "
+                  "Tell them to look at you, pleased with them",
+}
+# Your hand in their hair (1.65.0, page 1.574.0): the page's `rev_hair`.
+REV_HAIR = {
+    "pull": "your fist is in their hair from behind and you are holding their "
+            "head pulled back",
+    "draw": "they are kneeling with their cheek against your hip, at your "
+            "side, holding on to your leg, your hand in their hair",
+    "look": "they are kneeling at your side and you are holding their head "
+            "tipped back by the hair so they look up at you",
 }
 # A toy Chloe has drawn partway out (1.59.0): the page sends its key.
 TOY_DRAWN = {"plug": "the plug", "lovense": "the Lovense", "wand": "the wand"}
@@ -5234,10 +5255,13 @@ def clean_scene(raw) -> dict:
         "toy_drawn": _enum(g("toy_drawn"), TOY_DRAWN, 8),
         # And lying behind them, holding them (1.64.0, page 1.573.0).
         "rev_spoon": _enum(g("rev_spoon"), REV_SPOON, 6),
+        # And her hand in their hair (1.65.0, page 1.574.0).
+        "rev_hair": _enum(g("rev_hair"), REV_HAIR, 8),
         "remote_level": clamp_num(g("remote_level"), 0, 4),
     }
     if not out["roles"]:
-        for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "toy_drawn", "remote_level", "rev_spoon"):
+        for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "toy_drawn", "remote_level",
+                  "rev_spoon", "rev_hair"):
             out[k] = None
     if out["remote_level"] is not None:
         out["remote_level"] = int(round(out["remote_level"])) or None
@@ -5539,6 +5563,9 @@ def chloe_scene_lines(s: dict):
                      "breathing together")
         tone.append("This is tender. You two are in love. Be soft, close and "
                     "loving: no orders, no teasing, nothing sexual.")
+    rh = s.get("rev_hair")
+    if rh in REV_HAIR:
+        facts.append(REV_HAIR[rh])
     td = s.get("toy_drawn")
     if td in TOY_DRAWN:
         facts.append(f"your hand is on {TOY_DRAWN[td]} they are wearing and you "
@@ -5755,7 +5782,7 @@ def clean_context(raw: dict) -> dict:
         "scene": (clean_scene(g("scene")) or None) if who in ("baye", "chloe") else None,
         # Chloe's beat, and the order it is about — keys off `CHLOE_BEAT` and
         # `REV_ORDER_WORDS`, never words. See `build_chloe_messages`.
-        "rev": _enum(g("rev"), CHLOE_BEAT, 8) if who == "chloe" else None,
+        "rev": _enum(g("rev"), CHLOE_BEAT, 12) if who == "chloe" else None,
         "rev_order": _enum(g("rev_order"), REV_ORDER_WORDS, 10) if who == "chloe" else None,
     }
     return {k: v for k, v in out.items() if v not in (None, [], "")}

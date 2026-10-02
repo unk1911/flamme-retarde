@@ -4032,6 +4032,8 @@ const HELP = [
     ['– · SHIFT + –', 'help.k.revmoves'],
     // And lying down behind you, holding you (1.573.0).
     ['SHIFT + 7 · “spoon me”', 'help.k.revspoon'],
+    // Her fist in your hair (1.574.0).
+    ['. · ,', 'help.k.revhair'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [

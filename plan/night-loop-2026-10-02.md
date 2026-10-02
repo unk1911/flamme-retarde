@@ -90,7 +90,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    praise; asks "spoon me", "cuddle me", "hold me", "zagrli me u krevetu"; a key. Bodies must
    not interpenetrate (measure gaps); the cot holds both (AVBD/mattress lift as relevant).
    Starts when item 9 or 11 lands (not parallel with item 10 if both touch 49-revmoves).
-13. [ ] **Chloe pulls your hair when she's excited (reverse roles)** (Misha, 06:55: "does Chloe
+13. [x] **Chloe pulls your hair when she's excited (reverse roles)** (Misha, 06:55: "does Chloe
    ever pull me by the hair, when she is excited? ... just like I (Chloe) sometimes pull baye's
    hair, she should do it also to me"). Today she only has 1.565.0's light nape hold (rvm.nape:
    ~7° camera pitch, upper back eased back). Build the real thing, mirroring the player's

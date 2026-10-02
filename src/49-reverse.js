@@ -229,7 +229,12 @@ function revActive() { return !!rev.on; }
 /** Whether this file drives Chloe's figure (90-app.js's `poseSwimBody` stands back). */
 function revOwnsYou() { return !!rev.on; }
 /** The person Baye is with while the roles are reversed: Chloe. */
-function revWho() { return rev.on ? { x: rev.ch.x, y: rev.ch.y, z: rev.ch.z } : null; }
+function revWho() {
+  if (!rev.on) return null;
+  // Her fist in your hair holds your body where it faces (1.574.0, `rvhWho`).
+  const h = typeof rvhWho === 'function' ? rvhWho() : null;
+  return h || { x: rev.ch.x, y: rev.ch.y, z: rev.ch.z };
+}
 /**
  * The scene block's part of this (`sceneTalk` in 90-app.js): the swap, and
  * since 1.563.0 Chloe's side of it for her own voice on the service — the
@@ -249,6 +254,8 @@ function revScene() {
   if (typeof rvtScene === 'function') rvtScene(o);
   // Lying behind you on the cot, holding you (1.573.0).
   if (typeof rvmScene === 'function') rvmScene(o);
+  // Her fist in your hair, or you drawn in to her side (1.574.0).
+  if (typeof rvhScene === 'function') rvhScene(o);
   return o;
 }
 
@@ -423,6 +430,8 @@ function revOff(why = 'asked') {
   if (typeof rvmClear === 'function') rvmClear();
   // A toy she had drawn partway out, seated; her phone away (1.567.0).
   if (typeof rvtClear === 'function') rvtClear();
+  // Her fist out of your hair (1.574.0).
+  if (typeof rvhClear === 'function') rvhClear();
   rev.on = false;
   if (jadrija && jadrija.ride) jadrija.ride(null);
   revArmClear();
@@ -462,6 +471,8 @@ function revSafe(who = 'you') {
   // And her belt and the collar (1.564.0): a swing stops where it is and she
   // lets go of the strap; the collar comes off at once.
   if (typeof rvkSafe === 'function') rvkSafe();
+  // And her fist in your hair (1.574.0): open, this instant.
+  if (typeof rvhSafe === 'function') rvhSafe();
   // And her moves (1.565.0): a hold, a grip, a hand on your chin — all off.
   if (typeof rvmSafe === 'function') rvmSafe();
   // And the toys (1.567.0): a draw stops where it is and goes back to its
@@ -503,6 +514,9 @@ function revWords(text) {
   // whole line, so it never takes a sentence that only mentions a toy.
   const tw = typeof rvtWords === 'function' ? rvtWords(t) : null;
   if (tw) return tw;
+  // Your hair in her fist (1.574.0, src/49-revpull.js): "pull my hair", "draw me in".
+  const hw = typeof rvhWords === 'function' ? rvhWords(t) : null;
+  if (hw) return hw;
   // Her hip tease and her hug and kiss (1.569.0, src/49-revmoves.js).
   if (/^((come on |go on )?show me (your|what you('ve| have) got|some) ?(moves|got)?( then| babe| please)?|show me what you('ve| have) got|show off( for me)?|dance for me|(pokazi|pokazes) mi( sto znas| svoje pokrete| pokrete)?|montre[- ]moi( ce que tu sais faire| tes mouvements)?)$/.test(t)) return 'rev.move:thrust';
   // Lying behind you and holding you (1.573.0, src/49-revmoves.js): "spoon
@@ -572,6 +586,7 @@ function revAct(name) {
     return rvkAsk(name.slice(4));
   }
   if (name.startsWith('rev.move:') && typeof rvmAskMove === 'function') return rvmAskMove(name.slice(9));
+  if (name.startsWith('rev.hair:') && typeof rvhAsk === 'function') return rvhAsk(name.slice(9));
   if ((name.startsWith('rev.toy:') || name.startsWith('rev.remote:')) && typeof rvtAsk === 'function') {
     return rvtAsk(name.slice(4));
   }
@@ -638,6 +653,15 @@ function revKey(e) {
     e.preventDefault();
     if (typeof rvmAskMove === 'function') {
       const r = rvmAskMove(e.shiftKey ? 'hug' : 'thrust');
+      if (typeof toast === 'function') toast(r.label);
+    }
+    return true;
+  }
+  // Your hair in her fist (1.574.0): . the pull from behind, , the kneeling draw.
+  if (e.code === 'Period' || e.code === 'Comma') {
+    e.preventDefault();
+    if (typeof rvhAsk === 'function') {
+      const r = rvhAsk(e.code === 'Period' ? 'pull' : 'draw');
       if (typeof toast === 'function') toast(r.label);
     }
     return true;
@@ -967,6 +991,8 @@ function revDecide() {
   // Her moves (1.565.0, src/49-revmoves.js): circling the cot, her hand in
   // your hair, holding you down, sitting by you, your chin, your nape.
   if (typeof rvmCands === 'function') for (const c of rvmCands(ctx, D)) cands.push(c);
+  // Her fist in your hair, when she is excited (1.574.0, src/49-revpull.js).
+  if (typeof rvhCands === 'function') for (const c of rvhCands(ctx, D)) cands.push(c);
   // The remote: since 1.567.0 a move of hers with the phone in her hand
   // (`move:remote`, src/49-revtoys.js, among `rvmCands`); the bare buzz is
   // what is left without that file.
@@ -999,6 +1025,10 @@ function revDecide() {
     D.next = rev.clock + 4 + n * 1.2;
   } else if (pick.id.startsWith('move:')) {
     const r = rvmStart(pick.id.slice(5), 'mood | alt: ' + alt);
+    if (r !== true) revTrace({ pick: pick.id + ':' + r });
+    D.next = rev.clock + 3;
+  } else if (pick.id.startsWith('hair:') && typeof rvhChoose === 'function') {
+    const r = rvhChoose(pick.id, 'mood | alt: ' + alt);
     if (r !== true) revTrace({ pick: pick.id + ':' + r });
     D.next = rev.clock + 3;
   } else if (pick.id === 'buzz') {
@@ -1123,6 +1153,8 @@ function revTick(dt) {
   // Her hand on a toy you wear, her phone (1.567.0): the last contact
   // measured, a draw going back, a move you asked for.
   if (typeof rvtTick === 'function') rvtTick(dt);
+  // Her fist in your hair (1.574.0): its asks of her arms, before they are solved.
+  if (typeof rvhTick === 'function') rvhTick(dt);
   // Her moves, her hands, her look (1.565.0).
   if (typeof rvmTick === 'function') rvmTick(dt);
   revCamera(dt);
@@ -1198,6 +1230,9 @@ function revCamera(dt) {
   // A toy drawn out or pushed back in (1.567.0): a shiver.
   const sv = typeof rvtCamTilt === 'function' ? rvtCamTilt() : null;
   if (sv) { camera.rotateX(sv[0]); camera.rotateZ(sv[1]); }
+  // Your head pulled back by your hair (1.574.0): your view with it.
+  const hv = typeof rvhCamTilt === 'function' ? rvhCamTilt() : null;
+  if (hv && (hv[0] > 0.002 || Math.abs(hv[1]) > 0.002)) { camera.rotateX(hv[0]); camera.rotateZ(hv[1]); }
   camera.updateMatrixWorld();
 }
 
