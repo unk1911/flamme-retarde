@@ -8,6 +8,83 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.560.3] — 2026-10-01
+
+### The plug, in the cleft and not under it
+
+Misha: *"i see a bug with the butt plug toy, as u can see here she puts it
+in the wrong hole.."* His shot is from behind with her standing. The base
+sits at the bottom of her cleft, in the gap at the top of her thighs. His
+second shot, a headstand seen from the front with her legs apart, looked
+right.
+
+**It did not drift.** The first suspicion was the skin mount: if the plug's
+thighs/pelvis blend were not her skin's, the base would slide off it when
+her legs moved. MEASURED against her own vertices round the base, each
+pushed through its own weights and compared with where the plug's mount
+carries it: the vertex it sat on stayed within 0.2 mm standing, 0.9 in the
+headstand, 1.8 on all fours, 0.1 face down and 4 mm curled up (mostly
+along the axis). The weights were already her skin's, read off the triangle
+there (legUL 0.40, legUR 0.40, pelvis 0.20). The plug went where it was put.
+
+**It was put at the corner.** The 1.560.2 mount touched her at (−0.021,
+0.826) in the bind frame. That is where the underside of her crotch turns
+up into the line between her cheeks, 12 mm above the lowest point of her
+crotch (0.814). Her cheeks only meet above about 0.815. Standing, the front
+of a 46 mm base hung below that point, so seen level from behind it showed
+in the thigh gap. On all fours it sat on the back of her vulva. The
+headstand looked right because it shows the underside, where the corner is
+just "behind the vulva".
+
+**Now it is 3 cm up the line.** The new mount is on her midline vertex at
+(−0.0448, 0.8445). The cleft painted on her skin texture ends there, so the
+dark line now runs down to the base and not past it. Her cheeks are 15 mm
+behind it on either side, so standing they close over its edges. The axis
+rises 46° (`tilt` 0.80, was 60°), about square to her skin there and up
+towards her navel. It sits 1 mm deeper than flush, which tucks it in a
+little. `PLUG.at` is (−0.0501, 0.8390, 0). The skin weights are read again
+off the new triangle: legUL 0.38, legUR 0.38, pelvis 0.21, spine01 0.03.
+The mount still rides those weights each frame, as before.
+
+The candidates were swept against `plugFit` in two passes. The first was 7
+heights up the midline × 7 tilts, in all eight poses. The second was 3
+depths × 6 tilts at the chosen vertex. The worst floating edge across all
+eight poses was the score. Moving 6 mm lower and keeping the old depth
+gives the best fit of all (2.9 mm), but from behind it is hard to tell
+apart from the old place. The vertex at the end of the painted cleft was
+the highest place that stayed under 4 mm.
+
+**Fit, before → after** (posed, mm along the plug's axis; `rim` is
+[pressed-in, median, floating] at the base's inner edge, `hid` is how many
+of 24 points on its edge her own skin hides from a level camera behind her.
+Neck and bulb are 0 of 24 outside her in every row, before and after):
+
+    pose                face        rim (before → after)                  hid
+    bind                8.6 → 7.9   −7.9/−3.2/3.1  → −11.4/−6.2/2.3    16 → 18
+    standing (dwell)    8.5 → 7.8   −11.2/−5.9/3.3 → −17.3/−9.5/2.8    16 → 18
+    headstand           7.8 → 7.5   −4.3/−1.3/2.9  → −5.6/−2.2/2.1      7 → 9
+    on all fours        6.9 → 6.1   −9.3/−3.5/2.9  → −11.0/−6.3/2.3    14 → 16
+    on her front        8.6 → 7.9   −9.4/−4.1/3.2  → −13.3/−7.5/2.6    16 → 18
+    kneeling up (cot)   8.6 → 7.9   −9.1/−3.9/3.2  → −12.8/−7.2/2.6    16 → 18
+    on her back (cot)   7.6 → 6.8   −9.7/−4.0/2.6  → −13.1/−7.6/2.3    16 → 16
+    legs spread         6.8 → 6.6   −4.4/−1.2/2.8  → −5.2/−2.2/2.2      6 → 6
+    fetal               4.7 → 3.9   −13.4/−2.7/2.3 → −18.8/−2.1/3.6    12 → 9
+
+No edge floats more than 3.6 mm. The cheeks now press 4 to 6 mm harder on
+the sides of the base, which is them closing over it. In a level view from
+behind, standing, the base is between her cheeks. From the side it does not
+show at all. Lying face down and on all fours it sits up in the cleft, a
+base-length clear of her vulva. Seen from the front in the headstand it is
+now behind the curve of her crotch.
+
+**The rest follows the mount.** The hand that presses it home aims at the
+mount (`toyMount`). At `strapIt` it now gets to within 89 to 99 mm of it,
+against about 100 before. With both toys in, their bounding boxes are
+58 mm apart and their centres 150 mm. The Lovense is unchanged: tip 36/38,
+LED 7/8.
+
+People 100, blockers 820, no console errors. No `rng()` draw changed.
+
 ## [1.560.2] — 2026-10-01 (baye 1.52.0)
 
 ### The other toy: a plug on the shelf
