@@ -105,15 +105,18 @@ const RVM = {
 };
 
 const RVM_SAY = {
-  circle: [['Polako... gledam te sa svih strana.', "Slowly... I'm looking at you from every side.", 'Doucement... je te regarde sous tous les angles.'],
-    ['Mm. Lijepo izgledaš ovako.', 'Mm. You look lovely like this.', 'Mm. Tu es jolie comme ça.']],
-  stroke: [['Tako... dobra si.', "There... you're good.", "Voilà... tu es sage."],
-    ['Šššš. Tu sam.', "Shhh. I'm here.", 'Chut. Je suis là.']],
-  hold: [['Ostani dolje.', 'Stay down.', 'Reste en bas.'], ['Ni ne pokušavaj.', "Don't even try.", "N'essaie même pas."]],
-  sitby: [['Ajde da te malo pogledam.', 'Let me look at you a bit.', 'Laisse-moi te regarder un peu.']],
-  chin: [['Gore glavu. Pogledaj me.', 'Head up. Look at me.', 'Relève la tête. Regarde-moi.']],
-  grip: [['Mm. Ovako ostani.', 'Mm. Stay just like this.', 'Mm. Reste comme ça.'], ['Moja si.', "You're mine.", 'Tu es à moi.']],
-  wait: [['Čekam.', "I'm waiting.", "J'attends."], ['Hm? I?', 'Hm? Well?', 'Hm ? Alors ?']],
+  // English since 1.569.0, written for her (see `REV_SAY` in 49-reverse.js).
+  circle: ["Mm... let me see you from every angle.", 'Mm. You look so good like this.'],
+  stroke: ["There... you're so good.", "Shh. I'm right here."],
+  hold: ['Stay down.', "Don't even try."],
+  sitby: ['Let me get a good look at you.'],
+  chin: ['Chin up. Look at me.'],
+  grip: ['Mm. Stay just like that.', "You're mine."],
+  wait: ["I'm waiting.", 'Hm? Well?'],
+  // 1.569.0: showing off beside the cot, and holding you.
+  thrust: ['Hehe. Like what you see?', 'Mm, watch me, babe.', "Eyes up here... kidding. Don't stop looking."],
+  hug: ['C\'mere, you.', "Mm. I've got you."],
+  kiss: ['Mm. You taste like the beach.', 'One more... okay, two.'],
 };
 
 const rvm = {
@@ -600,6 +603,7 @@ function rvmBody(dt) {
   B.bow = damp(B.bow, B.bowTo, 5, dt);
   B.w = damp(B.w, B.wTo, 5, dt);
   B.turn = damp(B.turn, B.turnTo, 4, dt);
+  B.push = damp(B.push || 0, B.pushTo || 0, 10, dt);
   const st = you.fig.state;
   if (B.mode === 'kneel') {
     // Held at the KNEEL key.
@@ -1057,6 +1061,11 @@ function rvmCands(ctx, D) {
   if (ctx === 'front' || ctx === 'back' || ctx === 'side') add('sitby', 0.32);
   if (ctx === 'kneel' || ctx === 'cotKneel') add('chin', 0.70);
   if (ctx === 'kneel' || ctx === 'fours' || ctx === 'stand' || ctx === 'cotKneel' || ctx === 'front') add('grip', 0.25 + 0.45 * D.heat);
+  // 1.569.0. Her hip tease, now and then at middling heat and never twice in
+  // a few picks; her hug and kiss while you are on your back, likelier the
+  // better you have been doing.
+  if ((onCot || ctx === 'stand' || ctx === 'kneel') && !recent('thrust') && D.heat > 0.3 && D.heat < 0.85) add('thrust', 0.22);
+  if (ctx === 'back' && !recent('hug')) add('hug', 0.16 + 0.22 * Math.min(2, D.streak));
   // The toys you are wearing, in her hands (1.567.0, src/49-revtoys.js).
   if (typeof rvtCands === 'function') for (const c of rvtCands(ctx, D)) out.push(c);
   return out;
@@ -1143,6 +1152,21 @@ function rvmStart(id, why = 'mood') {
     }
     if (best) { revGo(best.x, best.z); rev.ch.face = Fc.clone(); }
     M.ph = 'on';
+  } else if (id === 'thrust') {
+    // BESIDE the cot, never at its foot: level with your hips, a long step
+    // off its edge, facing you across it.
+    const S = rvmBesideSpot('pelvis', [0.62, 0.72, 0.55], 0.55);
+    if (!S) return 'no room beside the cot';
+    M.spot = S; M.dur = 5.4 + Math.random() * 1.4; M.gap = 9;
+    revGo(S.x, S.z); rev.ch.face = S.face;
+  } else if (id === 'hug') {
+    if (ctx !== 'back') return 'not on your back';
+    const H = rvmHugSpots();
+    if (!H) return 'no shoulders';
+    const P = rvmPlan([{ s: 'R', T: H.far.T, n: H.far.n }, { s: 'L', T: H.near.T, n: H.near.n }],
+      { mode: 'kneel', prefer: H.out, preferK: 3, bowMax: 1.15, headR: 0.12, reach: 0.46 });
+    if (!P) return 'noplace';
+    M.plan = P; M.dur = 9; M.gap = 9; M.kissD = 9;
   } else if ((id === 'toy' || id === 'remote') && typeof rvtStart === 'function') {
     // The toys in her hands (1.567.0, src/49-revtoys.js).
     const r = rvtStart(M);
@@ -1165,6 +1189,10 @@ function rvmEnd(why = 'done') {
   // A draw left out goes back to its seat; the phone goes away (1.567.0).
   if ((M.id === 'toy' || M.id === 'remote') && typeof rvtEnd === 'function') rvtEnd(M, why);
   rvm.nape = 0; rvm.chin = 0;
+  if (M.id === 'thrust' || M.id === 'hug') { rvm.body.pushTo = 0; rvm.body.turnTo = 0; rvm.body.bowTo = 0; rvm.body.wTo = 0; }
+  if (M.gap != null && M.gap < 9) rvmTrace({ pick: 'move gap:' + M.id, why: 'min ' + M.gap.toFixed(3) + ' m' + (M.kissD != null && M.kissD < 9 ? ', faces ' + M.kissD.toFixed(3) + ' m' : '') });
+  rvm.lastGap = { id: M.id, gap: M.gap != null ? +M.gap.toFixed(3) : null, kissD: M.kissD != null ? +M.kissD.toFixed(3) : null,
+    kissed: !!M.kissed, pushMax: M.pushMax != null ? +M.pushMax.toFixed(3) : null, why };
   if (jadrija && jadrija.petTouch && (M.id === 'stroke' || M.id === 'care')) jadrija.petTouch(0);
   rvmTrace({ pick: 'move end:' + M.id, why });
   if (rev.dom && !rev.care) rev.dom.next = Math.max(rev.dom.next, rev.clock + 1.5 + Math.random() * 1.5);
@@ -1257,6 +1285,79 @@ function rvmSitSpot() {
   return { seat, stand: new THREE.Vector3(qx, rev.ch.y, qz), yaw, top: G.top, out: G.out.clone(), ax: G.ax.clone(), toHead: sgn };
 }
 
+/** Your body's bones, world: trunk, head and every limb (a raised leg too). */
+const RVM_ALL = ['pelvis', 'spine02', 'spine03', 'chest', 'neck', 'head', 'armUL', 'armUR', 'armLL', 'armLR', 'handL', 'handR',
+  'legUL', 'legUR', 'legLL', 'legLR', 'footL', 'footR', 'toeL', 'toeR'];
+function rvmYourAll() {
+  const out = [];
+  for (const n of RVM_ALL) { const p = revBone(n, new THREE.Vector3()); if (p) out.push(p); }
+  return out;
+}
+/** Her bones that could touch you: trunk, head, hands, knees. */
+const RVM_HER = ['pelvis', 'spine02', 'chest', 'head', 'handL', 'handR', 'legLL', 'legLR', 'legUL', 'legUR'];
+function rvmGapNow(skip = null) {
+  if (!you || !you.fig) return 9;
+  const mine = rvmYourAll();
+  let g = 9;
+  you.mesh.updateMatrixWorld();
+  for (const n of RVM_HER) {
+    if (skip && skip[n]) continue;
+    const i = you.fig.boneIndex(n);
+    if (i < 0) continue;
+    const q = you.fig.boneAt(i, _mT).applyMatrix4(you.mesh.matrixWorld);
+    for (const p of mine) g = Math.min(g, p.distanceTo(q));
+  }
+  return g;
+}
+
+/**
+ * A place BESIDE the cot (1.569.0): level with your bone `at` along it, `offs`
+ * m out from its edge into the room, facing you across it — and kept only if
+ * every bone of yours, a raised leg included, is at least `clear` m off it on
+ * the level. Never the cot's foot: that is between your legs.
+ */
+function rvmBesideSpot(at, offs, clear) {
+  const G = rvmCotGeom();
+  const B = revBone(at, new THREE.Vector3());
+  if (!G || !G.edge || !B) return null;
+  const inset = (G.edge.x - G.mid.x) * G.out.x + (G.edge.z - G.mid.z) * G.out.z;
+  const along0 = (B.x - G.mid.x) * G.ax.x + (B.z - G.mid.z) * G.ax.z;
+  const mine = rvmYourAll();
+  for (const off of offs) {
+    for (const da of [0, 0.12, -0.12, 0.24, -0.24]) {
+      const a = along0 + da;
+      const x = G.mid.x + G.ax.x * a + G.out.x * (inset + off), z = G.mid.z + G.ax.z * a + G.out.z * (inset + off);
+      const [qx, qz] = ground.confine ? ground.confine(x, z, rev.ch.y) : [x, z];
+      if (Math.hypot(qx - x, qz - z) > 0.02 || !jadrija.kabina.room(x, z, 0.15)) continue;
+      if (mine.some((p) => Math.hypot(p.x - x, p.z - z) < clear)) continue;
+      const face = new THREE.Vector3(x - G.out.x * 3, rev.ch.y, z - G.out.z * 3);
+      return { x, z, face, along: a, off, out: G.out.clone() };
+    }
+  }
+  return null;
+}
+
+/**
+ * YOUR SHOULDERS, for her hug (1.569.0): you on your back on the cot, her
+ * at its side. The far one she wraps a hand over the top of, the near one
+ * she holds from above. `out` is the cot's room side, where she comes from.
+ */
+function rvmHugSpots() {
+  const G = rvmCotGeom();
+  const a = revBone('armUL', new THREE.Vector3()), b = revBone('armUR', new THREE.Vector3());
+  if (!G || !G.out || !a || !b) return null;
+  const da = (a.x - G.mid.x) * G.out.x + (a.z - G.mid.z) * G.out.z;
+  const db = (b.x - G.mid.x) * G.out.x + (b.z - G.mid.z) * G.out.z;
+  const near = da > db ? a : b, far = da > db ? b : a;
+  const away = G.out.clone().negate();
+  const nF = away.clone().multiplyScalar(0.55).add(_mUP).normalize();
+  return {
+    out: G.out.clone(), nearB: near, farB: far,
+    far: { T: far.clone().addScaledVector(away, 0.035).addScaledVector(_mUP, 0.045), n: nF },
+    near: { T: near.clone().addScaledVector(_mUP, 0.065).addScaledVector(G.out, 0.01), n: _mUP.clone() },
+  };
+}
+
 /** The move, a frame (after her body is placed, before her arms are solved). */
 function rvmMoveTick(dt) {
   const M = rvm.move;
@@ -1329,6 +1430,8 @@ function rvmMoveTick(dt) {
     return;
   }
   if (M.id === 'sitby') { rvmSitTick(M, dt); return; }
+  if (M.id === 'thrust') { rvmThrustTick(M, dt); return; }
+  if (M.id === 'hug') { rvmHugTick(M, dt); return; }
   if (M.id === 'chin') {
     const Hd = rvmYourHead();
     if (!Hd) { rvmEnd('no head'); return; }
@@ -1384,6 +1487,116 @@ function rvmMoveTick(dt) {
     }
     if (!rev.dom.order) rvmEnd('order over');
   }
+}
+
+/**
+ * HER HIP TEASE (1.569.0). Misha: *"pelvic humps next to me"*. Beside the
+ * cot, facing you across it, hands on her hips: a few slow thrusts of her
+ * hips into the air, each a little roll. Her hips go FORWARD while her boots
+ * stay where they stand (`crouchSolve`'s `push`, the legs re-reached for it)
+ * and her knees soften (`w`); her shoulders go back as they come (a negative
+ * bow up her spine), and her trunk turns a little with each, which is the
+ * roll. Nowhere near you: she is placed a long step off the edge and the
+ * gap from any bone of hers to any of yours is measured every frame.
+ */
+const RVM_THRUST = { P: 1.15, push: 0.085, w: 0.16, back: 0.13, roll: 0.10 };
+function rvmThrustTick(M, dt) {
+  const B = rvm.body;
+  if (M.ph === 'go') {
+    let dy = 0;
+    if (revAt() && rev.ch.face) { const F = rev.ch.face; dy = Math.atan2(-(F.x - rev.ch.x), -(F.z - rev.ch.z)) - rev.ch.yaw; dy = Math.atan2(Math.sin(dy), Math.cos(dy)); }
+    if ((revAt() && Math.abs(dy) < 0.15) || M.t > 7) { M.ph = 'on'; M.t0 = M.t; rvmSay('thrust', true); }
+    return;
+  }
+  const tt = M.t - M.t0;
+  // In over half a second, out over the last.
+  const env = Math.min(1, tt / 0.6) * Math.max(0, Math.min(1, (M.dur - tt) / 0.6));
+  const ph = tt * Math.PI * 2 / RVM_THRUST.P;
+  // Slow out, a beat held, back: a raised cosine squared.
+  const c = 0.5 - 0.5 * Math.cos(ph), k = c * c * env;
+  B.pushTo = RVM_THRUST.push * k;
+  B.wTo = RVM_THRUST.w * env;
+  B.bowTo = -RVM_THRUST.back * k;
+  B.turnTo = RVM_THRUST.roll * Math.sin(ph) * env;
+  // Hands on her hips (the `hips` move's own ask).
+  for (const s of ['R', 'L']) {
+    const sg = s === 'R' ? 1 : -1;
+    const hip = new THREE.Vector3(0.035, 1.0, 0.165 * sg).applyMatrix4(you.mesh.matrixWorld);
+    const n = new THREE.Vector3(0.15, 0.1, sg).applyQuaternion(you.mesh.quaternion).normalize();
+    const d = new THREE.Vector3(0.35, -1, 0.05 * sg).applyQuaternion(you.mesh.quaternion);
+    const pole = new THREE.Vector3(-0.55, 0.15, sg).applyQuaternion(you.mesh.quaternion);
+    rvmAsk(s, { C: hip.addScaledVector(n, 0.012), n, d, pole, cock: -0.1, shape: 'hip', rate: 5 });
+  }
+  M.gap = Math.min(M.gap, rvmGapNow());
+  M.pushMax = Math.max(M.pushMax || 0, B.push || 0);
+  if (tt > M.dur) { B.pushTo = 0; B.bowTo = 0; B.turnTo = 0; B.wTo = 0; rvmEnd('done'); }
+}
+
+/**
+ * HER HUG AND KISS, you on your back on the cot (1.569.0) — your legs down
+ * or raised (1.566.0's ladder) alike, because she comes from the cot's SIDE
+ * at your shoulders and never near its foot. Kneeling at the edge, she leans
+ * over you: her right hand wraps over your far shoulder, her left holds the
+ * near one (both palms solved on, as every hand of hers is), her eyes on
+ * yours; then she bows the rest of the way until her face is at yours, holds
+ * the kiss, and comes back up into the hug before she lets go.
+ */
+const RVM_HUG = { kissAt: 1.8, kissD: 0.13, kissHold: 2.6, bowMax: 1.25 };
+function rvmHugTick(M, dt) {
+  const B = rvm.body;
+  const H = rvmHugSpots();
+  if (!H) { rvmEnd('no shoulders'); return; }
+  if (M.ph === 'go') {
+    if (M.plan.mode === 'kneel' && revAt()) rvmWant('kneel');
+    if (rvmSettled() || M.t > 8) { M.ph = 'on'; M.t0 = M.t; B.bowTo = M.plan.bow; rvmSay('hug', true); }
+    return;
+  }
+  const tt = M.t - M.t0;
+  const { r } = rvmAxes(rev.ch.yaw);
+  // Both hands on: her reach closed by her bow, as the stroke does.
+  const shR = rvmShoulder('R', _mS);
+  const Fc = rvmYourFace(new THREE.Vector3());
+  const hi = you.fig.boneIndex('head');
+  const myHead = hi >= 0 ? you.fig.boneAt(hi, _mK).applyMatrix4(you.mesh.matrixWorld) : null;
+  // Her face: a little in front of her head bone.
+  const myFace = myHead ? myHead.clone().add(_mL.set(0.10, 0.07, 0).applyQuaternion(you.fig.boneTurn(hi, _mQ)).applyQuaternion(you.mesh.quaternion)) : null;
+  const kd = Fc && myFace ? Fc.distanceTo(myFace) : 9;
+  M.kissD = Math.min(M.kissD, kd);
+  const kissing = tt > RVM_HUG.kissAt && tt < RVM_HUG.kissAt + RVM_HUG.kissHold + 1.0;
+  if (!kissing && shR) {
+    const need = shR.distanceTo(H.far.T) - RVM.reach;
+    B.bowTo = Math.max(0, Math.min(RVM_HUG.bowMax, B.bowTo + need * dt * 2));
+  } else if (kissing && Fc && myFace) {
+    // The rest of the way down, by her face against yours.
+    const need = kd - RVM_HUG.kissD;
+    B.bowTo = Math.max(0, Math.min(RVM_HUG.bowMax, B.bowTo + Math.max(-0.4, Math.min(0.4, need)) * dt * 2.5));
+    if (!M.kissed && kd < RVM_HUG.kissD + 0.05) {
+      M.kissed = true; M.kissAt = +tt.toFixed(2);
+      if (audio && audio.kiss) audio.kiss();
+      rvmSay('kiss', true);
+    }
+  }
+  rvmAsk('R', { C: H.far.T.clone().addScaledVector(H.far.n, 0.004), n: H.far.n, d: H.out.clone().negate().addScaledVector(_mUP, -0.6).normalize(),
+    pole: r.clone().add(_mA.set(0, 0.35, 0)), cock: 0.1, shape: 'soft', rate: 4 });
+  rvmAsk('L', { C: H.near.T.clone().addScaledVector(H.near.n, 0.004), n: H.near.n, d: H.out.clone().negate(),
+    pole: r.clone().negate().add(_mA.set(0, 0.35, 0)), cock: 0.1, shape: 'soft', rate: 4 });
+  // Her trunk and head never into you: her hands and the kiss are the only touch.
+  M.gap = Math.min(M.gap, rvmGapNow({ handL: 1, handR: 1, head: 1 }));
+  if (tt > M.dur) rvmEnd('done');
+}
+
+/** A move of hers asked for by you (a key or your words), 1.569.0. */
+function rvmAskMove(id) {
+  if (!rev.on) return { ok: false, label: 'roles are not reversed' };
+  if (rev.care) return { ok: false, label: 'aftercare' };
+  if (id === 'kiss') id = 'hug';
+  if (rvm.move && rvm.move.id === id) return { ok: true, label: 'Chloe: already' };
+  if (rvm.move && rvm.move.id !== 'care') rvmEnd('asked: ' + id);
+  if (rev.arm.mode === 'spank' && typeof revArmStop === 'function') revArmStop();
+  const r = rvmStart(id, 'asked');
+  if (r === true) return { ok: true, label: id === 'hug' ? 'Chloe: a hug and a kiss' : 'Chloe: showing off' };
+  if (id === 'hug' && r === 'not on your back') return { ok: false, label: 'hug: on your back on the cot (7)' };
+  return { ok: false, label: id + ': ' + r };
 }
 
 /**
@@ -1569,7 +1782,7 @@ function rvmSafe() {
   if (rvm.move) rvmEnd('safeword');
   rvm.pend = null;
   rvm.nape = 0; rvm.chin = 0;
-  rvm.body.bowTo = 0; rvm.body.turnTo = 0;
+  rvm.body.bowTo = 0; rvm.body.turnTo = 0; rvm.body.pushTo = 0; rvm.body.wTo = 0;
   if (rvm.body.mode === 'sit') rvmWant('stand');
 }
 
@@ -1585,7 +1798,7 @@ function rvmClear() {
   _lkA.identity();
   rvm.look.on = false; rvm.look.at = 0;
   if (you && you.eyes) you.eyes(null);
-  Object.assign(rvm.body, { mode: 'stand', want: 'stand', t: 9, bow: 0, bowTo: 0, w: 0, wTo: 0, turn: 0, turnTo: 0, sit: null, was: null });
+  Object.assign(rvm.body, { mode: 'stand', want: 'stand', t: 9, bow: 0, bowTo: 0, w: 0, wTo: 0, turn: 0, turnTo: 0, push: 0, pushTo: 0, sit: null, was: null });
   const b = jadrija && jadrija.figure;
   if (b) { b.aim('spine01', 0, 0, 1, 0); b.aim('spine02', 0, 0, 1, 0); b.aim('chest', 0, 0, 1, 0); }
   rvm.flinch.on = false; rvm.flinch.x = 0; rvm.flinch.v = 0;
@@ -1594,6 +1807,10 @@ function rvmClear() {
 /** `__fr.reverse.moves` — see 49-reverse.js. */
 const rvmApi = {
   start: (id) => rvmStart(id, 'probe'),
+  ask: (id) => rvmAskMove(id),
+  gap: () => ({ now: rvm.move ? +rvmGapNow().toFixed(3) : null, last: rvm.lastGap || null,
+    move: rvm.move ? { id: rvm.move.id, ph: rvm.move.ph, gap: +(rvm.move.gap || 0).toFixed(3), kissD: rvm.move.kissD != null ? +rvm.move.kissD.toFixed(3) : null, kissed: !!rvm.move.kissed } : null,
+    push: +(rvm.body.push || 0).toFixed(3), bow: +rvm.body.bow.toFixed(2), mode: rvm.body.mode }),
   end: () => { rvmEnd('probe'); return true; },
   spank: (n = 1, hold = false) => rvmSpankStart(n, 'probe', { hold }),
   /** The contacts measured: palm against the spot, m. `reset` clears. */
