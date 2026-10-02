@@ -8,6 +8,175 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.576.0] — 2026-10-02
+
+### The vikendica's bojler and WC at full resolution, and the outside weathered, shaded and tiled
+
+Misha: *"further polish the vikendica, upstairs bathroom boiler and toilet
+need more polygons. and outside the exterior of vikendica need more detail and
+shade"*.
+
+Everything is off his own photographs and the 15 Aug walk-through
+(`/mnt/c/tmp/refs/vacay_house/`). The bojler is the one in the mirror at 23 s.
+The cistern and its inlet are at 21.5 s. The render, the soffit and the awning
+are in the loggia and terrace stills. Geometry is in
+`tools/blender/vikendica.py`, the two shader changes are in
+`src/44-vikendica.js`.
+
+**The bojler** (`_bojler`). It was one loft of ten rings at 28 sides, flat
+shaded, with boxes and 8-sided sticks under it. Now:
+
+- **The jacket** is a 96-sided lathe, smooth. It has a dished bottom and a
+  torispherical crown, each a superelliptic quarter of 14 rings, and the
+  rolled weld seam where each meets the shell.
+- **Under the dish**: the round plastic cover over the heating flange, with
+  the fluted thermostat knob (16 ribs, a moulded pointer) on its room side
+  and the red pilot lamp beside it.
+- **The thermometer**: a chromed bezel, a dial with eleven ticks over 270°,
+  a needle and boss, and a domed glass. It was four stacked discs.
+- **Two welded hanging straps** round the back. Their tabs are bolted to
+  the tiling, and from the room they are the grey bars at each side of the
+  tank.
+- **The two half-inch tails**, each with its red or blue ring and a hex
+  union. The cold one goes through the safety valve, with its spout and test
+  lever, then a ball valve with a blue butterfly. Both bend back into chrome
+  rosettes on the tiles, clearing the pot's rim by 3 cm.
+- **The safety valve's drain hose** is the hose from the photograph,
+  dropping down beside the machine. The flex goes to a junction box on the
+  side wall.
+- **The rating plate and badge** are bent round the jacket.
+- The jacket goes out in a blob of its own (`shell_enamel`) with
+  `enamelMat`: the plaster's value, a stove-enamel highlight.
+
+**The WC** (`_wc`, `_wc_seat`):
+
+- **The pan** is 3× the rings and 72 round (was 2× and 40). It stands on the
+  floor with a splayed foot, where it used to stop 2 cm up over a line of
+  cobalt. Two domed bolt caps sit at the foot.
+- **The seat** is a rounded 16-point section swept round 96 stations. It is
+  wider at the hinge, crowned on top and flat where it bears. It was a
+  square-section band.
+- **The lid**: 17 × 96, with a shallow dome on its top face.
+- **The hinges** are chromed posts, knuckles and pins. They were two boxes.
+  The hinge line moved forward to 0.262 and the lid to 95°, so it leans on
+  the cistern's cover instead of passing through it.
+- **The cistern**: 3× the rings, 72 round, stopping in a flat top. It has
+  a separate crowned cover, 1 cm proud, with the joint's shadow line under
+  it. The dual flush is in the cover.
+- **The water in**, as filmed: a stop valve out of the tiling at cover
+  height, with a cross-head handle, and a chromed 10 mm pipe. The pipe swings
+  round the tank's corner in one bend into its side, with a compression nut.
+  The low angle valve and braided flexi are gone.
+- **Downstairs**, the high-cistern WC shares the pan, seat, lid and hinges.
+- **The enamel pot and the bucket** under the new bojler are 64 and 48
+  round and smooth (were 18 and 16, flat). Nothing else in the bathroom
+  clashed: the basin, the shower and the tap were already 40-sided and
+  smooth from 1.559.4.
+
+**The outside: shade.** Two things made the house look flat, and neither was
+the walls.
+
+- **The porch ceiling and the soffits were the brightest surfaces on the
+  house.** The shell shader rolls every downward face toward the sky and
+  lifts it a third, so a white ceiling indoors does not render tan. It did
+  that outdoors too. The underside of the terrace slab (the porch ceiling of
+  the flat below), the eave soffits and the awning's cloth turned up, took
+  the sun, and blew out to white over walls in their own shade. The roll now
+  applies only inside the 6.78 × 7.73 footprint (`uVikInv`, a world-to-house
+  matrix). Outside it, it applies only to faces more than 32° off straight
+  down: the shutter blades face 45° down, and without the roll they took the
+  karst's ochre bounce and the white grilje came out brown.
+- Measured on the porch at 13:00: the soffit was (255,255,255) before and is
+  now (128,125,112), a warm grey as in the loggia photograph, against a sunlit
+  wall at (111,119,122). The awning is its cream
+  again, as in the terrace photograph.
+
+**The outside: detail** (`_render_tint`, `_soffit_tint`, `_eave_tint`).
+Every outside wall on both storeys, the set-back return, the loggia walls,
+the gables, the chimney and the gate wall are now a 16 × 10 cm grid. Its
+corners carry the weathering as vertex colour, the same `frcol` route the
+plaster indoors uses:
+
+- a slow three-octave mottle of patching and repaint, with warm/cool drift;
+- rain runs, as noise stretched 11:1 down the wall;
+- under every sill, a dark run off each end of the stone, a fainter wash
+  between, and the sill's shadow line;
+- streaks beside both downpipes;
+- splash and dust up the foot of every wall;
+- the shade under the eaves and the verges;
+- on the south face under the terrace slab, which is a porch;
+- on the terrace floor line;
+- in the inside corner of the west set-back;
+- on the east wall over the stair's nosings and under its flight;
+- in the back loggia under its ceiling;
+- soot down the chimney from its crown.
+
+Two more changes to the walls:
+
+- **No seams.** The walls are built of strips, aprons and lintels round
+  each window, and each was bevelled 18 mm on all sides. That ruled a grid
+  of grooves through the render at every jamb, sill and head line. The
+  render panels have no bevel now.
+- The roof's wall-head band was coplanar with the walls, invisible while
+  both were one flat colour. It is held 2 cm inside now, so the band does
+  not flicker.
+
+The terrace slab and its nose, the eave soffits and the rafter tails carry
+the occlusion too: darkest into the angle over the wall, lifting toward the
+open edge.
+
+**The roof: kupe** (`_kupe`, `_ridge_tiles`). Each slope was one flat
+terracotta slab.
+
+- It is laid now in courses 36 cm deep. Across the roof, convex covers and
+  shallow channels alternate on a 21 cm pitch. Each course's foot stands
+  2 cm proud of the next, which is the lap.
+- The cover mouths at the eave are stopped with white mortar.
+- The ridge has 40 cm half-round cappings bedded in mortar, with mortared
+  ends.
+- Every tile has its own colour off a hash: a few replacements, bleached
+  tops, dirty channels, and each tile's head in the shadow of the course
+  above. No generator is touched.
+- The tiles are the NEAR roof: their own blob (`roof_kupe`, `loft_kupe`)
+  with `kupeMat`, which discards past `VIK.kupeNear` (60 m) for every
+  camera. The flat slab, lowered 3.5 cm so it never shows near, is the far
+  roof, because a 21 cm ripple at a kilometre is a moiré.
+- The kupe cast no shadow of their own. The slab does.
+- The loft variant gets them too.
+
+**And** two oval opal wall lamps, the loggia's fitting turned on its side,
+with a cage: beside the front door at the stair head, and on the south face
+by the terrace door under the slab.
+
+| blob | tris before | tris after | KB before | KB after |
+|---|---|---|---|---|
+| shell | 418,926 | 488,066 | 790.4 | 887.1 |
+| shell_ware | 9,848 | 32,184 | 28.5 | 60.8 |
+| shell_enamel (new) | — | 7,676 | — | 8.0 |
+| shell_glass | 1,584 | 1,964 | 6.4 | 7.4 |
+| roof | 14,956 | 26,256 | 25.0 | 59.2 |
+| roof_kupe (new, near) | — | 48,106 | — | 24.3 |
+| loft | 29,316 | 30,752 | 54.2 | 60.6 |
+| loft_kupe (new, near) | — | 51,886 | — | 25.8 |
+
+- **Payload**: the vikendica blobs go from 960 to 1,189 KB (+229 KB). The
+  page goes from 40.28 to 40.58 MB.
+- **Frame time**, headless on the 4090: inside 27.7 vs 27.8 ms, in the
+  bathroom 32.0 vs 31.8, from the road 31.1–32.6 vs 28.4–35.8, over the
+  roof 29.0–30.3 vs 25.7–28.4. That is within this machine's run-to-run
+  noise (a second pass of both builds swung 30 ms).
+- **Rebake**: still byte-stable.
+- **Regression**: people 100, blockers 820 (no exterior geometry has a
+  blocker, and none was added). No console errors. Checked at 07:30, 13:00,
+  17:36 and 20:12.
+
+**Found, not changed (ask):**
+
+- The verge soffits at the gable ends are the plywood's own orange, lit by
+  the sky. They read brighter than the eaves.
+- The walk-through shows bamboo and a fig against the yard walls. There is
+  no planting against the house.
+
 ## [1.574.0] — 2026-10-02 (baye 1.65.0)
 
 ### Roles reversed: Chloe's fist in your hair, and the kneeling draw

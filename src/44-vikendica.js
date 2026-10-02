@@ -93,6 +93,12 @@ const VIK = {
   // are standing in the middle of goes black in a way no real room does. 0.14
   // is the plaster doing what plaster does.
   glow: 0.14,
+
+  // How near the roof is drawn as laid tiles (1.576.0) rather than as the
+  // flat slab under them. A 21 cm ripple in courses is the roof from the road;
+  // from further than this it is a moiré, and the plain slab makes no claim.
+  // At sixty metres a tile pitch is still four pixels across at 1280.
+  kupeNear: 60,
 };
 
 
@@ -131,6 +137,10 @@ async function buildVikendica(scene, field) {
   root.position.set(here[0], base, here[2]);
   root.rotation.y = yaw;
   scene.add(root);
+  // World to house-local, for the one thing the shell's shader needs to know
+  // about where a fragment is: inside the walls or out. See `mat`.
+  root.updateMatrixWorld(true);
+  const vikInv = { value: root.matrixWorld.clone().invert() };
 
   const mat = solidMaterial(0xffffff, {
     spec: 0.05,
@@ -149,8 +159,24 @@ async function buildVikendica(scene, field) {
     // downward faces the normal is rolled up towards the horizon, which samples
     // the sky term instead — cooler and brighter, which is what a white ceiling
     // in a room with the sea outside it does.
+    //
+    // ONLY INSIDE THE WALLS (1.576.0). The roll was applied to every downward
+    // face in the payload, so outdoors the underside of the terrace slab — the
+    // porch ceiling of the flat below — and the eave soffits were turned to
+    // face the sky, took the sun on their backs, were lifted a third, and came
+    // out as the brightest surfaces on the house: a white panel glowing over a
+    // wall in its shade, at every hour. Outside the 6.78 x 7.73 footprint a
+    // soffit is a soffit and takes the ground bounce like any other. Only a
+    // soffit, though — a face turned more than 32 degrees off straight down:
+    // the blades of every shutter on the house face 45 degrees down, and
+    // without the roll they took the karst's ochre bounce and the white
+    // grilje came out as brown ones.
+    uniforms: { uVikInv: vikInv },
+    decl: 'uniform mat4 uVikInv;',
     body: `base *= vVCol;
-      float dn = smoothstep(0.0, -0.55, n.y);
+      vec3 vikP = (uVikInv * vec4(vWorld, 1.0)).xyz;
+      float vikIn = step(abs(vikP.x), 3.40) * step(abs(vikP.z), 3.875);
+      float dn = smoothstep(0.0, -0.55, n.y) * max(vikIn, step(-0.85, n.y));
       n = normalize(mix(n, vec3(n.x, 0.30, n.z), dn));
       base *= 1.0 + 0.34 * dn;`,
   });
@@ -212,20 +238,48 @@ async function buildVikendica(scene, field) {
     body: 'base *= vVCol;',
   });
 
+  // The bojler's jacket, which is stove enamel: the one painted metal in the
+  // house with a gloss on it. On the plaster material its 96-sided curve
+  // shaded like a white column of render; the highlight running down it is
+  // what says steel. Its own value is the plaster's — ENAMEL_W is chosen in
+  // the Blender file to sit between the tile and the machine under it and the
+  // emissive must not move it out of that slot — so only the gloss differs.
+  const enamelMat = solidMaterial(0xffffff, {
+    spec: 0.20, specPower: 70, emissive: VIK.glow + 0.04,
+    body: 'base *= vVCol;',
+  });
+
+  // The kupe — the roof's tiles as laid, out of `_kupe` in the Blender file —
+  // lit exactly as the slab under them is, and simply not there past
+  // `VIK.kupeNear` from the eye: the slab is 3.5 cm under the troughs and takes
+  // over without a seam. A discard and not a visibility switch, so it is right
+  // for every camera there is, the aeroplane's included.
+  const kupeMat = solidMaterial(0xffffff, {
+    spec: 0.05,
+    specPower: 30,
+    emissive: VIK.glow,
+    body: `if (length(vWorld - uCamPos) > ${VIK.kupeNear.toFixed(1)}) discard;
+      base *= vVCol;`,
+  });
+
   const parts = {};
   const soft = (k) => k.endsWith('_glass') || k.endsWith('_sheer');
   for (const key of ['shell', 'roof', 'loft',
                      'shell_glass', 'roof_glass', 'loft_glass',
                      'shell_sheer', 'roof_sheer', 'loft_sheer',
-                     'shell_ware']) {
+                     'shell_ware', 'shell_enamel', 'roof_kupe', 'loft_kupe']) {
     const b64 = PAYLOAD['vikendica_' + key + '_fr3d'];
     if (!b64) { if (!soft(key)) console.warn('no vikendica payload:', key); continue; }
     try {
       const geo = readFR3D(await inflateBinary(b64));
       const mesh = new THREE.Mesh(geo,
         key.endsWith('_sheer') ? sheerMat : key.endsWith('_glass') ? glassMat
-          : key.endsWith('_ware') ? wareMat : mat);
-      mesh.castShadow = !soft(key);
+          : key.endsWith('_ware') ? wareMat
+            : key.endsWith('_enamel') ? enamelMat
+              : key.endsWith('_kupe') ? kupeMat : mat);
+      // The kupe cast nothing the slab under them does not: their own laps
+      // are finer than a texel of the sun's map.
+      mesh.castShadow = !soft(key) && !key.endsWith('_kupe');
       mesh.receiveShadow = true;
       if (soft(key)) mesh.renderOrder = 3;
       root.add(mesh);
@@ -234,7 +288,7 @@ async function buildVikendica(scene, field) {
       console.warn('vikendica failed:', key, e.message);
     }
   }
-  for (const k of ['loft', 'loft_glass', 'loft_sheer']) {
+  for (const k of ['loft', 'loft_glass', 'loft_sheer', 'loft_kupe']) {
     if (parts[k]) parts[k].visible = false;
   }
 
@@ -3420,10 +3474,10 @@ async function buildVikendica(scene, field) {
     },
     /** 'now' | 'loft' — which roof is on. The rooms below do not change. */
     roof(which) {
-      for (const k of ['roof', 'roof_glass', 'roof_sheer']) {
+      for (const k of ['roof', 'roof_glass', 'roof_sheer', 'roof_kupe']) {
         if (parts[k]) parts[k].visible = which !== 'loft';
       }
-      for (const k of ['loft', 'loft_glass', 'loft_sheer']) {
+      for (const k of ['loft', 'loft_glass', 'loft_sheer', 'loft_kupe']) {
         if (parts[k]) parts[k].visible = which === 'loft';
       }
       for (const b of loftOnly) b.off = which !== 'loft';
