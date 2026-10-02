@@ -55,7 +55,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
 
 ## After the loop (launch when the last night item has merged, ~07:30)
 
-9. [ ] **Thin-film: harbour oil sheen + a bather kid blowing soap bubbles** (Misha, 06:05,
+9. [x] **Thin-film: harbour oil sheen + a bather kid blowing soap bubbles** (Misha, 06:05,
    inspired by https://sael.net/soap-bubble/ — "All rights reserved": take NO code from it;
    rebuild from physics). Our own thin-film LUT (RGB vs optical path difference, summed over
    the visible spectrum with CIE matching functions, baked at load, ~50 lines), indexed by

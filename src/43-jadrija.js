@@ -52616,6 +52616,330 @@ async function buildJadrija(scene) {
     rec.wx = W.x; rec.wy = W.y; rec.wz = W.z; rec.kx = K.x;
   }
 
+  // ── the bubble girl ───────────────────────────────────────────────────────
+  //
+  // Misha, 2 Oct 2026: *"maybe one of the bather kids seated at one of the
+  // chairs near one of the businesses there can be blowing the bubbles"*.
+  //
+  // WHO: the café sitters are the pinned half of the skinned tier, dealt the
+  // eight bodies round-robin, so two of them are children — and the smokers'
+  // note above says how that was found. The bubbler is the child-bodied
+  // sitter (under 1.45 m, as drawn) with both hands free whose terrace is
+  // nearest the mole: today that is the girl at beach bar MINI, at t 279.6,
+  // facing the sea and the moored dinghies. By rule, not by hash, and no draw
+  // of anything (Rule 4). `fg.bubbles` marks her.
+  //
+  // HOW: `smokeArm`'s solve, word for word in its method — two frames, rest
+  // and lips, a slerp and a lerp between them, the wrist worked back from
+  // where the prop has to be — with a wand for a cigarette. At rest the ring
+  // is down in the bottle on her table (dipping); at the lips it stands a
+  // hand's breadth in front of her mouth, upright, and she blows: bubbles off
+  // the ring, out along where her face points, into the terrace's air.
+  // The pool and the film shader are 43-bubbles.js.
+  //
+  // Inside `WAND.near` only, like the smokers inside theirs. Past it the arm
+  // is the clip's, the wand and the bottle are hidden, the pool is emptied
+  // and nothing here costs more than the clock.
+  const WAND = {
+    near: 60,
+    // Seconds between blows (dipping in between), and the first one sooner.
+    every: [1.6, 4.2], first: [0.6, 2.0],
+    up: 0.80, hold: 2.0, down: 0.80,
+    // Bubbles a second while she blows, and how fast they leave the ring.
+    rate: [6, 10], blow: [0.35, 0.85],
+    // The wand: a 13.5 cm stick, a 21 mm ring on its end; `holdAt` is how far
+    // up the stick from its foot her fingers have it.
+    stick: 0.135, stickR: 0.0026, ringR: 0.021, tube: 0.0030, holdAt: 0.035,
+    grip: 0.30, side: 0.010, curl: 0.85,
+    // The two frames, figure space (forward, up, out to her right): `g` the
+    // way the gripping fingers point, `e` the stick's axis toward the ring.
+    // At rest the ring points down into the bottle; at the lips it stands up,
+    // `out` in front of the mouth and in the head's frame.
+    rest: { g: [0.30, 0.0, -0.95], e: [0.72, -0.69, 0.05], pole: [-0.35, -1.0, 0.45], dip: 0.03 },
+    lips: { g: [0.20, 0.05, -0.98], e: [0.10, 0.99, 0.02], pole: [0.05, -1.0, 0.70], out: 0.070 },
+    // The bottle on her table: a 4.6 cm by 10.5 cm squeeze bottle, open.
+    bottle: { r: 0.023, h: 0.105, in: 0.27, right: 0.07 },
+    // Of the true wind, at a café table under a parasol: about the smoke's,
+    // a little more — the bubbles go out from under it.
+    air: 0.045,
+  };
+  let bubbler;                          // her figure record, null if nobody
+  let bubbles = null;                   // the pool (43-bubbles.js)
+  let wand = null;
+  const bubRec = { on: false, id: -1, qa: new THREE.Quaternion(), qb: new THREE.Quaternion(),
+    qc: new THREE.Quaternion(), ex: 0, ey: 0, ez: 0, wx: 0, wy: 0, wz: 0, kx: 0 };
+  const bubStat = { ms: 0, gap: -1, blows: 0, near: false, emitted: 0 };
+  const _bR = new THREE.Vector3(), _bM = new THREE.Vector3();
+  const _bInv = new THREE.Matrix4(), _bB = new THREE.Matrix4();
+  const _bX = new THREE.Vector3(), _bY = new THREE.Vector3(), _bZ = new THREE.Vector3();
+  let bubSitters = null;                // who a bubble can burst against
+
+  function dealBubbler(skin) {
+    bubbler = null;
+    const pinned = skin.pairs().filter(([fg, f]) => fg && fg.sitAt && !fg.phone && !fg.smoke
+      && skinHeight(f.data) * (f.mesh.scale.y || 1) < 1.45);
+    pinned.sort((a, b) => (Math.abs(a[0].t - JAD.jetty) - Math.abs(b[0].t - JAD.jetty)) || a[0].idx - b[0].idx);
+    if (!pinned.length) return;
+    const fg = pinned[0][0];
+    bubbler = fg;
+    fg.bubbles = 1;
+    // Her table, and the bottle on it: on the line from its middle toward her,
+    // `in` along, and a little to her right, where her right hand is.
+    const A = fg.sitAt;
+    const tw = toWorld(A.ct, A.cs);
+    fg.tableW = tw;
+    let dx = fg.x - tw[0], dz = fg.z - tw[2];
+    const l = Math.hypot(dx, dz) || 1;
+    dx /= l; dz /= l;
+    const rx = Math.sin(fg.yaw), rz = Math.cos(fg.yaw);
+    const B = WAND.bottle;
+    fg.bottleAt = [tw[0] + dx * B.in + rx * B.right, fg.y + (A.mesh ? 0.722 : 0.75), tw[2] + dz * B.in + rz * B.right];
+    // The people round her a bubble can burst on: everybody seated within
+    // eight metres but her, as an upright capsule.
+    bubSitters = skin.pairs().filter(([p]) => p && p !== fg && p.sitAt && Math.hypot(p.x - fg.x, p.z - fg.z) < 8)
+      .map(([p]) => [p.x, p.y, p.z]);
+  }
+
+  function bubbleClock(fg, dt) {
+    let m = fg.bub;
+    if (!m) m = fg.bub = { phase: 'rest', pt: 0, wait: lerpR(WAND.first, jit(fg.idx | 0, 9171)), n: 0, u: 0, em: 0 };
+    m.pt += dt;
+    if (m.phase === 'rest') {
+      m.wait -= dt;
+      if (m.wait <= 0) { m.phase = 'up'; m.pt = 0; }
+    } else if (m.phase === 'up' && m.pt >= WAND.up) {
+      m.phase = 'hold'; m.pt = 0; bubStat.blows++;
+    } else if (m.phase === 'hold' && m.pt >= WAND.hold) {
+      m.phase = 'down'; m.pt = 0;
+    } else if (m.phase === 'down' && m.pt >= WAND.down) {
+      m.phase = 'rest'; m.pt = 0; m.n++;
+      m.wait = lerpR(WAND.every, jit((fg.idx | 0) * 37 + m.n, 9173));
+    }
+    m.u = m.phase === 'up' ? smooth01(m.pt / WAND.up)
+      : m.phase === 'hold' ? 1
+        : m.phase === 'down' ? 1 - smooth01(m.pt / WAND.down) : 0;
+    return m;
+  }
+
+  /** The wand: a stick along +y from its foot, the ring on its end in the
+   *  xy plane. Its origin is where the fingers hold it. And the bottle. */
+  function makeWand() {
+    const W = WAND, g = new THREE.Group();
+    const pink = solidMaterial(0xe85a9c, { spec: 0.35, specPower: 60 });
+    const stick = new THREE.Mesh(new THREE.CylinderGeometry(W.stickR, W.stickR, W.stick, 8, 1), pink);
+    stick.position.y = W.stick * 0.5 - W.holdAt;
+    g.add(stick);
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(W.ringR, W.tube, 8, 28), pink);
+    ring.position.y = W.stick - W.holdAt + W.ringR;
+    g.add(ring);
+    g.name = 'bubble-wand';
+    g.visible = false;
+    scene.add(g);
+    const B = W.bottle, b = new THREE.Group();
+    const blue = solidMaterial(0x2f7fd6, { spec: 0.45, specPower: 70 });
+    const white = solidMaterial(0xf2f2f2, { spec: 0.3 });
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(B.r, B.r, B.h * 0.78, 14, 1), blue);
+    body.position.y = B.h * 0.39;
+    b.add(body);
+    const sh = new THREE.Mesh(new THREE.CylinderGeometry(B.r * 0.55, B.r, B.h * 0.12, 14, 1), blue);
+    sh.position.y = B.h * 0.84;
+    b.add(sh);
+    const neck = new THREE.Mesh(new THREE.CylinderGeometry(B.r * 0.55, B.r * 0.55, B.h * 0.10, 14, 1, true), white);
+    neck.position.y = B.h * 0.95;
+    b.add(neck);
+    // The cap, off, lying on its side beside it.
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(B.r * 0.62, B.r * 0.62, 0.016, 12, 1), white);
+    cap.rotation.z = Math.PI / 2;
+    cap.position.set(0.05, B.r * 0.62, -0.03);
+    b.add(cap);
+    b.name = 'bubble-bottle';
+    b.visible = false;
+    scene.add(b);
+    return { g, b };
+  }
+
+  function bubbleOff(f) {
+    dropSmoke(f, bubRec);
+    if (wand) { wand.g.visible = false; wand.b.visible = false; }
+    if (bubbles) bubbles.clear();
+    bubStat.near = false;
+  }
+
+  /** What is under a bubble: the resort's own surfaces, or the sea. */
+  function bubbleGround(x, z) {
+    const ts = local(x, z);
+    return ts[1] < -0.5 ? 0.05 : Math.max(0.05, surfaceY(ts[0], ts[1]));
+  }
+
+  /** Inside her table's top, or inside somebody seated near her. */
+  function bubbleHit(x, y, z, r) {
+    const fg = bubbler, b = fg.bottleAt, tw = fg.tableW;
+    // The table: a disc 0.31 m round about its middle, 4 cm deep.
+    if (tw && y - r < b[1] && y > b[1] - 0.04 && Math.hypot(x - tw[0], z - tw[2]) < 0.31) return true;
+    if (!bubSitters) return false;
+    for (const p of bubSitters) {
+      const dx = x - p[0], dz = z - p[2];
+      if (dx * dx + dz * dz < (0.24 + r) * (0.24 + r) && y > p[1] + 0.35 && y < p[1] + 1.35) {
+        return bubbles.rnd() < 0.7;
+      }
+    }
+    return false;
+  }
+
+  function stepBubbler(dt, cam) {
+    const skin = crowds.skin;
+    if (!skin || !skin.pairs) return;
+    if (bubbler === undefined) dealBubbler(skin);
+    if (!bubbler) return;
+    const t0 = performance.now();
+    const fg = bubbler;
+    const m = bubbleClock(fg, dt);
+    const pr = skin.pairs().find(([p]) => p === fg);
+    if (!pr) return;
+    const f = pr[1];
+    const dx = f.mesh.position.x - cam.x, dz = f.mesh.position.z - cam.z;
+    if (WAND.near <= 0 || !f.mesh.visible || (fg.topple && fg.topple.phase !== 'wet')
+      || dx * dx + dz * dz > WAND.near * WAND.near) {
+      if (bubStat.near || bubRec.on) bubbleOff(f);
+      return;
+    }
+    const B = smokeBody(f);
+    if (!B) return;
+    bubStat.near = true;
+    if (!wand) wand = makeWand();
+    if (!bubbles) bubbles = makeBubbles(scene);
+    wand.b.position.set(fg.bottleAt[0], fg.bottleAt[1], fg.bottleAt[2]);
+    wand.b.rotation.y = fg.yaw;
+    wand.b.visible = true;
+    const was = bubRec.on && bubRec.id === fg.idx;
+    if (was) bubbleLight(f, B, fg, m, dt);
+    bubbleArm(f, B, fg, m);
+    const tt = state.t;
+    const w = state.windSpeed * (0.8 + 0.4 * state.gust) * WAND.air;
+    const wd = state.windDir + 0.35 * Math.sin(tt * 0.071) * Math.sin(tt * 0.029 + 1.3);
+    bubbles.step(dt, Math.cos(wd) * w, Math.sin(wd) * w, bubbleGround, bubbleHit);
+    bubStat.ms += (performance.now() - t0 - bubStat.ms) * 0.05;
+  }
+
+  /** The wand where her fingers are in the palette about to be drawn, and the
+   *  bubbles off its ring while she blows. */
+  function bubbleLight(f, B, fg, m, dt) {
+    const H = B.H, W = WAND;
+    const Wr = f.boneAt(H.ih, _sW), K = f.boneAt(H.if, _sK);
+    if (Wr.distanceToSquared(K) < 1e-6) return;
+    const Qf = f.boneTurn(H.if, _sQ), Qh = f.boneTurn(H.ih, _sR);
+    const g = _sG.copy(H.d).applyQuaternion(Qf);
+    const e = _sF.copy(H.n).applyQuaternion(Qf);
+    const c = _sC.copy(H.c).applyQuaternion(Qh);
+    const k = 1 / (f.mesh.scale.x || 1);
+    const grip = _sP.copy(K).addScaledVector(g, W.grip * H.fl).addScaledVector(c, W.side * k);
+    const Mw = f.mesh.matrixWorld;
+    grip.applyMatrix4(Mw);
+    Mw.decompose(_sO, _sQw, _sX);
+    e.applyQuaternion(_sQw).normalize();
+    g.applyQuaternion(_sQw).normalize();
+    // The wand's frame: +y up the stick, +z the ring's normal (the fingers
+    // across the stick), +x the third.
+    _bY.copy(e);
+    _bZ.crossVectors(g, e);
+    if (_bZ.lengthSq() < 1e-6) _bZ.set(0, 0, 1);
+    _bZ.normalize();
+    _bX.crossVectors(_bY, _bZ).normalize();
+    _bB.makeBasis(_bX, _bY, _bZ);
+    wand.g.quaternion.setFromRotationMatrix(_bB);
+    wand.g.position.copy(grip);
+    wand.g.visible = true;
+    // The ring's middle, in the world.
+    const ring = _bR.copy(grip).addScaledVector(e, W.stick - W.holdAt + W.ringR);
+    // The lips, and where her face points.
+    const Qhd = f.boneTurn(B.ih, _sQh);
+    const hp = f.boneAt(B.ih, _sH);
+    const lips = _bM.copy(B.lips).applyQuaternion(Qhd).add(hp).applyMatrix4(Mw);
+    const fwd = _sD.copy(_sX1).applyQuaternion(Qhd).applyQuaternion(_sQw).normalize();
+    if (m.phase === 'hold' && m.pt > 0.1) bubStat.gap = Math.max(bubStat.gap, ring.distanceTo(lips));
+    // Blowing: a steady stream out of the ring, past the first breath in.
+    if (m.phase === 'hold' && m.pt > 0.15 && m.pt < W.hold - 0.1) {
+      const rnd = bubbles.rnd;
+      m.em += dt * lerpR(W.rate, rnd());
+      while (m.em >= 1) {
+        m.em -= 1;
+        const sp = lerpR(W.blow, rnd());
+        const jx = (rnd() - 0.5) * 0.25, jy = (rnd() - 0.4) * 0.25, jz = (rnd() - 0.5) * 0.25;
+        const o = 0.012;
+        bubbles.emit(ring.x + fwd.x * 0.02 + (rnd() - 0.5) * o, ring.y + fwd.y * 0.02 + (rnd() - 0.5) * o,
+          ring.z + fwd.z * 0.02 + (rnd() - 0.5) * o,
+          (fwd.x + jx) * sp, (fwd.y + jy) * sp + 0.05, (fwd.z + jz) * sp);
+        bubStat.emitted++;
+      }
+    } else {
+      m.em = 0;
+    }
+  }
+
+  /** Her arm: the ring in the bottle, or before her lips, or between. */
+  function bubbleArm(f, B, fg, m) {
+    const H = B.H, W = WAND, rec = bubRec;
+    const S = f.boneAt(H.iu, _sS), E = f.boneAt(H.il, _sE), Wr = f.boneAt(H.ih, _sW);
+    const K = f.boneAt(H.if, _sK);
+    const Lu = E.distanceTo(S), Lf = Wr.distanceTo(E), L = Lu + Lf;
+    if (Lu < 0.05 || Lf < 0.05) return;
+    if (rec.on && rec.id === fg.idx
+      && E.x === rec.ex && E.y === rec.ey && E.z === rec.ez
+      && Wr.x === rec.wx && Wr.y === rec.wy && Wr.z === rec.wz && K.x === rec.kx) return;
+    const ia = _sA.copy(rec.qa).invert(), ib = _sB.copy(rec.qb).invert();
+    const uc = _sU.copy(E).sub(S).applyQuaternion(ia).normalize();
+    const fc = _sD.copy(Wr).sub(E).applyQuaternion(ib).applyQuaternion(ia).normalize();
+    const Hclip = _sHc.copy(ia).multiply(ib).multiply(_sQ.copy(rec.qc).invert())
+      .multiply(f.boneTurn(H.ih, _sR));
+    const k = 1 / (f.mesh.scale.x || 1);
+    const a = W.curl, up = W.stick - W.holdAt + W.ringR;
+    // AT REST: the ring down in the neck of the bottle, in figure space.
+    _bInv.copy(f.mesh.matrixWorld).invert();
+    const bt = fg.bottleAt;
+    const ringR = _bR.set(bt[0], bt[1] + W.bottle.h - W.rest.dip, bt[2]).applyMatrix4(_bInv);
+    const Rt = W.rest;
+    let g = _sG.set(...Rt.g).normalize(), e = _sF.set(...Rt.e).normalize();
+    smokeFrame(H, g, e, a, _sN, _sL, _sC, _sQr);
+    _sWr.copy(ringR).addScaledVector(e, -up * k).addScaledVector(_sC, -W.side * k)
+      .addScaledVector(g, -W.grip * H.fl).addScaledVector(_sN, -H.len);
+    // AT THE LIPS: the head's frame, the ring `out` in front of the mouth.
+    const Qhd = f.boneTurn(B.ih, _sQh);
+    const Lp = W.lips;
+    g = _sG.set(...Lp.g).applyQuaternion(Qhd).normalize();
+    e = _sF.set(...Lp.e).applyQuaternion(Qhd).normalize();
+    smokeFrame(H, g, e, a, _sN, _sL, _sC, _sQm);
+    const fwd = _bM.copy(_sX1).applyQuaternion(Qhd);
+    const ringL = _sV.copy(B.lips).applyQuaternion(Qhd).add(f.boneAt(B.ih, _sH)).addScaledVector(fwd, Lp.out * k);
+    _sWm.copy(ringL).addScaledVector(e, -up * k).addScaledVector(_sC, -W.side * k)
+      .addScaledVector(g, -W.grip * H.fl).addScaledVector(_sN, -H.len);
+    const u = m.u;
+    const T = _sT.copy(_sWr).lerp(_sWm, u).addScaledVector(_sX1, 0.06 * Math.sin(Math.PI * u));
+    const Q = _sQr.slerp(_sQm, u);
+    const v = _sP.copy(T).sub(S);
+    const d = Math.min(Math.max(v.length(), Math.abs(Lu - Lf) + 1e-3), L - 1e-3);
+    v.normalize();
+    T.copy(S).addScaledVector(v, d);
+    const ae = (d * d + Lu * Lu - Lf * Lf) / (2 * d);
+    const h = Math.sqrt(Math.max(0, Lu * Lu - ae * ae));
+    const p = _sO.set(...Rt.pole).normalize().lerp(_sM.set(...Lp.pole).normalize(), u);
+    p.addScaledVector(v, -p.dot(v));
+    if (p.lengthSq() < 1e-6) p.set(v.y, -v.x, 0);
+    p.normalize();
+    const el = _sM.copy(S).addScaledVector(v, ae).addScaledVector(p, h);
+    rec.qa.setFromUnitVectors(uc, _sX.copy(el).sub(S).normalize());
+    rec.qb.setFromUnitVectors(fc.applyQuaternion(rec.qa), _sX.copy(T).sub(el).normalize());
+    rec.qc.copy(Q).multiply(_sA.copy(rec.qb).multiply(rec.qa).multiply(Hclip).invert());
+    aimQ(f, 'armUR', rec.qa);
+    aimQ(f, 'armLR', rec.qb);
+    aimQ(f, 'handR', rec.qc);
+    _sX.set(0, 0, 0).crossVectors(H.d, H.n).applyQuaternion(Q);
+    f.aim('fingersR', _sX.x, _sX.y, _sX.z, a);
+    rec.on = true;
+    rec.id = fg.idx;
+    rec.ex = E.x; rec.ey = E.y; rec.ez = E.z;
+    rec.wx = Wr.x; rec.wy = Wr.y; rec.wz = Wr.z; rec.kx = K.x;
+  }
+
   // ── the bathers, as things the jet can hit and things that answer ─────────
   //
   // Misha, 4 Sep 2026: *"if i spray one of the bathers, they will respond,
@@ -77886,6 +78210,8 @@ async function buildJadrija(scene) {
     // The smokers, off the palettes the flush has just built — see the note
     // over `stepSmokers` for why after it and not beside the phones.
     stepSmokers(dt, cam);
+    // And the girl with the bubble wand, the same way and for the same reason.
+    stepBubbler(dt, cam);
     // The Bucketeer, who carries her own range gate for the same reason Baye's
     // is here rather than inside her stepper.
     // `who` and `dir`, not `cam`. She had the bug the note at the top of this
@@ -79987,6 +80313,40 @@ async function buildJadrija(scene) {
      * closest the fingers came to the nose tip, less a finger's half-width
      * (negative would be a finger through it). `reset` clears the two.
      */
+    /**
+     * The bubble girl (`WAND`, 1.571.0): who, where, what she is doing, the
+     * pool's numbers, and `gap` — the worst ring-to-lips distance while she
+     * blows (the ring is aimed `WAND.lips.out` in front of them).
+     * `bubbleNow()` starts a blow; `bubbleCfg().near = 0` turns it all off.
+     */
+    bubbles: (reset) => {
+      if (reset) { bubStat.gap = -1; }
+      const fg = bubbler;
+      const pr = fg && crowds.skin ? crowds.skin.pairs().find(([p]) => p === fg) : null;
+      return {
+        who: fg ? { i: fg.idx, seat: fg.seat, shop: fg.sitAt.shop, t: +fg.t.toFixed(1), s: +fg.lane.toFixed(1),
+          x: +fg.x.toFixed(2), y: +fg.y.toFixed(2), z: +fg.z.toFixed(2), yaw: +fg.yaw.toFixed(3),
+          face: [+Math.cos(fg.yaw).toFixed(3), +(-Math.sin(fg.yaw)).toFixed(3)],
+          h: pr ? +(skinHeight(pr[1].data) * (pr[1].mesh.scale.y || 1)).toFixed(2) : null,
+          kind: pr && pr[1].data.kind2 ? pr[1].data.kind2 : null,
+          bottle: fg.bottleAt ? fg.bottleAt.map((v) => +v.toFixed(3)) : null,
+          phase: fg.bub ? fg.bub.phase : null, u: fg.bub ? +fg.bub.u.toFixed(2) : null,
+          wand: wand && wand.g.visible ? wand.g.position.toArray().map((v) => +v.toFixed(3)) : null } : null,
+        near: bubStat.near, blows: bubStat.blows, emitted: bubStat.emitted,
+        gap: +bubStat.gap.toFixed(4), ms: +bubStat.ms.toFixed(3),
+        pool: bubbles ? bubbles.stats() : null,
+      };
+    },
+    bubbleList: () => (bubbles ? bubbles.list() : []),
+    bubblePop: () => (bubbles ? bubbles.popOne() : null),
+    bubbleCfg: () => WAND,
+    /** The pool's own numbers (43-bubbles.js) — `pop` is how long a burst takes. */
+    bubblePool: () => BUBBLE,
+    bubbleNow: () => {
+      const m = bubbler && bubbler.bub;
+      if (m && m.phase === 'rest') { m.wait = 0; return true; }
+      return false;
+    },
     smokers: (reset) => {
       if (reset) { smokeStat.gap = -1; smokeStat.nose = -1; smokeStat.holds = 0; }
       const pairs = crowds.skin ? crowds.skin.pairs() : [];

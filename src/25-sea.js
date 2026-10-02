@@ -122,6 +122,12 @@ const SEA = {
   waveLod: 1.0,
   // How hard the far tile mottles the water the analytic sum gave up on.
   farSwell: 0.85,
+  // The oil sheen in the harbours (1.571.0) — see `sheenCap` and the note in
+  // the fragment. `k` is how much of the film's own reflectance is let
+  // through (1 is the physics, at full patch cover); `on` is the radius from
+  // the nearest harbour inside which the branch runs at all — past it the
+  // shader skips the whole thing on a uniform.
+  sheen: { k: 0.8, on: 420 },
 };
 
 /**
@@ -461,6 +467,9 @@ uniform vec4 uSeaK;
 uniform vec4 uCapK;
 uniform float uWaveScale;
 uniform float uFarSwell;
+uniform vec4 uSheenSeg[3];
+uniform vec4 uSheenR;
+uniform vec2 uSheenO;
 
 varying vec3 vWorld;
 varying vec2 vP;
@@ -471,7 +480,20 @@ ${GLSL_TERRAIN}
 ${GLSL_SKY}
 ${GLSL_HAZE}
 ${GLSL_WATER}
+${GLSL_THINFILM}
 ${SEA_WAVE}
+
+/**
+ * How far inside one harbour capsule this water is: 1 in the middle, 0 past
+ * its radius r. A capsule is a segment a to b (s.xy, s.zw) in world metres —
+ * along a pier, along a line of moorings. Differences only: p - a is small
+ * wherever it matters, so two kilometres from the origin costs nothing here.
+ */
+float sheenCap(vec2 p, vec4 s, float r){
+  vec2 ba = s.zw - s.xy, pa = p - s.xy;
+  float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-3), 0.0, 1.0);
+  return 1.0 - smoothstep(0.55 * r, r, length(pa - ba * h));
+}
 
 /**
  * The surface from underneath, which is a different object from the surface.
@@ -560,6 +582,53 @@ void main(){
   // Each layer's slope lives in its own rotated frame, so carry it back through
   // the transpose before summing or all three lean the same wrong way.
   vec2 micro = r0.xz * 0.46 + (r1.xz * rotA) * 0.33 + (r2.xz * rotB) * 0.21;
+
+  // ── oil sheen, in the harbours only ──────────────────────────────────────
+  // A few millilitres of outboard and diesel spread to a film a few hundred
+  // nanometres thick and lie in loose drifting patches where boats moor. The
+  // colour is the thin-film table (24-thinfilm.js, oil 1.45 on water 1.333)
+  // and it is drawn further down, as a tint on the reflection; here is only
+  // WHERE, and how thick.
+  //
+  // Gated twice: on a uniform (uSheenR.w is 0 unless the camera is within
+  // SEA.sheen.on of a harbour, so the open sea never enters the branch), and
+  // on the harbour capsules, so outside them it is three distances a pixel.
+  //
+  // The patches are value noise in the harbour's OWN frame — positions taken
+  // relative to uSheenO and slid slowly downwind — domain-warped by two more
+  // noises, at constant scales. Nothing multiplies a world position by
+  // anything that varies with it (memory: two kilometres from the origin a 1%
+  // wobble is 22 m). Irregular at every scale, and faded on the pixel's own
+  // footprint so that past about 3 m of footprint, where a fringe would be
+  // finer than a pixel, there is no sheen at all rather than a crawl of
+  // coloured grain.
+  float sheenM = 0.0, sheenD = 0.0;
+  if (uSheenR.w > 0.0 && gl_FrontFacing) {
+    vec2 pw = vWorld.xz;
+    float hm = max(max(sheenCap(pw, uSheenSeg[0], uSheenR.x),
+                       sheenCap(pw, uSheenSeg[1], uSheenR.y)),
+                       sheenCap(pw, uSheenSeg[2], uSheenR.z));
+    hm *= 1.0 - smoothstep(0.8, 3.5, fw);
+    if (hm > 0.002) {
+      vec2 q = (pw - uSheenO) - w * (uTime * 0.05);
+      vec2 wq = q * 0.09;
+      vec2 warp = vec2(fbm2(wq + vec2(3.1, 7.7) + uTime * 0.0040, 3),
+                       fbm2(wq + vec2(11.3, 1.9) - uTime * 0.0031, 3)) - 0.5;
+      float pat = fbm2(q * 0.062 + warp * 2.4, 4);
+      // About a fifth of the harbour carries film; the rest is clean water.
+      float patchM = smoothstep(0.53, 0.64, pat);
+      // Thicker in a patch's core, thinning to nothing at its edge — and the
+      // edge is the very-thin grey-clear film, the core the magenta-green
+      // second order. A swirl inside it, warped harder, draws the bands.
+      float core = smoothstep(0.53, 0.80, pat);
+      float swirl = fbm2(q * 0.38 + warp * 4.0 + vec2(5.2, 9.1), 3);
+      sheenD = (30.0 + 320.0 * core) * (0.70 + 0.60 * swirl);
+      sheenM = hm * patchM;
+      // A slick damps the capillary ripples — which is how one is seen from
+      // a cliff on a grey day with no colour in it at all.
+      micro *= 1.0 - 0.45 * sheenM;
+    }
+  }
   // The fade survives, as a backstop rather than as the mechanism: 1 to 4.5
   // metres of footprint instead of 0.18 to 1.6, which is about where even
   // anisotropic filtering has run out of tile to resolve. It was 2 to 9 for a
@@ -696,6 +765,33 @@ void main(){
 
   vec3 col = mix(body * (uAmbSky * uAmbI * 1.5 + uSunColor * uSunI * 0.16), sky, fres);
 
+  // The sheen's colour. The film changes what the surface REFLECTS and
+  // nothing else, so it is the reflection that is tinted: by the film's
+  // reflectance over bare water's own 0.020 at the same angle, which is 1
+  // for a film too thin to interfere and up to 2.5 at a bright fringe. The
+  // optical path carries the angle (2 n d cos theta_t), and toward grazing,
+  // where Fresnel sends every surface to a mirror, the tint goes to 1 with
+  // it. Sky-lit, so it goes with the sky: at night there is none. Calm water
+  // only — on a steep facet or under foam the film is broken up.
+  vec3 sheenT = vec3(1.0);
+  if (sheenM > 0.0) {
+    float cosI = max(dot(-viewDir, n), 0.0);
+    float opd = 2.0 * 1.45 * sheenD * filmCosT(cosI, 1.45);
+    vec3 tint = filmRGB(opd, 0.75) / 0.0201;
+    float calm = 1.0 - smoothstep(0.10, 0.32, length(waveN.xz));
+    float a = sheenM * calm * uSheenR.w * (1.0 - smoothstep(0.20, 0.70, fres));
+    // The hue lifted 1.7 times over the brightening. On a film this thin
+    // over water the fringes swing the reflectance by a factor of two and
+    // their hue is pastel (the table's lower row): an eye standing on the
+    // quay adapts to it and sees colour, a frame on a bright shallow shelf
+    // does not. Brightness stays the physics; only the chroma is helped.
+    vec3 dt = tint - 1.0;
+    float L = dot(dt, vec3(0.2126, 0.7152, 0.0722));
+    dt = vec3(L) + (dt - vec3(L)) * 1.7;
+    sheenT = max(vec3(0.0), 1.0 + dt * a);
+    col += sky * fres * dt * a;
+  }
+
   // ── the light that came back out ────────────────────────────────────────
   // Everything above is the surface: a mirror with a body colour behind it, and
   // a body colour is a flat fact about the depth here. What was missing is the
@@ -761,7 +857,9 @@ void main(){
   float ndh = max(dot(n, hv), 0.0);
   float spec = pow(ndh, sharpAA) * ((sharpAA + 2.0) / (sharp + 2.0));
   float broad = pow(ndh, 18.0);
-  col += uSunColor * uSunI * (spec * 2.4 * (1.0 - far * 0.55) + broad * 0.22);
+  // (Times the sheen's tint, which is 1 everywhere but on a film: a glint
+  // off oil is coloured.)
+  col += uSunColor * uSunI * sheenT * (spec * 2.4 * (1.0 - far * 0.55) + broad * 0.22);
 
   // ── foam ────────────────────────────────────────────────────────────────
   // Crest foam where the wave is steep, and a band along every shoreline.
@@ -913,6 +1011,10 @@ function buildSea(scene) {
       uNear: { value: SEA.near },
       uK: { value: Math.log(SEA.reach / SEA.near + 1) },
       uWaveScale: { value: SEA.waveScale },
+      ...shareThinFilm(),
+      uSheenSeg: { value: [new THREE.Vector4(), new THREE.Vector4(), new THREE.Vector4()] },
+      uSheenR: { value: new THREE.Vector4(0, 0, 0, 0) },
+      uSheenO: { value: new THREE.Vector2() },
     },
     vertexShader: SEA_VERT,
     fragmentShader: SEA_FRAG,
@@ -923,6 +1025,58 @@ function buildSea(scene) {
   mesh.renderOrder = 1;
   scene.add(mesh);
 
+  // ── the harbours the sheen lies in ──────────────────────────────────────
+  //
+  // Three capsules, world metres. Slot 0 and 2 are the Brod's pier (59-brod.js,
+  // `BROD.quay`), where the Šibenik boat berths on one face and sixteen small
+  // craft lie med-moored on the other — 1000150357 and _376 are that marina,
+  // flat calm — and the inlet behind its root, running south-west. Slot 1 is
+  // the line of dinghies off Strand Jadrija, set from 90-app.js once the
+  // resort's frame exists (`sheenAt`). Built on first use: BROD is declared
+  // further down the concatenation.
+  const sheenSeg = mat.uniforms.uSheenSeg.value, sheenR = mat.uniforms.uSheenR.value;
+  const sheenOn = [false, false, false];
+  function sheenAt(i, a, b, r) {
+    sheenSeg[i].set(a[0], a[a.length - 1], b[0], b[b.length - 1]);
+    sheenR.setComponent(i, r);
+    sheenOn[i] = true;
+  }
+  let sheenInit = false;
+  function sheenBrod() {
+    sheenInit = true;
+    if (typeof BROD === 'undefined' || !BROD.quay) return;
+    const Q = BROD.quay, br = Q.face * Math.PI / 180;
+    const ax = Math.sin(br), az = -Math.cos(br);
+    const [rx, rz] = Q.root;
+    sheenAt(0, [rx - ax * 12, rz - az * 12], [rx + ax * (Q.len + 10), rz + az * (Q.len + 10)], 24);
+    // South-west from the root, up the inlet.
+    const sw = Math.PI * 1.25;
+    sheenAt(2, [rx, rz], [rx + Math.sin(sw) * 55, rz - Math.cos(sw) * 55], 20);
+    mat.uniforms.uSheenO.value.set(Math.round(rx), Math.round(rz));
+  }
+  // How close the camera is to any harbour, for the gate — and the frame
+  // origin the noise is taken in, which is the nearest harbour's own end.
+  let sheenNear = -1;
+  function sheenGate(camera) {
+    if (!sheenInit) sheenBrod();
+    const cx = camera.position.x, cz = camera.position.z;
+    let best = Infinity, bi = -1;
+    for (let i = 0; i < 3; i++) {
+      if (!sheenOn[i]) continue;
+      const S = sheenSeg[i];
+      const bx = S.z - S.x, bz = S.w - S.y, px = cx - S.x, pz = cz - S.y;
+      const h = Math.max(0, Math.min(1, (px * bx + pz * bz) / Math.max(1e-3, bx * bx + bz * bz)));
+      const d = Math.hypot(px - bx * h, pz - bz * h) - sheenR.getComponent(i);
+      if (d < best) { best = d; bi = i; }
+    }
+    sheenNear = best;
+    // The origin snaps to whole metres at the start of a segment and only
+    // changes when the nearest harbour does, so the pattern never jumps
+    // under a camera that is looking at it.
+    if (bi >= 0) mat.uniforms.uSheenO.value.set(Math.round(sheenSeg[bi].x), Math.round(sheenSeg[bi].y));
+    sheenR.w = best < SEA.sheen.on ? SEA.sheen.k : 0;
+  }
+
   function update(camera) {
     // Snap the centre so the warped lattice does not shimmer as you move.
     const s = 8;
@@ -930,7 +1084,11 @@ function buildSea(scene) {
       Math.round(camera.position.x / s) * s,
       Math.round(camera.position.z / s) * s,
     );
+    sheenGate(camera);
   }
 
-  return { mesh, mat, update };
+  return { mesh, mat, update, sheenAt,
+    sheen: () => ({ near: +sheenNear.toFixed(1), k: sheenR.w,
+      seg: sheenSeg.map((v, i) => (sheenOn[i] ? [...v.toArray().map((x) => +x.toFixed(1)), sheenR.getComponent(i)] : null)),
+      origin: mat.uniforms.uSheenO.value.toArray() }) };
 }

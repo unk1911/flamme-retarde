@@ -1242,7 +1242,7 @@ function handsPose(f, rec, fg, t, dt, geo) {
     // The phone's arm is the phone's; only the thumb was ever this one's.
     // And the cigarette's, which is solved by the same kind of hold on the
     // same side (`stepSmokers` in 43-jadrija.js).
-    const held = sd > 0 && !!(fg.phone || fg.smoke);
+    const held = sd > 0 && !!(fg.phone || fg.smoke || fg.bubbles);
     if (HANDS.off || held) { handClear(f, B, r, held); continue; }
     // Measured against where the last solve put the wrist: how far off the
     // surface a resting hand actually got (a reach the arm did not have).
@@ -1251,7 +1251,7 @@ function handsPose(f, rec, fg, t, dt, geo) {
       handStats.res += e; handStats.n++;
       if (e > handStats.resMax) { handStats.resMax = e; handStats.worst = fg.idx; }
     }
-    const g = fg.gArm > 0 && (fg.phone || fg.smoke ? true : !!fg.gArmL) === (sd < 0) ? fg.gArm : 0;
+    const g = fg.gArm > 0 && (fg.phone || fg.smoke || fg.bubbles ? true : !!fg.gArmL) === (sd < 0) ? fg.gArm : 0;
     handSide(f, r, B, H, fg, s, sd, g, t, dt, geo, rec.lean);
   }
   // The lean a table asked for, eased with the hand that asked for it. Not
