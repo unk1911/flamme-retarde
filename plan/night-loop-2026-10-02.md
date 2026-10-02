@@ -17,7 +17,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    off, the AVBD strap in HER hand (third-person arm), swings at the cot targets, same hit
    path/marks/sounds; collar: she buckles it on you, leads you (camera follows), tugs move
    your pose (reuse the leash pose steps). Safeword ends both.
-3. [ ] **Phase 2c — standing spanks done properly + more Chloe moves.** Fix the 8–19 cm
+3. [x] **Phase 2c — standing spanks done properly + more Chloe moves.** Fix the 8–19 cm
    misses (solve the arm to the target with the same two-bone hinge solver as 1.561.1),
    kneel-by-the-cot instead of squat, head tracking you, hand poses (open palm, grip),
    circling, hair stroke, hand on your back holding you down, sitting on the cot edge.
