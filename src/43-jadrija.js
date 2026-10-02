@@ -63021,10 +63021,32 @@ async function buildJadrija(scene) {
    * `tilt` is how far the plug's own axis rises above her forward, which is
    * the way that entrance runs. Both were swept through `__fr.jad.raw().plug`
    * against `plugFit`'s numbers, the way TOY's two were.
+   *
+   * IN THE CLEFT, NOT UNDER IT (1.560.3). Misha: *"she puts it in the wrong
+   * hole"*. The first mount, (−0.0225, 0.8175) at 1.05, was on her skin at
+   * (−0.021, 0.826), the corner where the underside of her crotch turns up
+   * into the line between her cheeks. It did not drift there: the skin round
+   * it stayed within 0.2 mm of the base standing and within 4 mm in every
+   * pose, because the plug rides that skin's own weights. The corner was the
+   * wrong place to start. Standing, the front of the base hung below the
+   * point where her cheeks meet, in the gap at the top of her thighs. On all
+   * fours it sat on the back of her vulva. Only a headstand, seen from the
+   * front with her legs apart, made it look right.
+   *
+   * Now it is 3 cm further up that line, on her midline vertex at (−0.0448,
+   * 0.8445). That is where the cleft the skin texture paints ends, so the
+   * cleft runs down to the base. Her cheeks are 15 mm behind it on either
+   * side, so standing they close over its edges. The axis rises 46° (0.80),
+   * close to square to her skin there and up towards her navel, the way
+   * that canal runs. The base sits 1 mm deeper than flush. The skin weights
+   * are her own again, read off the triangle the axis meets: thighs
+   * 38 / 38, pelvis 21, spine 3. Swept over 3 depths × 6 tilts here and
+   * 7 heights × 7 tilts up the line, in eight poses; see the changelog for
+   * the table.
    */
   const PLUG = {
-    at: [-0.0225, 0.8175, 0],
-    tilt: 1.05,
+    at: [-0.0501, 0.8390, 0],
+    tilt: 0.80,
     /** Metres the motor moves it while it is in her — less than TOY.buzz: it is held all round. */
     buzz: 0.0007,
     /** How far up its own axis her fist closes on it: the waist of the bulb. */
