@@ -53,6 +53,22 @@ merged + released before the next starts. Consensual adult kabina play; safeword
 8. [ ] Safeword also stops the Lovense/plug in both modes (Misha hasn't answered — only if
    he says yes; otherwise skip).
 
+## After the loop (launch when the last night item has merged, ~07:30)
+
+9. [ ] **Thin-film: harbour oil sheen + a bather kid blowing soap bubbles** (Misha, 06:05,
+   inspired by https://sael.net/soap-bubble/ — "All rights reserved": take NO code from it;
+   rebuild from physics). Our own thin-film LUT (RGB vs optical path difference, summed over
+   the visible spectrum with CIE matching functions, baked at load, ~50 lines), indexed by
+   film thickness x cos(view angle). (a) Oil sheen: faint drifting iridescent patches on the
+   water at the harbour (Šibenik riva / the boats / fuel dock — find where boats moor), in
+   the sea shader or as decal patches, calm water only, broken up by noise (no regular
+   pattern — memory nothing-beats-a-wrong-pattern; no varying coefficient on absolute
+   position). (b) One of the seated bather kids on a chair near one of the businesses there
+   blows soap bubbles: a wand, bubbles spawned at the lips, drifting on the wind with a
+   little buoyancy, swirling drained-film colours (black film top), popping with an
+   expanding-hole shader; pooled, cheap (dozens, one shader). RULE 4 for any 43-jadrija.js
+   bather change (own RNG). people 100 / blockers 820.
+
 ## Rules for each iteration
 - One worktree agent at a time; brief it fully (memory notes, fast pipeline, RULE 4,
   regression people 100 / blockers 820, CHANGELOG/TASKLOG one row, commit in worktree).
