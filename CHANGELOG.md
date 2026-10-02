@@ -8,6 +8,110 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.584.0] — 2026-10-02
+
+### the test pipeline: a report key, a server that knows its build, eight at once
+
+Misha, approving the pipeline list: *"do all 5"*. Nothing a player sees
+changes except one new key.
+
+- **The report key, `` ` `` (Backquote, under Escape).** It copies one line
+  to the clipboard and toasts "copied" (en/hr/fr; also on the help sheet).
+  The line is also printed to the console as `[report] …`, and
+  `__fr.report()` returns the same thing as an object (`.line` is the line).
+  New file `src/94-report.js`. The line holds:
+  - the build;
+  - the phase;
+  - where you are, in world x,y,z, and at Jadrija the resort's t/s and the
+    room (`vikendica upper:living`, `vikendica ground:boravak`,
+    `vikendica loft`, `kabina`);
+  - the camera and its yaw/pitch, plus the on-foot look angles;
+  - what the crosshair is on. That is a raycast from the middle of the
+    picture against every visible colour-writing mesh, nearest bounding
+    sphere first. It gives the hit point, the distance, t/s, the room, the
+    mesh's name and its parents' names, its triangle count and face, and
+    either the baked vertex colour or the material colour.
+  - Unnamed meshes are named by where their builder handed them back
+    (`jadrija.vik.root`, `sea.mesh`, `jadrija.castersLive[1]`). The
+    vikendica's blobs are now named `vikendica:shell`, `vikendica:roof`,
+    `…:shell_ware` and so on, and the landmarks `landmark:<name>`. The
+    awning's cloth, bar, arms, gearbox and crank are named too.
+  - A merged blob has lost its Blender objects' names, so on the shell the
+    vertex colour is the clue. Checked headless at the vikendica's terrace:
+    `hit cloth < vikendica:awning < jadrija.vik.root @ … 1.04 m … [vikendica
+    upper:terrace] mesh 1120 tris face 116 mat #f1ebcd`. The cassette itself
+    is in the shell: `hit vikendica:shell … 1.29 m … vcol #e7e6e2`. In the
+    kabina it gave `you … [kabina]`.
+  - A real key press put the line on the clipboard (read back in the probe).
+    Copying uses a textarea and `execCommand` first, so it works over http
+    and file://, then the async clipboard, raced against a 600 ms timeout.
+  - Cost: 0.3–0.4 s on the key press, almost all of it in the few big merged
+    meshes that enclose the camera. It is a single key, not a per-frame
+    cost.
+- **`tools/serve.mjs`.** Run `node tools/serve.mjs [--root DIR]`.
+  - It serves one checkout on 127.0.0.1 on a port the OS picks, and prints
+    the URL.
+  - It first compares the page's `const BUILD = { v }` with that checkout's
+    `build.py` VERSION. If the page is unbuilt or the versions differ it
+    refuses, with exit 3. A page older than its newest `src/*` gets a
+    warning.
+  - `--check` only verifies. `--idle 30` (the default) exits after 30
+    minutes with no requests, so an orphan does not hold a port all night.
+  - Two started at once got 36743 and 38409.
+  - `--root` defaults to the current directory when it is a checkout.
+- **shoot.mjs / shootmany.mjs serve themselves.**
+  - With no `--url` they start that server inside their own process, so it
+    dies with them. Pass `--query jadrija` (or `--url '?jadrija'`) for the
+    query.
+  - With any URL, the page's `BUILD.v` is compared with the checkout's
+    build.py, and a mismatch prints `WARNING: the page is v1.584.0 but
+    /home/unk1911/flamme-retarde/build.py is v1.583.0 — a stale server on
+    --url?`.
+  - The `build` line now carries the page's version.
+  - New plan step `"key": "Backquote"` (or a list of codes) sends a real key
+    through `Input.dispatchKeyEvent`. That counts as user activation, which
+    the clipboard needs and a synthetic KeyboardEvent does not have.
+  - shoot.mjs grants itself clipboard read/write so a probe can read the
+    clipboard back.
+- **No intro in the tools.** A fresh profile had never seen the cinematic,
+  so shoot.mjs played it on every `?jadrija` and `?ground`. It now appends
+  `nointro` unless the URL already says `intro`/`nointro` or `--intro` is
+  given. film.mjs and record.mjs already did this. On plain `?jadrija`,
+  "jadrija ready" took 0.5–0.8 s in every run here.
+- **shootmany's default `--jobs` is now 8** (it was 4). This is the measured
+  table. It used eight identical Jadrija plans (enter, two moves, a still)
+  on the RTX 4090 laptop, with other agents using the GPU and CPU at the
+  same time (load average 4–14). The two best settings and 4 were each run
+  a second time.
+
+  | jobs | batch wall | per plan | one plan's own time | CPU mean / peak | RAM peak | GPU mean |
+  |---|---|---|---|---|---|---|
+  | 3 | 101.7 s | 12.7 s | 34.0 s | 22 / 37 % | 17.5 GB | 28 % |
+  | 4 | 79.4 / 79.5 s | 9.9 s | 39.4–39.6 s | 29–31 / 53–58 % | 19.8 GB | 35 % |
+  | 6 | 85.6 / 84.1 s | 10.5–10.7 s | 44.4–45.0 s | 30–34 / 69–81 % | 22.4 GB | 26–35 % |
+  | 8 | 60.7 / 59.6 s | 7.5–7.6 s | 59.0–59.8 s | 51–57 / 82–88 % | 31.4 GB | 35–44 % |
+
+  - Repeats agreed within 2 %.
+  - At 6 the eight plans run in two waves (6, then 2), so they lose to 4 on
+    this set. Over a long queue, 6 and 8 give the same throughput (0.135
+    plans/s, against 0.10 at 4).
+  - Each Chrome costs about 2.4 GB, so on a busy machine `--jobs 6` is the
+    same throughput for 9 GB less.
+  - About 10 s of every run is loading the 41 MB page.
+- **`tools/tasklog.py`** gives a TASKLOG row's minutes from timestamps.
+  - Start: `--start PATH|ISO`, or `--since-commit SHA`.
+  - End: `--end ISO|now|head|SHA`. The default is HEAD's time if that is
+    after the start, otherwise now.
+  - `--agent-ms MS` takes the minutes from an agent's usage block instead.
+  - `--fix-last` or `--row TEXT` writes the minutes into that row.
+    `--calls N` and `--runs N` set those columns, and `--dry-run` writes
+    nothing.
+  - It refuses a file whose rows do not round-trip. Rewriting the 1.583.0
+    row with its own values left the file byte-identical.
+  - Example: `--since-commit d861d35 --end c192a87` says 23 min for that
+    task, against the 26 its usage block gave, because the agent started
+    before that commit.
+
 ## [1.583.0] — 2026-10-02 (baye 1.70.0)
 
 ### Roles reversed: Chloe has a mood, and you can beg her

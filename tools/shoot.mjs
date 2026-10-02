@@ -4,11 +4,23 @@
 //
 //   node tools/shoot.mjs out.png [--hour 19.4] [--pos x,y,z] [--look yaw,pitch]
 //                                [--q low] [--wait 120] [--fly] [--size WxH]
+//                                [--root <checkout>] [--url URL] [--intro]
+//                                [--query jadrija]   (or --url '?jadrija')
+//
+// No --url: it serves the checkout itself (tools/serve.mjs, in this process,
+// on a free port, refusing a page that is not that checkout's build) — the
+// checkout is --root, else the current directory, else the one this file is
+// in. With --url it uses that, and either way it compares the page's
+// BUILD.v with that checkout's build.py and prints a WARNING if they differ.
+//
+// The intro cinematic is skipped (`nointro` on the URL): a fresh profile has
+// never seen it, so every run used to sit through it. --intro keeps it.
 
 import { spawn } from 'node:child_process';
 import { writeFileSync, readFileSync, rmSync } from 'node:fs';
 import { createServer } from 'node:net';
 import { gpuLaunch, RENDERER_JS } from './gpu.mjs';
+import { startServer, buildPyVersion, defaultRoot } from './serve.mjs';
 
 const args = process.argv.slice(2);
 const out = args[0] || 'shot.png';
@@ -35,7 +47,28 @@ const PROFILE = '/tmp/claude-chrome-profile-' + PORT;
 // A fresh profile every launch: a stale one (a crashed run's lock file, or a
 // session restore) is the other way the same run failed on alternate tries.
 if (!flag('keep-profile')) rmSync(PROFILE, { recursive: true, force: true });
-const URL_BASE = opt('url', 'http://127.0.0.1:8794/flamme-retarde.html');
+// The checkout this run is about, and what its build.py says the page is.
+const ROOT = defaultRoot(opt('root', null));
+const WANT_V = buildPyVersion(ROOT);
+// `--url '?jadrija'` (or `--query jadrija`) is a query on our own server.
+const URL_ARG = opt('url', null);
+const OWN = !URL_ARG || URL_ARG.startsWith('?');
+let URL_BASE = OWN ? null : URL_ARG;
+if (OWN) {
+  try {
+    const srv = await startServer({ root: ROOT });
+    const qs = URL_ARG || (opt('query', null) ? '?' + opt('query').replace(/^\?/, '') : '');
+    URL_BASE = srv.url + qs;
+    console.log(`serving ${srv.root} v${srv.version} at ${srv.base}`);
+  } catch (e) {
+    console.log(e.message);
+    process.exit(3);
+  }
+}
+// The intro: skipped unless asked for, or unless the URL already says.
+if (!flag('intro') && !/[?&](no)?intro\b/.test(URL_BASE)) {
+  URL_BASE += (URL_BASE.includes('?') ? '&' : '?') + 'nointro';
+}
 const quality = opt('q', 'low');
 const maxWait = Number(opt('wait', 150)) * 1000;
 
@@ -87,6 +120,21 @@ const logs = [];
 chrome.stderr.on('data', (d) => logs.push(String(d)));
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+// A DOM `code` to what Input.dispatchKeyEvent also wants: the key, its text,
+// and the Windows virtual-key code.
+const KEYS = { Backquote: ['`', 192], Space: [' ', 32], Enter: ['Enter', 13], Escape: ['Escape', 27],
+  Tab: ['Tab', 9], Minus: ['-', 189], Equal: ['=', 187], Comma: [',', 188], Period: ['.', 190],
+  Slash: ['/', 191], Semicolon: [';', 186], Quote: ["'", 222], BracketLeft: ['[', 219],
+  BracketRight: [']', 221], Backslash: ['\\', 220] };
+function keyOf(code) {
+  let m;
+  if ((m = code.match(/^Key([A-Z])$/))) return { key: m[1].toLowerCase(), text: m[1].toLowerCase(), vk: m[1].charCodeAt(0) };
+  if ((m = code.match(/^Digit(\d)$/))) return { key: m[1], text: m[1], vk: 48 + +m[1] };
+  if ((m = code.match(/^F(\d+)$/))) return { key: code, text: '', vk: 111 + +m[1] };
+  const k = KEYS[code] || [code, 0];
+  return { key: k[0], text: k[0].length === 1 ? k[0] : '', vk: k[1] };
+}
 
 async function endpoint() {
   for (let i = 0; i < 120; i++) {
@@ -232,6 +280,9 @@ async function main() {
     await send('Profiler.setSamplingInterval', { interval: 500 });
     await send('Profiler.start');
   }
+  // So a probe can read back what the page put on the clipboard.
+  await browser.send('Browser.grantPermissions', { origin: new URL(url).origin,
+    permissions: ['clipboardReadWrite', 'clipboardSanitizedWrite'] }).catch(() => {});
   await send('Page.navigate', { url });
   TS('navigated');
 
@@ -246,7 +297,7 @@ async function main() {
   // --- wait for the build ---------------------------------------------------
   const t0 = Date.now();
   TS('wait build');
-  let status = null;
+  let status = null, versionSeen = null;
   while (Date.now() - t0 < maxWait) {
     await sleep(500);
     try {
@@ -255,9 +306,20 @@ async function main() {
         const b = document.getElementById('bar-fill');
         return { stage: s ? s.textContent : null,
                  pct: b ? b.style.width : null,
-                 ready: !document.getElementById('enter').hidden };
+                 ready: !document.getElementById('enter').hidden,
+                 v: typeof BUILD !== 'undefined' ? BUILD.v
+                   : (document.querySelector('meta[name=version]') || {}).content || null };
       })()`);
     } catch (e) { status = { err: String(e) }; }
+    // WHICH BUILD IS THIS. A server on a fixed port answers whoever asks, and
+    // on 1 Oct one silently served main's page to a worktree's probe.
+    if (status && status.v && !versionSeen) {
+      versionSeen = status.v;
+      if (WANT_V && status.v !== WANT_V) {
+        console.log(`WARNING: the page is v${status.v} but ${ROOT}/build.py is v${WANT_V}`
+          + ` — ${OWN ? 'rebuild?' : 'a stale server on --url?'}`);
+      }
+    }
     if (status && status.ready) break;
   }
   const buildSeconds = (Date.now() - t0) / 1000;
@@ -281,7 +343,7 @@ async function main() {
     const { profile } = await send('Profiler.stop');
     writeFileSync(bootProf, JSON.stringify(profile));
   }
-  console.log(`build ${buildSeconds.toFixed(1)}s · chrome up ${chromeUp.toFixed(1)}s · ${renderer} · port ${PORT}`);
+  console.log(`build v${versionSeen || '?'} ${buildSeconds.toFixed(1)}s · chrome up ${chromeUp.toFixed(1)}s · ${renderer} · port ${PORT}`);
   // AND AT JADRIJA, UNTIL IT IS THERE. Measured 27 Sep: the resort is built
   // and walkable 1.8 s after the enter click, and plans were opening with a
   // guessed `settle` of 20 000 ms — eighteen seconds of every run spent
@@ -328,6 +390,20 @@ async function main() {
     // Async, so a step's `js` may `await` — and a promise it ends on is waited
     // for rather than dropped.
     if (poses.length) await evalJs(`(async () => { ${poses.join(';')}; return 1; })()`);
+    // `key`: a real key press through the input pipeline ("Backquote",
+    // "KeyE", "Digit8" …, or a list of them) — unlike a synthetic
+    // KeyboardEvent from `js` it carries user activation, which is what
+    // the clipboard and audio need.
+    if (shotSpec.key) {
+      for (const code of [].concat(shotSpec.key)) {
+        const k = keyOf(code);
+        await send('Input.dispatchKeyEvent', { type: 'keyDown', code, key: k.key, text: k.text,
+          windowsVirtualKeyCode: k.vk, nativeVirtualKeyCode: k.vk });
+        await send('Input.dispatchKeyEvent', { type: 'keyUp', code, key: k.key,
+          windowsVirtualKeyCode: k.vk, nativeVirtualKeyCode: k.vk });
+        await sleep(60);
+      }
+    }
     if (shotSpec.drag) {
       await touchDrag(shotSpec.drag, shotSpec.dragHold ?? 140, !!shotSpec.keep);
     }
