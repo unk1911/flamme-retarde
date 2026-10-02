@@ -45,6 +45,10 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    a few slow thrusts in the air, a cheeky English line), a tease like Baye's "the bend"; no
    contact with player-Baye's body, no grinding on her. In her selector (now and then, mid heat)
    and on a key/ask ("show me your moves"). Strap-on: declined, do not build.
+   PLUS (Misha, 06:00): the existing hug + kiss extended to player-Baye on her back with legs
+   raised (1.566.0 leg poses): Chloe comes to the cot SIDE, leans over, hugs her close and kisses
+   her; the hip-thrust tease stays standing beside the cot, before or after the hug. Never
+   between the raised legs, never thrusting while close/hugging.
 7. [ ] **Reverse-roles polish from playtesting the above** (whatever is roughest).
 8. [ ] Safeword also stops the Lovense/plug in both modes (Misha hasn't answered — only if
    he says yes; otherwise skip).
