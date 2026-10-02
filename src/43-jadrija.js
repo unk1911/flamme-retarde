@@ -47678,22 +47678,28 @@ async function buildJadrija(scene) {
     wiggle: { lie: { front: 1, side: 1, back: 1 }, deg: [22, 36], gap: 0.3, up: 0.16, hold: 0.08, down: 0.32, J: 6 },
     arch: { lie: { front: 1, knees: 1, seat: 1 }, deg: [22, 34], head: 0.6, up: 0.8, hold: 2.4, down: 1.0 },
     lift: { lie: { front: 1 }, deg: [16, 26], up: 0.45, hold: 2.0, down: 0.7 },
+    // BRACED (1.568.0, the autonomous mode's anticipation): both knees drawn
+    // a little and held, the way a body tightens waiting for the next one —
+    // feet a hand off the mattress face down, and held for as long as she
+    // expects to wait (`hold`, passed in), then let go slowly.
+    brace: { lie: { front: 1, back: 1, side: 1 }, deg: [10, 18], up: 0.3, hold: 1.6, down: 0.8 },
   };
-  function cotMove(kind, k = 0.6) {
+  function cotMove(kind, k = 0.6, hold = null) {
     const R = cotR, M = COT_MOVE[kind];
     if (!R || !R.on || !skinFig || !M) return false;
     const pose = COT_RAG.poses[show.phase];
     if (!pose || !M.lie[pose.lie]) return false;
     k = clamp(k, 0, 1);
     const D = Math.PI / 180, deg = (M.deg[0] + (M.deg[1] - M.deg[0]) * k) * D;
-    const T = (lag) => ({ t: 0, lag, up: M.up, hold: M.hold, down: M.down, l: 0, r: 0, h: 0, s: 0 });
+    const Hd = hold != null ? clamp(+hold || 0, 0.2, 6) : M.hold;
+    const T = (lag) => ({ t: 0, lag, up: M.up, hold: Hd, down: M.down, l: 0, r: 0, h: 0, s: 0 });
     const first = Math.random() < 0.5;
     let end = 0;
     if (kind === 'heels') {
       const a = T(0), b = T(M.gap);
       a[first ? 'l' : 'r'] = deg; b[first ? 'r' : 'l'] = deg * 0.9;
       R.kicks.push(a, b);
-      end = M.gap + M.up + M.hold + M.down;
+      end = M.gap + M.up + Hd + M.down;
     } else if (kind === 'wiggle') {
       const kn = deg * (pose.knee || 0.5);
       for (let n = 0; n < 3; n++) {
@@ -47711,7 +47717,7 @@ async function buildJadrija(scene) {
         const J = M.J * (0.6 + 0.4 * k) * (first ? 1 : -1);
         cotImpulse(R.rag.pelvis, null, x * J, 0, z * J);
       }
-      end = 2 * M.gap + M.up + M.hold + M.down;
+      end = 2 * M.gap + M.up + Hd + M.down;
     } else if (kind === 'arch') {
       const e = T(0);
       e.s = deg;
@@ -47719,12 +47725,17 @@ async function buildJadrija(scene) {
       // stays where it is, which is a chin level with a back that straightened.
       if (pose.lie === 'front') e.h = deg * M.head;
       R.kicks.push(e);
-      end = M.up + M.hold + M.down;
+      end = M.up + Hd + M.down;
     } else if (kind === 'lift') {
       const e = T(0);
       e.h = deg * Math.sign(pose.head || 1);
       R.kicks.push(e);
-      end = M.up + M.hold + M.down;
+      end = M.up + Hd + M.down;
+    } else if (kind === 'brace') {
+      const e = T(0);
+      e.l = deg; e.r = deg * 0.92;
+      R.kicks.push(e);
+      end = M.up + Hd + M.down;
     }
     while (R.kicks.length > 6) R.kicks.shift();
     // The give drawn for as long as it lasts — see `calm` and `actIn`.
@@ -70053,6 +70064,28 @@ async function buildJadrija(scene) {
   }
   const signals = {};
   const _sigW = new THREE.Vector3();
+  /**
+   * THE TOYS ON HER, FOR HER OWN MODE (1.568.0, src/49-auto.js): which of the
+   * two with a motor she is wearing, and of those running, the level it is
+   * turned to (0.15..1) and where in its pattern it is this moment (0..1,
+   * times the level) — what she feels, and so what she answers. Null with
+   * neither on her.
+   */
+  function autoToyView() {
+    let out = null;
+    for (const k of ['plug', 'lovense']) {
+      if (!worn[k]) continue;
+      if (!out) out = { worn: [], lvl: 0, beat: 0, on: [] };
+      out.worn.push(k);
+      const sg = signals[k];
+      if (!sg) continue;
+      const lv = sg.lvl == null ? 1 : sg.lvl;
+      out.on.push(k);
+      out.lvl = Math.max(out.lvl, lv);
+      out.beat = Math.max(out.beat, signalAmp(sg.t) * lv);
+    }
+    return out;
+  }
 
   /**
    * ── ONE WORD, WHICHEVER ROAD IT TAKES ──────────────────────────────────
@@ -80416,7 +80449,7 @@ async function buildJadrija(scene) {
         hamSwing: hammock && hammock.api && HAM[p] ? hammock.api.swing() : null,
         // The playground's kit (1.562.0): on it, and near enough to get on.
         pg: show.pg && PG_PH[p] ? { kind: show.pg.kind, stage: show.pg.stage, t: show.pg.ridT || 0 } : null,
-        atPlay: pgNear(show.t, show.s) };
+        atPlay: pgNear(show.t, show.s), toy: autoToyView() };
     },
     /** Whether she could be asked for `name` now — `askWhy`, null when she could. */
     autoWhy: (name) => (show ? askWhy(name) : 'gone'),
@@ -80468,7 +80501,7 @@ async function buildJadrija(scene) {
      */
     autoMove: (o = {}) => {
       if (!show) return false;
-      if (o.cot) return cotMove(o.cot, o.k == null ? 0.6 : o.k);
+      if (o.cot) return cotMove(o.cot, o.k == null ? 0.6 : o.k, o.hold == null ? null : o.hold);
       if (o.glance != null) {
         if (show.gaze === Infinity && !o.force) return false;
         show.gaze = Math.max(0, +o.glance || 0);
