@@ -161,6 +161,11 @@ async function main() {
   await send('Page.enable');
   await send('Emulation.setDeviceMetricsOverride',
     { width: W, height: H, deviceScaleFactor: 1, mobile: false });
+  // Focused and active, as shoot.mjs keeps its page. Without these a headless
+  // page counts as unfocused and drops synthetic key presses: the kabina promo
+  // (2 Oct 2026) pressed 8 to go into the kabina and filmed an empty hut.
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
+  await send('Page.setWebLifecycleState', { state: 'active' }).catch(() => {});
 
   const sep = URL_BASE.includes('?') ? '&' : '?';
   await send('Page.navigate',
