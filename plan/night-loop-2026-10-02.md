@@ -49,7 +49,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    raised (1.566.0 leg poses): Chloe comes to the cot SIDE, leans over, hugs her close and kisses
    her; the hip-thrust tease stays standing beside the cot, before or after the hug. Never
    between the raised legs, never thrusting while close/hugging.
-7. [ ] **Reverse-roles polish from playtesting the above** (whatever is roughest).
+7. [x] **Reverse-roles polish from playtesting the above** (whatever is roughest).
 8. [ ] Safeword also stops the Lovense/plug in both modes (Misha hasn't answered — only if
    he says yes; otherwise skip).
 
