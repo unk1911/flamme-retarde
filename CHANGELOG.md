@@ -8,6 +8,290 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.572.0] — 2026-10-02 (baye 1.63.0)
+
+### The third toy: a G-spot wand, in either hole
+
+Misha: *"can we also add a 3rd toy, which can be used in place of the lovense
+or plug, it's the gspot vibrator that I have seen folks use, it can go into
+either hole, for a more intense experience"*, with a photograph of the one he
+means (refs/toys/wand-ref.jpg, not committed). The night loop's item 10. The
+same two adults and the same consensual kabina play as the Lovense (1.559.x)
+and the plug (1.560.2), and the safeword over all of it.
+
+It is the plug's and the Lovense's every path with a third key on it (`wand`
+in CARRY, a receiver in `giftProps`, `wear:` / `doff:`, a channel of its own
+on the remote), and the one thing they do not have: a hole.
+
+**The object** (`wandMesh`, 43-jadrija.js). Off the photograph, traced at
+6.8 px/mm to the 22 cm these are sold at, as a radius against ARC LENGTH from
+the top of the head to the G-spot tip, swept along a spine that is straight
+down the head and the handle and bends 20° over the last half:
+
+    s 0–55 mm     the head, 45 mm across, a flattened dome on a cylinder,
+                  its underside a soft lip down to the neck
+    s 56–72       the neck, 21 mm, flaring into the band
+    s 73–79       the gold band, 32 mm, polished, proud by a hair
+    s 79–145      the handle, 35 mm under the band, tapering to its
+                  waist (21.5 mm at s 145), the infinity button on it
+    s 145–220     the G-spot end, swelling to 31 mm and rounding off
+
+Its own loft, not `loftAlong`, for two reasons. The button is GEOMETRY: two
+raised teardrops (1.1 mm proud, their points toward each other) inside a
+raised figure-of-eight rim, on the handle's face, so the radius depends on
+the angle round as well as the arc. And the rings are laid down head first a
+millimetre apart, so worn, what is drawn is a PREFIX of the index buffer —
+`drawRange` to the ring at her skin — and one geometry serves the shelf, her
+hand and every draw, with no cache of cut copies. 72 sides × 220 rings,
+31,680 triangles, and 2,016 for the band — one object, built once and kept. Soft matte pale pink
+(spec 0.32, power 16), against the Lovense's glossy hot pink and the plug's
+aubergine; the band a polished gold. Photographed against the reference:
+the photograph and the model on the shelf side by side were checked
+(the button sits just under the band, the waist and the curve where the
+photograph has them).
+
+It lies on the shelf by the television, on its side along the plank with the
+button up and the head toward the candle, in the strip in front of the plug
+and the photograph, clear of the plug's base and well short of the džezva. Its own mark
+under the shelf (`kit.work.wand`), the plug's arithmetic.
+
+**Worn: on her skin, turned by her pelvis, and settled.** Each hole is a point
+on v2.0's skin in her bind frame, the way in there in her sagittal plane, and
+how much of the toy is inside (`WAND.holes`):
+
+    front   (0.030, 0.815), on her midline under the crotch between the front
+            of the vulva (x 0.067) and the perineum, the way in up and back
+            (−0.50, 0.87); 80 mm of it inside, the curved end
+    back    (−0.0446, 0.8448), the vertex the plug's base sits 8 mm proud of
+            (1.560.3), on the plug's own axis (46°, up toward her navel);
+            72 mm inside
+
+The curve bends toward her front in both. The place rides her own skin
+weights there, as the plug's does (`wandSkin`, read off v2.0's triangle:
+thighs 0.40/0.39, pelvis 0.21 in front). The TURN does not: it is her pelvis
+alone (`wandCarry`). The plug takes the skin's turn, which is a blend of her
+pelvis and both thighs; that is right for a base on her skin and wrong for
+8 cm of curve inside her, which, folded at the hips, it turned 40° off her
+pelvis.
+
+**And it settles**, which the other two never had to. Some 14 cm of it is
+outside her, and on its own line it goes through things: over the cot's edge
+with it in front, 27 mm into the side of the mattress; on her back with it
+behind, 24 mm into her thighs; curled up, 21–25 mm. A rigid thing held at one end by a body turns about the place it is held,
+so each frame `wandTick` finds the turn about the entrance — in her sagittal
+plane and across it, up to 35° — that best clears the mattress (her cot's own
+box, out through its top or its nearest side, with a centimetre's give beside
+her), the floor, and her thighs (a capsule down each thigh bone, its radius the
+median distance of the inside of that thigh's skin, ten bands, measured once
+off v2.0), with the least turn that does it, eased. The motor's rock rides on
+top: the whole of it rocks about the entrance, 0.011 rad at full, which is 1.5
+mm at the head — the head is what shows the vibration.
+
+**The fit, MEASURED** (`wandFit`, this frame's pose, against v2.0's skin
+skinned on the CPU, signed distance to the nearest triangle, 1.5 mm of
+tolerance). `out` is how many points on rings of 16 round the OUTSIDE part
+(head to 6 mm short of her skin) are inside her — a thigh or a cheek through
+it; `deep` the deepest, and every one of them is in the FIRST ring past her
+skin (s 134 mm in front, 142 behind): her lips or her cheeks closing round the
+shaft where it leaves her. `cut` is how far inside her the drawn part ends
+(+ in). `settle` is the turn, and `bed` what is left of the mattress after it.
+
+    pose               front                              back
+                       out     deep  cut  settle     left  out     deep  cut  settle     left
+    standing           1/528   2.1   0.5  –          –     18/560  5.5   0.0  –          –
+    kneeling (floor)   0/528   –     0.5  –          –     12/560  4.4   0.0  –          –
+    on all fours       16/528  6.9   0.5  –          –     32/560  7.4   0.0  6°         4.6*
+    face down          1/528   2.0   0.5  –          –     12/560  4.5   0.0  –          –
+    on her back        45/528  10.8  0.5  –          –     24/560  6.1   0.0  30°        16.8*
+    legs apart         38/528  11.2  0.4  –          –     11/560  4.6   0.0  29°        8.7*
+    legs wider         5/528   2.8   0.5  –          –     11/560  4.7   0.0  –          –
+    left leg up        0/528   –     0.4  –          –     0/560   –     0.0  –          –
+    both legs up       0/528   –     0.4  –          –     0/560   –     0.0  –          –
+    legs straight up   0/528   –     0.5  –          –     3/560   1.7   0.0  –          –
+    legs down again    6/528   4.6   0.5  –          –     4/560   1.7   0.0  –          2.5
+    kneeling, cot      0/528   –     0.5  –          –     0/560   –     0.0  –          –
+    curled up          18/528  7.3   0.4  24°, −6°   7.9*  36/560  8.8   0.0  24°, −6°   16.1*
+    over the edge      0/528   –     0.6  −12°       5.9   6/560   3.3   0.0  –          –
+    upside down        0/528   –     0.5  –          –     1/560   1.6   0.0  –          –
+
+`left` is what the settle's own model has left over, mm; a `*` is its thigh
+capsules', which are conservative — her real skin (`out`) has nothing of the
+handle in her thighs there. Drawn 35 mm out by Chloe, face down, behind:
+out 10/688, deep 4.9, still only at the entrance.
+
+Nothing beyond that first ring is inside her in any pose: no thigh through the
+handle, no head under the sheet. The deepest, 11.3 mm, is on her back with her
+legs together in front — the 1.567.0 plug's shaft took 10.6 standing.
+`in`, the same count of the curved end OUTSIDE her, is 0 standing, kneeling,
+face down and with her legs up, and is NOT a reliable number folded at the
+hips (on her back with her knees together, curled up): v2.0's skin there
+self-intersects between her thighs and the nearest triangle's face says the
+wrong side. The curved end is never drawn, so it cannot show.
+
+**Fetching it** (normal roles). `wear:wand-front`, `wear:wand-back`, or bare
+`wear:wand` (the front). She walks to the shelf mark, takes it by the middle
+of its handle, and puts it in, her hand round to her bottom for the back (the
+plug's reach) or at her front for the front (the Lovense's). ONE TOY TO A HOLE
+(`holeClear`): putting it in takes out whatever is in that hole, straight back
+to its own place; the Lovense or the plug going in takes the wand out of
+theirs; and the wand asked for the other hole comes out of this one first.
+MEASURED, a session: the plug in, "wand in your ass" — the plug back on the
+shelf, the wand behind, running its 15 s; the Lovense in front with it; then
+"wand in your pussy" — the Lovense back on the stool, the wand moved to the
+front; "take the wand out" — back on the shelf. Out of doors it goes to your
+bag, like the others. The panel says *up to the shelf for it, for behind*.
+
+**Your words** (`server/baye/baye.py` 1.63.0, **needs deploying**). The noun
+`WAND`: "wand", "wand vibrator", "g-spot (vibe / vibrator / wand / toy)",
+"massager", "the pink one", "the big one", "štapić", "baguette" — FIRST of the
+three in `GIVE_WORDS`, because "g-spot vibrator" carries the Lovense's
+"vibrator". The hole off the sentence (`wand_hole`): ass, butt, bum, back,
+behind, anal, guza, dupe, straga, cul, derrière → back; pussy, front, vagina,
+pička, naprijed, chatte, devant → front; "instead of the plug" → back. And the
+wand is the one thing "use" or "try" puts on her, or its name going "in"
+somewhere with no verb at all:
+
+    "use the wand"                    wear:wand
+    "put the wand in your ass"        wear:wand-back
+    "wand in your pussy"              wear:wand-front
+    "the big one in your ass"         wear:wand-back
+    "stavi joj štapić straga"         wear:wand-back
+    "put the wand in instead of the plug"   wear:wand-back
+    "take the wand out", "wand out", "izvadi štapić"   doff:wand
+    "turn the wand on", "uključi štapić"               buzz:wand
+    "vibrate the wand for 2 minutes"                   buzz:wand:120
+    "wand off", "stop the wand"                        hush:wand
+    "buzz all three"                  buzz:lovense, buzz:plug, buzz:wand
+
+1,131 sentences quoted in this changelog give the same answer as 1.62.0.
+"Both" is still the Lovense and the plug; "all three" or "all the toys" adds
+the wand. Her scene carries `buzz_wand` and `toys` ({front, back}: which toy is
+in which hole), so both voices know it is in and where: *"you have the pink
+G-spot wand in your ass, its curved end in you and the big head and handle
+sticking out behind"*; going, *"the big motor, much stronger than the
+Lovense"*. Asked to put it in, she hears PUT IN THE WAND, IN YOUR ASS.
+
+**Its remote.** A third button on the phone's Lovense app, WAND, in a deeper
+pink under the plug's, its own five seconds and its own line
+(`phone.press('wand')`); the laptop's typed line and every road with a level
+(Chloe's 1/4..4/4, her own mode's steps) reach it the same way. Its motor is a
+wand massager's: 36 Hz, a fourth BELOW the Lovense, a slower heavier wobble
+(2.3 Hz), the low-pass down to 185 Hz so it is a rumble and not a buzz, and the
+loudest of the three (gain 0.20 against 0.14 and 0.10). Her lips and eyes
+follow it as they follow the others, harder: the nod is
+min(1, beat × (0.62 + 0.6 × level)) against the Lovense's
+beat × (0.4 + 0.6 × level).
+
+**More intense.** What she feels of the wand at a level is 1.45 times the
+Lovense's at the same level (`WAND.intense`, in `autoToyView`'s beat). Her own
+mode, face down, 120 s at 4/4 from heat 0.5, the same plan with each:
+
+    Lovense   heat 0.632, felt 0.70; 8 of 24 picks toy moves (react, arch,
+              squirm ×4, clench, heels); 2 rests; breaths 0; asks 0
+    wand      heat 0.728, felt 0.92; 11 of 27 picks toy moves (react, open,
+              squirm ×3, heels ×2, clench, and "too much... softer" ×3);
+              no rests; 29 breaths of her own between them
+
+On the wand her answer to it going on or up is bigger (a breath 1.35× harder,
+and a squirm with her legs as well as her back at half or more), her toy moves
+are scored 1.45× more, it heats her faster, and it takes her breath every 2.4
+to 5.6 s while it runs. Her lines for it: *"Oh god... that's the wand."*,
+*"Whoa— okay, that one's strong."*, *"Ahh... fuck, babe."*; up: *"Ah! ...that's
+so much."*, *"Mmh— don't stop, don't stop."*, *"I can't— hold still—"*.
+
+**Roles reversed** (src/49-revtoys.js). Chloe's moves work on it, and she has
+a new one.
+- **Her hand round its handle**, not on a base (`rvtWandHold`): the palm on
+  the side toward her shoulder, its face in to the handle's axis, the fingers
+  wrapping across it. Draw, tease and twist along its own curve (it slides
+  out the way a curved thing does — the spine's frame at her skin is the
+  seat). Draws 28–44 mm, teases 16 mm, twists ±20°. Palm to grip, MEASURED
+  face down, mean/worst mm — a draw: grip 2.5/6.4, out 3.3/15.9, hold
+  1.6/4.2, in 2.9/7.3, let 2.7/6.5; a twist: hold 3.7/9.7, in 4.0/15.7 (the
+  worst are single frames). Her hand is 90° off her forearm on it, against
+  115–145° on the plug's base: a handle is an easier hold.
+- **Her swap** (`move:swap`, `rvtSwapTick`): her hand on the toy in that
+  hole, drawn all the way out and off you into her fist; walked back to where
+  it lives (the plug's shelf, the Lovense's stool) and set down; to the shelf
+  for the wand, off it into her fist; back to you, planned to the wand's grip
+  as it will sit (kneeling by the cot for a low one); and pushed home along
+  its curve from 45 mm out over 1.6 s. In her selector now and then when she
+  is warm (heat > 0.35, two orders obeyed, the wand on the shelf and a hole
+  she can get at); with nothing in you yet, she can still fetch it and put it
+  in. Lines: *"Let's trade this for something bigger."*, *"I've got a better
+  toy for you, babe."*, *"Okay. Time for the good one."*; in: *"There. Now
+  we're talking."*, *"Mmm. That one fits you."*, *"All the way in. Good
+  girl."*. MEASURED, behind (you face down, the
+  plug in): asked "swap it for the wand" — she knelt, drew the plug out,
+  took it to the shelf, set it down beside the wand, took the wand, came
+  back, knelt, pushed it in from 28 mm, *"There. Now we're talking."*; the
+  plug on the shelf, `toys` {back: wand}, 18 s in all. In front (you on your
+  back, the Lovense in): "use the wand" — the Lovense to the stool, the wand
+  off the shelf, in from 45 mm, {front: wand}.
+- **Her remote** on it, with her own lines: *"Oh, you're gonna feel this
+  one."*, *"This is the big motor, babe."*; up: *"Too much? Hehe. No?"*,
+  *"Look at you shaking. More?"*.
+- **What you feel** (`rvtWandFelt`): the Lovense and the plug reach you as
+  your lips and eyes on their beat; the wand does as well, and more — your
+  view trembles with it (0.42 × the pulse), your breath catches on its strong
+  pulses (Baye's own gasps, likelier and louder the higher it is), and from
+  3/4 your back gives on its hardest (the flinch spring); and her draws and
+  pushes on it reach you 1.4×.
+- **Asking her**: "use the wand", "put the wand in my ass", "the wand in my
+  pussy please", "swap it for the wand", "stavi mi štapić" (`rev.toy:swap`,
+  `.back`, `.front`); "pull the wand out a bit" and the rest as before.
+- **The safeword**: a toy in her hand goes to its place, a wand partway in
+  goes back to its seat in 0.3 s, her remote off. MEASURED: "red" with the
+  wand 21 mm out of a draw at 2/4 — seated (d 0), remote 0, aftercare on; and
+  "red" mid-swap with the wand 30 mm into its push — seated, {front: wand},
+  the Lovense on its stool, nothing left in her hand. Normal mode's safeword
+  is item 8 (unanswered) and not changed.
+
+Server: CHLOE_BEATs `swap`, `swapin`, `wandon`, `wandup`; `toy_drawn` may be
+`wand`; the reversed scene says *"the wand they have in is going this second
+... the strong one — they are shaking with it"*.
+
+**Found and fixed: a toy taken out while running went on running.**
+`doffNow` switched the signal off AFTER taking the parts off her, and
+`signalSet` finds what to switch off by looking for it, on her or on its
+shelf — at that moment neither, so it answered "not out" and the signal
+stayed. MEASURED: the phone's BUZZ, "take it out", and it buzzed on the shelf
+until its five seconds ran out — the same for the plug and the Lovense, and a
+spoken 30 s ran all thirty. It is switched off first now.
+
+**Unchanged.**
+- The plug, posed standing: face 7.8, rim −17.3/−9.5/2.8, neck 0, bulb 0,
+  hid 18 — as 1.567.0. The Lovense: tip 38, LED 7 (the motor's shake is a
+  millimetre).
+- Normal roles (main's plan): flat, legs, the hand's spank, legs down, the
+  belt out and back, her mode with "more", "red" with aftercare, the collar
+  on, a tug in her mode, the collar's red.
+- Reversed (main's plan): keys 1–7, Shift+1..6, the plug drawn, the remote
+  up, her belt, the safeword and the roles back.
+- People 100, blockers 820, no console errors. 33 headless runs.
+- RULE 4: no `rng()` draw added, removed or moved (her new choices are
+  `Math.random`, as before).
+
+Debug: `__fr.jad.raw()`:
+- `wand({ hole, at, dir, se, settle, fit })` — re-place a hole for a sweep,
+  and the readout (holes, skin, settle, fit, box on the shelf);
+- `wandFit()`, `wandView(view, d)` (a camera on it), `toyHoles()`,
+  `toyView()`;
+- `wearToy('wand', on, hole)`; `toyTake`, `toyHome`, `toyIn`, `toyMountAt`,
+  `toyProp`, `toyMark` (her swap's).
+`__fr.reverse.toys.swap(hole)`, `swapPick(hole)`; `__fr.auto.state().toy`
+gains `x`, `wand`, `breaths`.
+
+**Rough, still:**
+- The thigh capsules are conservative: on her back with her knees together
+  and curled up it turns the wand up to 24° further than her real skin needs.
+- The `in` count above, folded at the hips (not drawn, so not seen).
+- Her hand putting it in standing is the plug's and the Lovense's reach, aimed
+  at the middle of its handle; it is a gesture at her bottom or her front and
+  not a solved grip.
+- Chloe carries a toy in her fist at her side; at the shelf she reaches down
+  to it with her palm, and it jumps into her hand at the end of the reach.
+
 ## [1.570.0] — 2026-10-02 (baye 1.62.0)
 
 ### Baye speaks English, in the same voice

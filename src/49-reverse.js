@@ -880,10 +880,10 @@ function revOrderEnd(kept, why) {
   revHud();
 }
 
-/** The worn toys she has a remote for: the Lovense, and the plug if it is in. */
+/** The worn toys she has a remote for: the Lovense, the plug, the wand (1.572.0). */
 function revToys() {
   const w = jadrija && jadrija.worn ? jadrija.worn() : [];
-  return w.filter((k) => k === 'lovense' || /plug/.test(k));
+  return w.filter((k) => k === 'lovense' || k === 'wand' || /plug/.test(k));
 }
 
 /** Her decision: score what she could do where you are, and pick one. */

@@ -161,6 +161,15 @@ const CARRY = [
   { key: 'plug', label: 'a remote-control plug',
     give: true, worn: true, box: [0.046, 0.11, 0.046], col: [0.19, 0.07, 0.27],
     radio: true, wear: 'pelvis' },
+  // AND THE THIRD, for either entrance (1.572.0). Misha, 2 Oct 2026: *"a 3rd
+  // toy, which can be used in place of the lovense or plug, it's the gspot
+  // vibrator"*. A dual-ended wand, lying on the same shelf as the plug;
+  // `radio` puts it on the phone's third channel, and the hole it goes in
+  // rides on the ask (`wear:wand-front`, `wear:wand-back`) — see WAND in
+  // 43-jadrija.js.
+  { key: 'wand', label: 'a pink G-spot wand vibrator',
+    give: true, worn: true, box: [0.045, 0.22, 0.045], col: [0.93, 0.64, 0.76],
+    radio: true, wear: 'pelvis' },
   // ── AND A BALL ────────────────────────────────────────────────────────
   //
   // Misha, 26 Sep 2026: the ball for the Slow Doodle. A 22 cm beach ball in

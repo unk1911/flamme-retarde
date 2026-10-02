@@ -923,6 +923,10 @@ const ears = (() => {
     // And the plug, which is on the shelf by the television (1.560.1). Looked
     // up on base and key before base alone — see the label in `send`.
     'wear.plug': 'up to the shelf for it',
+    // And the wand beside it, in whichever hole was asked (1.572.0).
+    'wear.wand': 'up to the shelf for it, for in front',
+    'wear.wand-front': 'up to the shelf for it, for in front',
+    'wear.wand-back': 'up to the shelf for it, for behind',
     // The two that are with you rather than at you.
     kiss: 'coming over to kiss you', hug: 'coming over for a hug',
     // The errand that comes back holding something. The panel says where she

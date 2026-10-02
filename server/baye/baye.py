@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.62.0"
+VERSION = "1.63.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -1144,6 +1144,27 @@ DONE_TO_HER = {
 # does — every loop over that table takes the first row that matches.
 PLUG = r"(?:butt|anal|ass)[\s-]?(?:plug|toy)s?|buttplug\w*|plugs?|anal\w*\s+[čc]ep\w{0,3}|[čc]ep\w{0,3}"
 
+# ── AND THE WAND (1.63.0) ─────────────────────────────────────────────────────
+#
+# Misha, 2 Oct 2026: *"a 3rd toy, which can be used in place of the lovense or
+# plug, it's the gspot vibrator ... it can go into either hole"*. Satchel key
+# `wand` — WAND in src/43-jadrija.js. Its nouns: "wand", "the wand vibrator",
+# "the g-spot (vibe / vibrator / wand / toy)", "gspot", "massager", "the pink
+# one", "the big one / big vibe", and the coast's "štapić" (French
+# "baguette"). FIRST of the three in `GIVE_WORDS`: "g-spot vibrator" carries
+# the Lovense's "vibrator", and every loop over that table takes the first row
+# that matches.
+WAND = (r"(?:g[\s-]?spot\s+)?wand(?:\s+(?:vibe|vibrator|massager))?s?|massagers?"
+        r"|g[\s-]?spot(?:\s+(?:vibe|vibrator|toy|wand))?|pink\s+(?:one|toy|vibe|vibrator)"
+        r"|big\s+(?:one|toy|vibe|vibrator)|[šs]tapi[ćc]\w{0,3}|baguette")
+# WHICH HOLE, said: the back, every way; and the front. Neither said is the
+# front, which is the G-spot it is made for.
+WAND_BACK = re.compile(r"\b(ass|arse|butt|bum|bottom|back|behind|anal\w*|anus|"
+                       r"guz\w*|dup\w*|straga|otraga|cul|derri[eè]re|fesses)\b")
+WAND_FRONT = re.compile(r"\b(pussy|front|vagina|cunt|vulva|pi[čc]k\w*|naprijed|"
+                        r"sprijeda|chatte|devant)\b")
+WAND_USE = re.compile(r"\b(use|uses|using|try|tries|stick|slide|push)\b")
+
 
 ASK_RE = re.compile(
     r"\b(can|could|would|will|wanna|want to)\s+(you|u)\b"
@@ -1264,7 +1285,11 @@ ASK_RE = re.compile(
     r"|\b(put|strap|wear|wearing|attach|fasten|fit|clip|insert)\b.{0,24}"
     r"\b(lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator|toy|"
     r"headphones|bose|(hand[\s-]?)?cuffs|bangles|bracelets|chain\w*|"
-    r"anklets?|leg[\s-]?irons?|shackles?|" + PLUG + r")\b"
+    r"anklets?|leg[\s-]?irons?|shackles?|" + PLUG + r"|" + WAND + r")\b"
+    # And the wand used, or named going in somewhere (1.63.0): "use the wand",
+    # "the wand in her ass", "g-spot vibe in your pussy".
+    r"|\b(use|try|stick|slide)\b.{0,24}\b(" + WAND + r")\b"
+    r"|\b(" + WAND + r")\b.{0,8}\b(in|into|up|u)\b"
     # AND OFF, SAID THE OTHER WAY ROUND. "Take off the cuffs" and "remove the
     # anklets" carry the noun AFTER the word, and neither the "<thing> off"
     # below nor `take ... out` reached them — measured against 1.44.0, both
@@ -1272,7 +1297,7 @@ ASK_RE = re.compile(
     r"|\b(take off|remove|removes|unfasten|unclip)\b.{0,24}"
     r"\b(lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator|toy|"
     r"headphones|bose|(hand[\s-]?)?cuffs?|bangles?|bracelets?|chain\w*|"
-    r"anklets?|leg[\s-]?irons?|shackles?|" + PLUG + r")\b"
+    r"anklets?|leg[\s-]?irons?|shackles?|" + PLUG + r"|" + WAND + r")\b"
     r"|\b(buzz|vibrate)\b|\b(switch|turn) (it |the )?(on|off)\b"
     # And the remote in Croatian (1.52.0): "uključi čep", "isključi lovense".
     r"|\b(uklju[čc]i|isklju[čc]i|vibriraj|zavibriraj)\b"
@@ -1288,10 +1313,11 @@ ASK_RE = re.compile(
     # The noun is what makes this safe: a bare `off` is in half the sentences
     # on this beach.
     r"|\b(lov[ei]n[cs]\w{0,3}|love[\s-]?sen[cs]\w{0,3}|vibrator|toy|"
-    + PLUG + r")\b.{0,16}\boff\b"
+    + PLUG + r"|" + WAND + r")\b.{0,16}\boff\b"
     # And the plug's ON as well as its off (1.52.0): "turn the plug on",
-    # "switch the plug on" — the noun between the two words, as above.
-    r"|\b(turn|switch)\b.{0,12}\b(" + PLUG + r")\b.{0,8}\bon\b"
+    # "switch the plug on" — the noun between the two words, as above. And
+    # the wand's (1.63.0).
+    r"|\b(turn|switch)\b.{0,12}\b(" + PLUG + r"|" + WAND + r")\b.{0,8}\bon\b"
     # AND THE CUFFS, THE SAME WAY. Misha, 20 Sep 2026: *"add command 'cuffs
     # off' to take them off"*. Two words, no verb, and `doff_of` is what
     # answers it — see the note there about `take ... off` having been a
@@ -1528,6 +1554,7 @@ GIVE_WORDS = (
     # against 1.29.0.
     ("cuffs", r"(hand[\s-]?)?cuffs?\b|bangles?|bracelets?|chain\w*"),
     ("headphones", r"headphones?|bose\b|cans\b"),
+    ("wand", WAND),
     ("plug", PLUG),
     ("lovense", LOVENSE + r"|toy\b"),
     ("cigarettes", r"cigarettes?|smokes?|fags?\b|pack of"),
@@ -1548,7 +1575,7 @@ GIVE_WORDS = (
 # The three rows that name a thing with a bone on it — see the `wear` column in
 # src/62-satchel.js. Spelled off `GIVE_WORDS` rather than beside it, so a noun
 # only ever has one spelling in this file.
-WEAR_KEYS = ("lovense", "plug", "headphones", "anklecuffs", "cuffs")
+WEAR_KEYS = ("lovense", "plug", "wand", "headphones", "anklecuffs", "cuffs")
 WEAR_WORDS = tuple((k, p) for k, p in GIVE_WORDS if k in WEAR_KEYS)
 
 
@@ -1568,7 +1595,8 @@ TURN_ON_RE = re.compile(r"\b(turn|switch)\b.{0,24}\bon\b")
 # The verb that names no other thing. See `buzz_of`.
 HUM_RE = re.compile(r"\b(buzz\w*|vibrat\w+)\b")
 # Both toys in one breath — see `skills_of`.
-BOTH_RE = re.compile(r"\bboth\b(\s+(of\s+(them|the\s+toys)|toys|the\s+toys))?")
+BOTH_RE = re.compile(r"\bboth\b(\s+(of\s+(them|the\s+toys)|toys|the\s+toys))?"
+                     r"|\ball\s+(three|3|the\s+toys|of\s+them)\b")
 
 
 def buzz_of(text: str):
@@ -1579,7 +1607,7 @@ def buzz_of(text: str):
     # AND "TURN THE PLUG ON" (1.52.0), the noun between the two words the way
     # "turn the lovense off" has it — see `OFF_RE` below. Only with one of the
     # two motors named: "turn it on" is a hose as often as a toy.
-    toy = re.search(r"\b(" + PLUG + r"|" + LOVENSE + r")", t)
+    toy = re.search(r"\b(" + PLUG + r"|" + WAND + r"|" + LOVENSE + r")", t)
     if not on and not off and toy and TURN_ON_RE.search(t):
         on = True
     # AND A BARE "OFF" AFTER THE THING'S OWN NAME.
@@ -1748,7 +1776,7 @@ def doff_of(text: str):
         # Taking it out needs somebody to say so: a take-or-pull verb, or the
         # word `out`. The cuffs and the headphones have no motor, so "cuffs
         # off" has nowhere else to go and needs no verb.
-        if key in ("lovense", "plug") and not verb and not re.search(r"\bout\b", t):
+        if key in ("lovense", "plug", "wand") and not verb and not re.search(r"\bout\b", t):
             return None
         return "doff:" + key
     # The bare pronoun, and only with a verb that means taking it out of her:
@@ -1808,15 +1836,39 @@ def short_wear(text: str):
         return None
     for key, pat in WEAR_WORDS:
         if re.search(r"\b(" + pat + r")", t):
-            if tail.group(1) == "in" and key not in ("plug", "lovense"):
+            if tail.group(1) == "in" and key not in ("plug", "lovense", "wand"):
                 return None
-            return "wear:" + key
+            return "wear:" + key + (wand_hole(t) if key == "wand" else "")
     return None
 
 
+def wand_hole(t: str) -> str:
+    """The wand's hole, said (1.63.0): "-back", "-front", or "" (the front)."""
+    if WAND_BACK.search(t):
+        return "-back"
+    if WAND_FRONT.search(t):
+        return "-front"
+    # Said as a swap for the toy in that hole: "the wand instead of the plug".
+    if re.search(r"\b(" + PLUG + r")", t):
+        return "-back"
+    return ""
+
+
 def wear_of(text: str):
-    """`wear:<key>` if the sentence puts something that is out on to her."""
+    """`wear:<key>` if the sentence puts something that is out on to her.
+
+    The wand carries its hole on the name (1.63.0): `wear:wand-back`,
+    `wear:wand-front`, or bare `wear:wand` (the front). And it is the one
+    thing she wears that "use" and "try" put on her, or its name going "in"
+    somewhere with no verb at all: "the wand in your pussy".
+    """
     t = (text or "").lower()
+    wand = re.search(r"\b(" + WAND + r")", t)
+    if wand and not WEAR_NOT.search(t) and (
+            WEAR_RE.search(t) or WAND_USE.search(t)
+            or re.search(r"\b(" + WAND + r")\b.{0,8}\b(in|into|up|u)\b", t)):
+        if not DOFF_RE.search(t) or WEAR_RE.search(t) or WAND_USE.search(t):
+            return "wear:wand" + wand_hole(t)
     if not WEAR_RE.search(t) or WEAR_NOT.search(t):
         return None
     for key, pat in WEAR_WORDS:
@@ -1987,12 +2039,15 @@ def skills_of(text: str) -> list:
     # both of them". Two names, and the page runs each — they are two
     # receivers on the one path, so two signals is exactly what it is.
     if BOTH_RE.search(t):
-        one = buzz_of(t.replace("both", "the lovense"))
+        one = buzz_of(BOTH_RE.sub("the lovense", t))
         if one:
             secs = secs_of(t)
             stop = one.startswith("hush:")
-            return (["hush:lovense", "hush:plug"] if stop
-                    else ["buzz:lovense" + secs, "buzz:plug" + secs])
+            # "All three" / "all the toys" is the wand as well (1.63.0).
+            three = bool(re.search(r"\ball\b", t))
+            keys = ["lovense", "plug"] + (["wand"] if three else [])
+            return ([("hush:" + k) for k in keys] if stop
+                    else [("buzz:" + k + secs) for k in keys])
     # The remote, before the table: "buzz the lovense" names a thing in the
     # bag and a verb no skill of hers uses.
     rem = buzz_of(t)
@@ -4550,6 +4605,17 @@ CHLOE_BEAT = {
     "toyno": "they asked you to do something with the toy they are wearing, "
              "but you cannot reach it the way they are lying. Tell them so, "
              "playful, and in charge",
+    # 1.63.0 (page 1.572.0): the wand — the pink G-spot one, the strong one.
+    "swap": "you are taking the toy they are wearing out of them to put it "
+            "away, and going to the shelf for the wand, the pink G-spot one, "
+            "which is much stronger. A short, teasing, promising line",
+    "swapin": "you have just slid the wand all the way into them, slowly, its "
+              "curved end in and its big head out. A short, pleased line",
+    "wandon": "you have switched on the wand they are wearing with the remote "
+              "on your phone — the big motor — and you are watching them take "
+              "it. A short, wicked line",
+    "wandup": "you are turning the wand in them up a step with the remote and "
+              "they are shaking with it. A short, teasing line",
     # 1.61.0 (page 1.569.0, src/49-revmoves.js): showing off beside the cot,
     # and holding them.
     "thrust": "you are standing beside the cot, hands on your hips, rolling "
@@ -4561,7 +4627,7 @@ CHLOE_BEAT = {
             "just kissed them on the lips. A short, fond, teasing line",
 }
 # A toy Chloe has drawn partway out (1.59.0): the page sends its key.
-TOY_DRAWN = {"plug": "the plug", "lovense": "the Lovense"}
+TOY_DRAWN = {"plug": "the plug", "lovense": "the Lovense", "wand": "the wand"}
 # The orders (`REV_ORDERS` in src/49-reverse.js), in words, and the plain
 # English of each the page captions (her own words since 1.61.0): the model
 # may say it its own way, but this is what the order IS.
@@ -4843,7 +4909,8 @@ KIND_NOUN = {
 # it off — see `build_talk_messages`.
 DON_NOUN = {"cuffs": "the diamond cuffs", "anklecuffs": "the ankle cuffs",
             "headphones": "the headphones", "lovense": "the Lovense",
-            "plug": "the plug"}
+            "plug": "the plug", "wand": "the wand",
+            "wand-front": "the wand, in front", "wand-back": "the wand, in your ass"}
 
 # What she has on, off the `wear` column in src/62-satchel.js — the same three
 # keys `WEAR_KEYS` is built from, said the way she would say them.
@@ -4855,7 +4922,36 @@ WORN_NOUN = {
     "headphones": "you have their big Bose headphones on",
     "lovense": "you are wearing the Lovense they gave you",
     "plug": "you have the plug in, the remote-controlled one from the shelf",
+    # The wand (1.63.0), and where — off `toys` in the scene, see `worn_line`.
+    "wand": "you have the wand in, the pink G-spot one from the shelf",
+    "wand@front": "you have the pink G-spot wand in your pussy, its curved end "
+                  "in you and the big head and handle sticking out between "
+                  "your thighs",
+    "wand@back": "you have the pink G-spot wand in your ass, its curved end in "
+                 "you and the big head and handle sticking out behind",
 }
+
+
+def worn_line(k: str, toys) -> str:
+    """`WORN_NOUN` for `k`, and for the wand the hole it is in (1.63.0)."""
+    if k == "wand" and isinstance(toys, dict):
+        if toys.get("front") == "wand":
+            return WORN_NOUN["wand@front"]
+        if toys.get("back") == "wand":
+            return WORN_NOUN["wand@back"]
+    return WORN_NOUN[k]
+
+
+def clean_toys(raw):
+    """`toys` off the page (1.63.0): which toy is in which hole, or None."""
+    if not isinstance(raw, dict):
+        return None
+    out = {}
+    for h, ok in (("front", ("lovense", "wand")), ("back", ("plug", "wand"))):
+        v = clamp_str(raw.get(h), 8)
+        if v in ok:
+            out[h] = v
+    return out or None
 
 # ── AND THE FOUR THINGS SHE OWNS THAT THE PAGE NEVER SENDS ──────────────────
 #
@@ -4890,6 +4986,9 @@ HER_WORLD = (
     "the other toy is a plug that stands on the shelf by the television in "
     "the hut; it goes in behind, and it is radio too, on its own button in "
     "the same app",
+    "the third, the strongest, is a pink G-spot wand lying on that shelf: "
+    "a big massager head on one end and a curved end that goes in, either "
+    "in front or behind, radio on its own button too",
     "another of that phone's apps is a live camera on you, so when they are "
     "nowhere in sight they may still be watching your face on a screen",
     "the konoba pours beer, a gemišt, wine, rakija and espresso, and they "
@@ -5061,6 +5160,9 @@ def clean_scene(raw) -> dict:
         "worn": [k for k in (clamp_str(x, 12) for x in worn[:6]) if k in WEAR_KEYS],
         "buzz": bool(g("buzz")) or None,
         "buzz_plug": bool(g("buzz_plug")) or None,
+        # The wand (1.63.0): going, and which toy is in which hole.
+        "buzz_wand": bool(g("buzz_wand")) or None,
+        "toys": clean_toys(g("toys")),
         # Her legs (1.58.0): each one's shape, and how far apart.
         "legs_l": _enum(g("legs_l"), LEGS_DOING, 8),
         "legs_r": _enum(g("legs_r"), LEGS_DOING, 8),
@@ -5221,11 +5323,15 @@ def scene_lines(s: dict):
         elif h is not None and h <= 0.3:
             facts.append("you are calm and easy")
     for k in s.get("worn") or []:
-        facts.append(WORN_NOUN[k])
+        facts.append(worn_line(k, s.get("toys")))
     if s.get("buzz"):
         facts.append("the Lovense they put on you is going, this second")
     if s.get("buzz_plug"):
         facts.append("the plug they put in you is going, this second")
+    if s.get("buzz_wand"):
+        facts.append("the wand they put in you is going, this second — the "
+                     "big motor, much stronger than the Lovense, and it is hard "
+                     "to keep still or keep your voice steady")
     if s.get("hair_pull"):
         facts.append("they have a fistful of your hair from behind and are "
                      "pulling your head back by it")
@@ -5387,15 +5493,19 @@ def chloe_scene_lines(s: dict):
                 else "red and stinging")
         facts.append(f"their skin is {look} where you have spanked them")
     for k in s.get("worn") or []:
-        facts.append(pov_swap(WORN_NOUN[k]))
+        facts.append(pov_swap(worn_line(k, s.get("toys"))))
     if s.get("buzz"):
         facts.append("the Lovense they are wearing is going this second: you "
                      "switched it on with the remote")
     if s.get("buzz_plug"):
         facts.append("the plug they have in is going this second: you switched "
                      "it on with the remote")
+    if s.get("buzz_wand"):
+        facts.append("the wand they have in is going this second: you switched "
+                     "it on with the remote, and it is the strong one — they "
+                     "are shaking with it")
     lv = s.get("remote_level")
-    if lv and (s.get("buzz") or s.get("buzz_plug")):
+    if lv and (s.get("buzz") or s.get("buzz_plug") or s.get("buzz_wand")):
         facts.append(f"the remote on your phone is at {lv} of 4"
                      + (", as high as it goes" if lv >= 4 else ""))
     td = s.get("toy_drawn")
@@ -5995,6 +6105,8 @@ def clean_talk(raw: dict, who: str = "baye") -> dict:
                  if k in WEAR_KEYS],
         "buzz": bool(g("buzz")) or None,
         "buzz_plug": bool(g("buzz_plug")) or None,
+        "buzz_wand": bool(g("buzz_wand")) or None,
+        "toys": clean_toys(g("toys")),
         "phone": bool(g("phone")) or None,
     }
     # Her beat is a key into the table for WHICH of her is speaking, and a key
@@ -6142,7 +6254,7 @@ def talk_facts(who: str, ctx: dict, t: dict, world: dict):
         # words for each are in `WORN_NOUN`, one file away from the prompt they
         # are written for, like every other table in this section.
         for k in (t.get("worn") or []):
-            her.append(WORN_NOUN[k])
+            her.append(worn_line(k, t.get("toys")))
         # AND THE ONE THING THAT HAPPENS TO HER WITHOUT ANYBODY SAYING
         # ANYTHING. Five seconds off a button in an app — see `HER_WORLD` —
         # and it can land in the middle of her own sentence from the far side
@@ -6154,6 +6266,9 @@ def talk_facts(who: str, ctx: dict, t: dict, world: dict):
         if t.get("buzz_plug"):
             her.append("the plug they put in you is going, this second, "
                        "and they did it from their phone")
+        if t.get("buzz_wand"):
+            her.append("the wand they put in you is going, this second, the "
+                       "strong one, and they did it from their phone")
         if t.get("phone"):
             them.append("they have their phone up with the camera app open, "
                         "so they are watching your face on a screen")
@@ -6374,7 +6489,7 @@ def build_talk_messages(who: str, ctx: dict, t: dict, world: dict,
         verb, _, key = does.partition(":")
         what = DON_NOUN.get(key, "it").upper()
         lines.append("")
-        on, off = ("IN", "OUT") if key == "plug" else ("ON", "OFF")
+        on, off = ("IN", "OUT") if key in ("plug", "wand", "wand-front", "wand-back") else ("ON", "OFF")
         ask = ("THEY HAVE ASKED YOU TO PUT " + on + " " + what + ". It is not "
                + on.lower() + " yet; you are reaching for it right now") if verb == "wear" \
             else ("THEY HAVE ASKED YOU TO TAKE " + off + " " + what + ", and you are "

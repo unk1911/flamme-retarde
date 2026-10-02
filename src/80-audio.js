@@ -1613,6 +1613,11 @@ function buildAudio() {
   const BUZZ_VOICE = {
     lovense: { f: 48, lp: 240, lfo: 3.6, wob: 2.6, gain: 0.14 },
     plug: { f: 72, lp: 300, lfo: 5.2, wob: 3.4, gain: 0.10 },
+    // AND THE WAND (1.572.0): a wand massager's motor, which is the big one
+    // — a fourth BELOW the Lovense at 36 Hz, a slower, heavier wobble, the
+    // low-pass down with it so it is a rumble and not a buzz, and louder:
+    // most of it is outside her, and it is the strong one.
+    wand: { f: 36, lp: 185, lfo: 2.3, wob: 1.6, gain: 0.20 },
   };
   const buzzV = {};
   /**

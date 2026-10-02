@@ -1167,8 +1167,8 @@ function rvmStart(id, why = 'mood') {
       { mode: 'kneel', prefer: H.out, preferK: 3, bowMax: 1.15, headR: 0.12, reach: 0.46 });
     if (!P) return 'noplace';
     M.plan = P; M.dur = 9; M.gap = 9; M.kissD = 9;
-  } else if ((id === 'toy' || id === 'remote') && typeof rvtStart === 'function') {
-    // The toys in her hands (1.567.0, src/49-revtoys.js).
+  } else if ((id === 'toy' || id === 'remote' || id === 'swap') && typeof rvtStart === 'function') {
+    // The toys in her hands (1.567.0, src/49-revtoys.js); her swap for the wand (1.572.0).
     const r = rvtStart(M);
     if (r !== true) return r;
   } else return 'no such move';
@@ -1187,7 +1187,7 @@ function rvmEnd(why = 'done') {
   if (M.id === 'sitby') rvmWant('stand');
   else rvm.downFor = M.id === 'care' ? 0 : 1.2;
   // A draw left out goes back to its seat; the phone goes away (1.567.0).
-  if ((M.id === 'toy' || M.id === 'remote') && typeof rvtEnd === 'function') rvtEnd(M, why);
+  if ((M.id === 'toy' || M.id === 'remote' || M.id === 'swap') && typeof rvtEnd === 'function') rvtEnd(M, why);
   rvm.nape = 0; rvm.chin = 0;
   if (M.id === 'thrust' || M.id === 'hug') { rvm.body.pushTo = 0; rvm.body.turnTo = 0; rvm.body.bowTo = 0; rvm.body.wTo = 0; }
   if (M.gap != null && M.gap < 9) rvmTrace({ pick: 'move gap:' + M.id, why: 'min ' + M.gap.toFixed(3) + ' m' + (M.kissD != null && M.kissD < 9 ? ', faces ' + M.kissD.toFixed(3) + ' m' : '') });
@@ -1369,7 +1369,7 @@ function rvmMoveTick(dt) {
   if (M.id !== 'care' && M.id !== 'hips' && M.ctx && ctx !== M.ctx) { rvmEnd('you moved: ' + (v ? v.phase : '?')); return; }
   const { f, r } = rvmAxes(rev.ch.yaw);
   // Her hand on a toy you are wearing, or her remote (1.567.0).
-  if ((M.id === 'toy' || M.id === 'remote') && typeof rvtMoveTick === 'function') { rvtMoveTick(M, dt); return; }
+  if ((M.id === 'toy' || M.id === 'remote' || M.id === 'swap') && typeof rvtMoveTick === 'function') { rvtMoveTick(M, dt); return; }
   if (M.id === 'circle') {
     if (M.ph === 'go') { rvmSay('circle'); M.ph = 'walk'; }
     if (revAt() || (rev.ch.stuck > 0.8)) {
