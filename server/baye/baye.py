@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.56.0"
+VERSION = "1.57.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4430,6 +4430,22 @@ CHLOE_BEAT = {
            "short line with it",
     "uncollar": "you are taking the collar off them now, the game with it "
                 "done for now. One fond line",
+    # 1.57.0 (page 1.565.0, src/49-revmoves.js): her own moves.
+    "circle": "you are walking slowly round the cot they are lying on, "
+              "looking them over from every side, letting them wait",
+    "stroke": "you are stroking their hair slowly with your hand, a moment "
+              "of tenderness in the game. A soft, warm line",
+    "hold": "you are pressing your hand flat on the small of their back, "
+            "holding them down on the cot. A firm, teasing line",
+    "sitby": "you have sat down on the edge of the cot beside them and are "
+             "leaning over them, your hand on them. A close, purring line",
+    "chin": "they are kneeling and you have put your hand under their chin "
+            "and tilted their face up to you. Tell them to look at you",
+    "grip": "you have taken a light hold of their hair at the nape and are "
+            "holding their head back a little. A short possessive line",
+    "wait": "you gave them an order a moment ago and they have not done it "
+            "yet; you are standing over them, hands on your hips, waiting. "
+            "A short impatient line",
 }
 # The orders (`REV_ORDERS` in src/49-reverse.js), in words, and the plain
 # Croatian of each the page has always captioned: the model may say it its own

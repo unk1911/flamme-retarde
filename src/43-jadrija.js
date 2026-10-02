@@ -79135,6 +79135,27 @@ async function buildJadrija(scene) {
      * where on her it landed (`cotAim`), or null for the cheek.
      */
     cotSpank: (side, from, k, hit) => cotSpank(side, from, k, hit),
+    /**
+     * A hand held down on her on the cot (1.565.0, the role swap's
+     * src/49-revmoves.js): `f` newtons straight down at world point `p` on the
+     * ragdoll body that rides `bone` ('spine02' the small of her back,
+     * 'pelvis'), for `dt` s — an impulse a frame, so it is a weight and not a
+     * slap — and the reflexes still to come from the last slap damped by
+     * `calm` (0..1 of them taken off), since a body held down does not arch
+     * or kick up as far. False when she is not on her ragdoll.
+     */
+    cotPress: (bone, p, f, dt, calm = 0) => {
+      const R = cotR;
+      if (!R || !R.on || !skinFig) return false;
+      const b = R.rag.body(bone);
+      if (b < 0) return false;
+      cotImpulse(b, p ? [p.x, p.y, p.z] : null, 0, -Math.max(0, f) * dt, 0);
+      if (calm > 0) {
+        const k = Math.max(0, 1 - calm * Math.min(1, dt * 8));
+        for (const Kn of R.kicks) { if (Kn.l != null) Kn.l *= k; if (Kn.r != null) Kn.r *= k; if (Kn.h != null) Kn.h *= k; if (Kn.s) Kn.s *= k; }
+      }
+      return true;
+    },
     /** The belt's world — her capsules, the cot — and a lash on her: see `beltWorld`, `beltHit`. */
     beltWorld: () => beltWorld(),
     /**
