@@ -40,6 +40,11 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    (audition 2–3 and say which); every client Chloe line table (49-reverse/revkit/revmoves/
    revtoys) speaks and captions the English line, rewritten to sound natural rather than
    translated; the player's commands stay multilingual; Baye stays as she is.
+   PLUS one small new Chloe move (Misha, 05:55): "pelvic humps next to me" — a teasing hip-thrust /
+   hip-roll move she does standing or kneeling BESIDE the cot (hands on hips or behind her head,
+   a few slow thrusts in the air, a cheeky English line), a tease like Baye's "the bend"; no
+   contact with player-Baye's body, no grinding on her. In her selector (now and then, mid heat)
+   and on a key/ask ("show me your moves"). Strap-on: declined, do not build.
 7. [ ] **Reverse-roles polish from playtesting the above** (whatever is roughest).
 8. [ ] Safeword also stops the Lovense/plug in both modes (Misha hasn't answered — only if
    he says yes; otherwise skip).
