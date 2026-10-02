@@ -47,7 +47,7 @@ SHARE = Path("/mnt/synology/shared/micko/flamme-retarde")
 # rebuild byte-for-byte identically, because comparing checksums is how we
 # check that what is on the server is what is in the repo. Bump them together
 # when cutting a release, next to the CHANGELOG entry.
-VERSION = "1.565.0"
+VERSION = "1.566.0"
 BUILD_DATE = "2026-10-02"
 
 THREE_VERSION = "0.180.0"

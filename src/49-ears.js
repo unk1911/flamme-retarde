@@ -589,7 +589,23 @@ const ears = (() => {
       // AND THE PLAYGROUND (1.555.2): armed here, and — signed in — the line
       // goes on so she says yes to it; her `does` coming back for the same
       // name is then skipped rather than asked twice. See `groundsWords`.
-      const gw = rw ? null : groundsWords(blob);
+      // AND HER LEGS' LADDER (1.566.0): "left leg up", "both legs up",
+      // "higher", "lijevu nogu gore", "spusti noge" — see `liftWords` in
+      // 49-auto.js. Armed here like the kit, and the line goes on signed in.
+      const J1 = typeof jadrija !== 'undefined' && jadrija;
+      const v1 = J1 && J1.autoView ? J1.autoView() : null;
+      const lw = !cue && typeof liftWords === 'function'
+        ? liftWords(blob, !!(v1 && (v1.liftL || v1.liftR || (v1.phase === 'cradle' && !v1.legsDown)))) : null;
+      if (lw) {
+        note('“' + blob + '”  typed · here  → ' + lw, 'heard');
+        const got = J1 && J1.askShow ? J1.askShow(lw) : false;
+        note('baye: ' + (got === true ? DOES[lw] : (WHY[got] || 'cannot do that here')),
+          got === true ? 'did' : 'meta');
+        armedHere = lw;
+        draw();
+        if (!AUTH.baye || !AUTH.user) return;
+      }
+      const gw = rw || lw ? null : groundsWords(blob);
       if (gw) {
         note('“' + blob + '”  typed · here  → ' + gw, 'heard');
         const J0 = typeof jadrija !== 'undefined' && jadrija;
@@ -888,6 +904,12 @@ const ears = (() => {
     'pet': 'you petting her hair',
     'legs.spread': 'her legs apart', 'legs.close': 'her legs together',
     'legs.wider': 'her legs wider apart',
+    // Her legs' ladder (1.566.0) — see `LIFT` in 43-jadrija.js.
+    'legs.leftup': 'her left leg up', 'legs.rightup': 'her right leg up',
+    'legs.leftdown': 'her left leg back down', 'legs.rightdown': 'her right leg back down',
+    'legs.leftstraight': 'her left leg up, straight', 'legs.rightstraight': 'her right leg up, straight',
+    'legs.bothup': 'both legs up', 'legs.straight': 'both legs straight up',
+    'legs.higher': 'her legs higher', 'legs.lower': 'her legs a little lower',
     // Her hands up to the back of her head, and then the swap. See `tieHair`
     // in 43-jadrija.js: it is the same latch the console has always driven,
     // with the two seconds of gesture in front of it that it never had.
@@ -984,7 +1006,13 @@ const ears = (() => {
     spreadalready: 'her legs are already apart',
     closed: 'her legs are already together',
     widest: 'she cannot go any wider',
-    cotnarrow: 'the cot is too narrow for her legs to go any wider',
+    cotnarrow: 'the cot is too narrow for her legs to go any wider lying flat — legs up first ("both legs up"), then wider',
+    // The ladder's (1.566.0).
+    liftpose: 'not in this pose — on her back or her front on the cot',
+    legtop: 'that leg is already up as far as it goes',
+    highest: 'her legs are already as high as they go',
+    notraised: 'neither leg is up — ask for one up first',
+    legdown: 'that leg is already down',
     noroom: 'there is no room to go any wider where she is standing',
     // Off her lane, a number with no clear ground for it within a couple of
     // metres of her (1.559.1) — see `hereRoom` in 43-jadrija.js.

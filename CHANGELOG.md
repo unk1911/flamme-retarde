@@ -8,6 +8,158 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.566.0] — 2026-10-02 (baye 1.58.0)
+
+### One leg up, both up, higher, and wider
+
+Misha: *"perhaps add support for spreading legs even wider, and perhaps
+support, while on the cot, one leg laying flat on the cot while the other
+raised, or both raised, and then raised higher"*. The night-loop plan, item 4.
+
+**Each leg on a ladder of its own** (`LIFT`, `liftPlan`, `liftLeg` in
+43-jadrija.js). On her back, over the legs-down pose (`supine`, whose arms go
+on doing what they do):
+
+| rung | the leg | measured, at rest |
+|---|---|---|
+| 0 | flat, the clip's own | — |
+| 1 | knee up, the sole flat on the cot | hip 41°, knee 100°, sole 3 mm into the folded blanket |
+| s | the straight-leg raise | hip 44°, knee 4° |
+| 2 | thigh straight up, shin level: the foot in the air | hip 81°, knee 90° |
+| 3 | straight up at the ceiling | hip 79°, knee 5–6° |
+| 4 | and over, past upright, toward her | hip 115°, knee 8° |
+
+On her front: 1 the shin up off the mattress (knee 90°), 2 the knee lifted
+off it as well (15° of hip extension), s the straight leg lifted behind her.
+Not on her side, sitting or kneeling; asked there she says *not in this pose
+— on her back or her front on the cot*.
+
+**Solved, not typed.** A shape is two numbers in the plane of the leg — the
+thigh's elevation above her own length and the knee's bend — turned into a
+knee point and an ankle point off her own hip and her own segment lengths,
+measured off the clip every frame, and `wheelLimb` solves the bones to them.
+There is no Euler anywhere in it, so none of the rig's three sign traps is in
+reach. Where the sole is on the cot its angle is not given at all: the thigh
+is solved for the contact (the lowest elevation that keeps the heel on what is
+under it — mattress, the folded blanket, or the rail, measured in her frame by
+rays at the room's mesh every 5 cm), and the same floor holds under every
+shape on the way, so a leg coming up from flat slides its heel up the bed
+instead of lifting off it or going into it. The planted foot is turned flat
+— its ankle-to-ball line 29° under level, as it is when she stands — and level
+across, so a knee fallen open does not roll it on to its outer edge (that was
+15 mm of sole into the blanket before; 3 mm after, at every spread).
+
+**Direct.** Every ask is one rung, eased over about a second from wherever the
+leg is: from the cradle (both knees up in her hands) "higher" goes straight to
+both legs up at the ceiling as her hands let go — the cross from `cradle` to
+`supine` the legs-down ask has always been — and "left leg up" keeps the left
+where it is and lays the right down. No pose cycles in between. A pose change
+puts the ladder away; the safeword (`sceneSafe`) brings a raised leg down.
+The cot's ragdoll and its hand-back after a slap are untouched: the give is
+laid under the solve, and slaps on her front with a shin up kick and settle as
+before (measured, no clamp, no drift).
+
+**Wider.** The spread takes whatever the legs are, so a leg up at the ceiling
+spread is a V, two knees up spread is the frog, and a planted foot spread
+lets its knee fall open while the foot stays on the mattress (its ankle no
+further out than 0.255 m from her middle; the mattress is 0.33). Each leg has
+its own ceiling, measured against the thigh above the mattress and the hip's
+abduction off her own trunk (tools/rom.js's frame), and a leg lying flat keeps
+the cot's:
+
+| shape | ceiling ("wider"s past apart) | at the ceiling |
+|---|---|---|
+| knee up, foot planted | apart only | knees open 38°, sole on the blanket |
+| foot up (the frog) | 2 | abduction 53°, hip 91°, thigh 6 mm over the mattress |
+| straight up (the V) | 4 | 51° a side, thighs 3–5 mm over the mattress |
+| over | 4 | 50° a side, thighs 12 mm over |
+| straight-leg raise | 3 | 44° a side |
+| on her front, shins up | apart only | 40–42° a side |
+
+Standing goes one partial step further (2.4 → 2.62): 45° and 52° a side, both
+feet flat (they measure 3.20 m, the floor's height, at every step). The cradle
+stays at 2.4: one step more puts a thigh into the mattress through half its
+24.8 s loop. And lying with her legs flat the cot is still too narrow — the
+refusal now says what to do about it: *legs up first ("both legs up"), then
+wider*.
+
+**Words.** Typed, matched in the page so they work signed out (`liftWords`,
+49-auto.js; 51 phrases tested offline, none wrong): "left leg up", "raise
+your right leg", "left leg up straight", "right leg down", "both legs up",
+"legs straight up", "higher", "even higher", "lower", "legs down";
+"lijevu nogu gore", "desnu nogu dolje", "obje noge gore", "noge ravno gore",
+"više" (only while a leg is up — otherwise it is "more"), "niže", "spusti
+noge"; "jambe gauche en l'air", "les deux jambes en l'air", "plus haut",
+"plus bas". Spoken: the same as service intents (`legs.leftup` … `legs.lower`,
+baye 1.58.0, **needs deploying**), ahead of `legs.down`/`legs.up`, whose "leg
+up" and "legs straight" would have taken them; the bare "više" is not one of
+them there. 3,364 quoted phrases from the changelog and the service compared
+against 1.57.0: none changed.
+
+**Her own mode** (49-auto.js) has seven new moves: a leg up (either), both
+up, higher (once she is warm), legs straight up, lower, down again, and wider
+once they are up. In a soak on the cot with spanks she picked a leg up, lower,
+legs down and both up of her own accord among the others.
+
+**Roles reversed.** Your legs, Shift and a number: Shift+1 the left leg up /
+down, Shift+2 the right, Shift+3 both up / down, Shift+4 higher, Shift+5
+wider, Shift+6 lower (on the help sheet), and the same words typed. Chloe has
+six new orders, obey-checked against the ladder: *"Lijevu nogu gore."*,
+*"Desnu nogu gore."*, *"Obje noge gore."*, *"Obje noge gore. Više."* (both
+straight up), *"Šire. Još šire."* (only where wider means something) and
+*"Spusti noge."* Measured: each order given, the key pressed, *kept* and
+praised within the hold.
+
+**Her scene** (`sceneTalk`): `legs_l` / `legs_r` (each leg's shape) and
+`legs_apart` (1–3), and the service says it — *"your left leg is raised
+straight up toward the ceiling and your right leg is lying flat on the cot,
+and your legs are spread wide"* — to Baye, and from her side to Chloe.
+
+**Her knees are held now too** (`LEG_LIMITS`, over `limits` in 41-skin.js):
+twist about the shin past 45°, or a bend past 150°. Measured over all of her
+clips, every frame: 16° and 132° at most. Every new shape stays under 6° of
+twist; nothing in a sweep of the spread, the cradle, the cot ragdoll, the
+plate, the dog's lick, the twerk, the handstand, upside down, lotus, perch and
+fetal was clamped.
+
+**The toys, in the new poses** (both worn; the plug's `plugFit` posed table,
+mm; the Lovense is rigid to her pelvis and reads tip 38 / LED 7 in every
+pose):
+
+    pose                       face  rim [in/median/out]   neck bulb hid
+    standing                    7.8  −17.3 / −9.5 / 2.8      0   0   18
+    knee up, both               7.7  −12.5 / −7.1 / 2.5      0   0   18
+      and apart                 7.1   −4.7 / −2.1 / 2.0      0   0    6
+    foot up, both               6.9  −11.7 / −7.1 / 2.5      0   0   16
+      the frog (1.7)            4.6   −4.3 / −2.6 / −0.8     0   0    2
+    straight up, both           6.9  −11.8 / −7.1 / 2.5      0   0   16
+      the V (2.4)               5.3   −4.1 / −2.3 / 0.0      0   0    1
+    over, both                  5.8  −11.5 / −6.4 / 2.3      0   0   16
+      and the V                 3.3   −5.0 / −3.5 / −2.3     0   0    6
+    straight-leg raise, wide    6.8   −4.2 / −1.9 / 1.5      0   0    4
+    one over, one flat          4.5  −15.2 / −7.9 / −0.8     0   0   17
+    front, shins up, apart      7.6   −5.7 / −2.2 / 2.1      0   0    9
+
+No edge floats more than 2.8 mm (1.560.3's worst was 3.6), nothing of the
+neck or the bulb shows, and neither toy goes into a thigh any deeper than it
+does standing. Spread wide the cheeks part and `hid` falls, which is what a
+spread is.
+
+Debug: `__fr.jad.raw().lift({ ask, set, sp, measure, rom, hold })` — the
+ladder, asked or set; `measure` is `legsMeasure` (the drawn body skinned on
+the CPU: feet against the surface under them, thighs against the mattress and
+her belly, hip and knee angles, toys against her thighs); `rom` each knee's
+and hip's worst turn this frame.
+
+**Found, not changed (ask):** the spread's own "wider" on her back with her
+knees up (1.522.0) turns each thigh up to 124° about its length, which a
+hip-twist limit at the clips' 63° would have redrawn (it clamped 1,582 frames
+a side in a soak); the hips are therefore not limited.
+
+People 100, blockers 820, no console errors. Regression: the existing leg
+asks standing and on the cot, her autonomous mode, roles reversed (keys 1–7,
+orders, safeword), the collar and the belt.
+
 ## [1.565.0] — 2026-10-02 (baye 1.57.0)
 
 ### Roles reversed, phase 2c: Chloe's palm on the spot, her knees, her eyes, and more of her
