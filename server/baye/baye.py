@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.69.0"
+VERSION = "1.70.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4461,9 +4461,18 @@ You may be frankly sexy and plain about what is going on: the cot, their
 bottom, your hand, how red it is getting. You are in charge and enjoying it,
 not crude for the sake of it.
 
+YOUR MOOD MOVES, and the context says where it is (MOOD). STERN when they
+keep ignoring you: clipped, firm, unimpressed, no giggles, the spanks harder
+and more of them, but stern is never cruel, never contemptuous: you are
+disciplining someone you adore. WARM when they have been pleasing you: gentle,
+affectionate, praising, proud, your hand lighter. EXCITED when they have
+begged you for it: giddy, eager, breathless, a little wild and very playful,
+giving them more than they asked for. Be surprising: a different turn of
+phrase every time, a little random, never the obvious line.
+
 THE SAFEWORD ALWAYS WINS. When the context says THIS IS AFTERCARE, you are only
 gentle: soft, warm, proud of them, checking they are all right. No orders, no
-teasing, nothing sexual.
+teasing, nothing sexual, whatever your mood was a moment ago.
 
 One line, and it is absolute. Nothing sexual about anyone who is not an adult,
 ever.
@@ -4659,6 +4668,40 @@ CHLOE_BEAT = {
     "kneel_look": "they are kneeling against your side and you have tipped "
                   "their head back by the hair so they look up at your face. "
                   "Tell them to look at you, pleased with them",
+    # 1.70.0 (page 1.583.0, src/49-revmood.js): her mood, and their begging.
+    "beg": "they have just begged you to {beg}. It thrills you. Say yes, "
+           "excited and playful, and promise them more than they asked for",
+    "surge": "you are getting excited all over again, worked up by them and "
+             "eager for more. A short, breathless, playful line",
+    "sterner": "they keep ignoring your orders and you are getting stricter "
+               "now. A short, firm line that tells them you mean it. Firm, "
+               "never cruel",
+    "soften": "they have started doing everything you say, so well, and you "
+              "are cooling off and getting gentler with them. A short, warm, "
+              "pleased line",
+}
+# What they begged for (1.70.0, page 1.583.0): the page's `rev_beg`.
+REV_BEG = {
+    "spank": "spank them",
+    "harder": "spank them harder, and more",
+    "whip": "use your belt on them",
+    "discipline": "discipline them, punish them",
+    "hair": "pull their hair",
+    "collar": "pull them by their collar",
+}
+# Her mood (1.70.0, page 1.583.0): the page's `rev_mood`, and the tone it is.
+REV_MOOD = {
+    "stern": "MOOD: STERN. They have ignored your orders again and again and "
+             "you have got strict: clipped, firm, unimpressed, no giggles, "
+             "and your hand is harder. Still never cruel or contemptuous: you "
+             "are disciplining someone you adore.",
+    "warm": "MOOD: WARM. They have been doing everything you say, beautifully, "
+            "and you have softened: gentle, affectionate, praising, proud of "
+            "them, lighter with your hand. Still in charge.",
+    "excited": "MOOD: EXCITED. They begged you for it and it thrilled you: "
+               "giddy, eager, breathless, a little wild and playful, wanting "
+               "to give them more than they asked for. Still affectionate.",
+    "neutral": None,
 }
 # Your hand in their hair (1.65.0, page 1.574.0): the page's `rev_hair`.
 REV_HAIR = {
@@ -5271,12 +5314,21 @@ def clean_scene(raw) -> dict:
         # And her hand in their hair (1.65.0, page 1.574.0).
         "rev_hair": _enum(g("rev_hair"), REV_HAIR, 8),
         "remote_level": clamp_num(g("remote_level"), 0, 4),
+        # And her mood (1.70.0, page 1.583.0): its name off a table, how
+        # stern, how gentle and how excited, 0..1, and what they last begged
+        # her for, off a table.
+        "rev_mood": _enum(g("rev_mood"), REV_MOOD, 8),
+        "rev_stern": clamp_num(g("rev_stern"), 0, 1),
+        "rev_warm": clamp_num(g("rev_warm"), 0, 1),
+        "rev_excite": clamp_num(g("rev_excite"), 0, 1),
+        "rev_beg": _enum(g("rev_beg"), REV_BEG, 10),
     }
     # The toy drawn partway out is Chloe's hand on HER since 1.68.0 (page
     # 1.582.0) as well, with the roles as they are: kept either way.
     if not out["roles"]:
         for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "remote_level",
-                  "rev_spoon", "rev_hair"):
+                  "rev_spoon", "rev_hair", "rev_mood", "rev_stern", "rev_warm", "rev_excite",
+                  "rev_beg"):
             out[k] = None
     if out["remote_level"] is not None:
         out["remote_level"] = int(round(out["remote_level"])) or None
@@ -5595,6 +5647,15 @@ def chloe_scene_lines(s: dict):
         facts.append("you are warmed up and enjoying this a lot")
     elif h is not None and h <= 0.3:
         facts.append("you are only getting started")
+    # Her mood (1.70.0, page 1.583.0) — never over the aftercare, below.
+    care = s.get("rev_care") or (s.get("safeword_ago_s") is not None
+                                 and s.get("safeword_ago_s") <= SCENE_CARE_S)
+    bg = s.get("rev_beg")
+    if bg in REV_BEG and not care:
+        facts.append(f"a moment ago they begged you to {REV_BEG[bg]}")
+    md = s.get("rev_mood")
+    if md in REV_MOOD and REV_MOOD[md] and not care:
+        tone.append(REV_MOOD[md])
     a = s.get("safeword_ago_s")
     if a is not None:
         by = ("they said the safeword" if s.get("safeword_by") != "her"
@@ -5646,8 +5707,9 @@ def build_chloe_messages(ctx: dict, world: dict):
                      "and stay in charge.")
     elif beat in CHLOE_BEAT:
         what = REV_ORDER_WORDS[order][0] if order in REV_ORDER_WORDS else "do as they were told"
+        begged = REV_BEG.get(sc.get("rev_beg"), "spank them")
         lines.append("WHAT YOU ARE DOING THIS SECOND: "
-                     + CHLOE_BEAT[beat].format(order=what) + ".")
+                     + CHLOE_BEAT[beat].format(order=what, beg=begged) + ".")
         if beat == "order" and order in REV_ORDER_WORDS:
             lines.append(f'The plain order is "{REV_ORDER_WORDS[order][1]}". You '
                          "may say it your own way, but it must be the same "

@@ -459,7 +459,10 @@ function rvhCands(ctx, D) {
   const edge = v && v.phase === 'edgeHeld';
   // Spanked or toyed with just now: the slaps counter and her toy moves.
   const hot = rev.clock - rvh.slapAt < 15 || D.last.slice(-3).some((x) => x === 'spank' || x === 'toy' || x === 'remote' || x === 'swap');
-  const ex = Math.max(0, D.heat - 0.4) * 1.6 + 0.12 * Math.min(3, D.streak) + (hot ? 0.35 : 0);
+  // And since 1.583.0 her sternness (your hair as discipline) and her
+  // excitement's waves (`rmoodHairEx`).
+  const ex = Math.max(0, D.heat - 0.4) * 1.6 + 0.12 * Math.min(3, D.streak) + (hot ? 0.35 : 0)
+    + (typeof rmoodHairEx === 'function' ? rmoodHairEx() : 0);
   if (ex < 0.15) return out;
   if (!edge && (ctx === 'front' || ctx === 'fours' || ctx === 'kneel' || ctx === 'cotKneel' || ctx === 'stand')) {
     out.push({ id: 'hair:pull', s: (ctx === 'stand' ? 0.5 : 1) * (0.15 + 0.6 * ex) });
@@ -964,7 +967,8 @@ function rvhPullTick(M, dt) {
     // Her other hand, while this one holds you.
     if (M.spank && !M.spanked && tt > RVH.pull.spankAfter && rev.arm.mode == null) {
       M.spanked = true;
-      const n = 1 + Math.floor(Math.random() * (1 + rev.dom.heat * 2));
+      const n0 = 1 + Math.floor(Math.random() * (1 + rev.dom.heat * 2));
+      const n = typeof rmoodSpanks === 'function' ? Math.min(5, rmoodSpanks(n0, false)) : n0;
       // From where she is, or not at all: never a step while her fist is in
       // your hair (`stay`, checked before anything of hers moves).
       const rr = typeof rvmSpankStart === 'function' ? rvmSpankStart(n, 'hair held', { stay: true }) : 'none';

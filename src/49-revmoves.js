@@ -863,6 +863,8 @@ function rvmSpankStart(n, why, o = {}) {
   const A = rev.arm;
   Object.assign(A, { mode: 'spank', ph: 'go', t: 0, n, err: 0, side0: null, from: null, ctx, hits: 0, hold: !!o.hold, fails: 0, replans: 0 });
   A.k = 9 + 7 * rev.dom.heat + (Math.random() < rev.dom.heat * 0.4 ? 4 : 0);
+  // Firmer stern, lighter warm, harder when you begged for harder (1.583.0).
+  if (typeof rmoodForce === 'function') { A.k = rmoodForce(A.k); rmood.hardNext = 0; }
   if (ctx !== 'front') A.side0 = Math.random() < 0.5 ? 1 : -1;
   // A spot she has somewhere to stand for — up to four tries (1.575.0).
   // The spot is a ray at you with play in it, and bent over the edge one in
@@ -1199,7 +1201,7 @@ function rvmStart(id, why = 'mood') {
     const sp = rvmBackSpot();
     if (!sp) return 'no back';
     M.spot = sp; M.dur = 6 + Math.random() * 3;
-    M.spank = Math.random() < 0.35 + 0.4 * rev.dom.heat;
+    M.spank = Math.random() < 0.35 + 0.4 * rev.dom.heat + (typeof rmood !== 'undefined' ? 0.3 * rmood.stern : 0);
     const P = rvmPlan([{ s: 'L', T: sp.T, n: sp.n }]);
     if (!P) return 'noplace';
     M.plan = P;

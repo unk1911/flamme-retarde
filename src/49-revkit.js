@@ -387,6 +387,11 @@ function rvkBeltRoundStart(n, why = 'mood') {
   B.ph = 'go'; B.t = 0;
   B.spot = S;
   B.charge = Math.min(1, 0.86 + 0.14 * rev.dom.heat + (why.startsWith('punish') ? 0.1 : 0));
+  // Her mood (1.583.0): full stern, lighter gentle, full when you begged.
+  if (typeof rmood !== 'undefined') {
+    B.charge = Math.max(0.6, Math.min(1, B.charge + 0.12 * rmood.stern - 0.2 * rmoodGentle() + (/^begged/.test(why) ? 0.1 : 0)));
+    rmood.hardNext = 0;
+  }
   revGo(S.x, S.z);
   rev.ch.face = S.face;
   B.rounds++;
@@ -991,7 +996,9 @@ function rvkDecide(v) {
       return 'beltback';
     }
     if (ctx === 'front' && (D.punish || Math.random() < 0.62)) {
-      const n = D.punish ? 3 + Math.floor(Math.random() * 2) : 2 + Math.floor(Math.random() * (1 + D.heat * 3));
+      const n0 = D.punish ? 3 + Math.floor(Math.random() * 2) : 2 + Math.floor(Math.random() * (1 + D.heat * 3));
+      // Her mood on the count (1.583.0); `rvkBeltRoundStart` caps it at six.
+      const n = typeof rmoodSpanks === 'function' ? rmoodSpanks(n0, !!D.punish) : n0;
       const why = (D.punish ? 'punishment' : 'mood') + ' | belt';
       D.punish = 0;
       const r = rvkBeltRoundStart(n, why);
@@ -1006,11 +1013,14 @@ function rvkDecide(v) {
   const n = D.obey + D.miss;
   if (rev.clock - B.lastOff > RVK.again && (ctx === 'front' || ctx === 'stand')
     && (D.heat >= 0.45 || D.miss >= 2 || n >= 5)) {
-    const p = 0.30 + (D.punish ? 0.30 : 0) + 0.25 * Math.max(0, D.heat - 0.45);
+    const p = 0.30 + (D.punish ? 0.30 : 0) + 0.25 * Math.max(0, D.heat - 0.45)
+      + (typeof rmood !== 'undefined' ? 0.3 * Math.max(0, rmood.stern - 0.4) : 0);
     if (Math.random() < p) { if (rvkBeltStart(D.punish ? 'punish' : 'mood') === true) { D.next = rev.clock + 3; return 'belt'; } }
   }
-  if (rev.clock - C.lastOff > RVK.collarAgain && (ctx === 'stand' || ctx === 'kneel' || ctx === 'fours') && n >= 3) {
-    if (Math.random() < 0.28) { if (rvkCollarStart('mood') === true) { D.next = rev.clock + 4; return 'collar'; } }
+  // Sterner, the collar sooner and likelier (1.583.0, `rmoodCollarP`).
+  const cp = typeof rmoodCollarP === 'function' ? rmoodCollarP() : 0;
+  if (rev.clock - C.lastOff > RVK.collarAgain && (ctx === 'stand' || ctx === 'kneel' || ctx === 'fours') && (n >= 3 || cp > 0.12)) {
+    if (Math.random() < 0.28 + cp) { if (rvkCollarStart('mood') === true) { D.next = rev.clock + 4; return 'collar'; } }
   }
   return null;
 }
@@ -1039,6 +1049,13 @@ function rvkCollarDecide(v) {
   if (rev.clock - C.since > 25 && !C.cot) cands.push({ id: 'cot', s: 0.5 + 0.6 * D.heat });
   cands.push({ id: 'look', s: 0.35 });
   if (D.punish) { const up = cands.find((c) => c.id === (pose === 'stand' ? 'down' : 'up')); if (up) up.s *= 3; }
+  // Her mood (1.583.0): stern or excited, more tugs and firmer ones, and
+  // sooner; gentle, more leading and looking.
+  if (typeof rmoodTugK === 'function') {
+    const tk = rmoodTugK();
+    for (const c of cands) if (c.id === 'up' || c.id === 'down') c.s *= tk;
+    D.next = rev.clock + (D.next - rev.clock) * rmoodGapK();
+  }
   const tot = cands.reduce((a, c) => a + c.s, 0);
   let x = Math.random() * tot, pick = cands[cands.length - 1];
   for (const c of cands) { x -= c.s; if (x <= 0) { pick = c; break; } }
@@ -1059,7 +1076,11 @@ function rvkCollarDecide(v) {
     }
     return 'lead:nowhere';
   }
-  if (pick.id === 'up' || pick.id === 'down') { rvkTug(pick.id, 0.85, 'pose ' + pose); return 'tug'; }
+  if (pick.id === 'up' || pick.id === 'down') {
+    const u = typeof rmood !== 'undefined' ? Math.min(1, 0.85 + 0.15 * rmood.stern + 0.08 * rmood.ex.v) : 0.85;
+    rvkTug(pick.id, u, 'pose ' + pose);
+    return 'tug';
+  }
   if (pick.id === 'cot') {
     // Beside the cot, and then a firm pull toward it — the leash's own road on.
     const S = rvkCotSide();
