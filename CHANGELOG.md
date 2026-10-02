@@ -315,10 +315,11 @@ she is excited? if not I think it would be hot to add it. Just like I (Chloe)
 sometimes pull baye's hair, she should do it also to me when in role
 reversal"* — and the follow-up, *"can Chloe pull me by my hair and bring my
 head ... towards her ... resulting in me trying to keep my balance by holding
-her by her legs"*. The draw is pose-solved from the two figures' placement,
-with reachable head and hand targets. The night loop's item 13. The same two
-adults and the same consensual kabina play as 1.561.0–1.572.0, and the
-safeword over all of it.
+her by her legs"*, in the version that was agreed: your CHEEK against her SIDE
+at the hip, your head turned to the side. Never your face to her front below
+the waist; that was declined and is not built. The night loop's item 13. The
+same two adults and the same consensual kabina play as 1.561.0–1.572.0, and
+the safeword over all of it.
 
 A new file, `src/49-revpull.js` (names `rvh…`), with small hooks in
 49-reverse.js (her selector, the words, the keys `.` and `,`, the camera,
@@ -382,19 +383,31 @@ the hold; "yank" is the first 0.45 s, when the fist moves 26 cm in 0.18 s):
 Your palms bracing, after they arrive: face down 0.2 / 0.4 mm median, on all
 fours 0.0–1.9 mm median. Your view: 30.9° at the most.
 
-**THE KNEELING DRAW.** You on your knees, she standing close. Her hand goes to
-the back of your head, high; she draws you in; your trunk bows to her and your
-arms go round her leg, both palms on her thigh, front and back, above the knee.
-Then she turns her shoulders to you and looks down while her fist tips your
-head back so you look up at her face, holds it with a line, and lets you go.
+**THE KNEELING DRAW.** You on your knees, she standing beside you, her side
+to you (her left or her right, whichever the room has space for). Her hand
+goes to the back of your head, high; she draws you in; your trunk bows to
+her, your head turns along her, and your cheek comes to rest against her
+side at the hip; your arms go round her leg, both palms on her thigh, front
+and back, above the knee. Then she turns her shoulders to you and looks down
+while her fist tips your head back so you look up at her face, holds it with
+a line, and lets you go.
 
 - **Measured on the skin**, not the bones: her vertices and yours skinned on
   the CPU the way the shader does it (`turn · (v − bind head) + head` over
-   four bones), off v2.0's mesh for you and hers for her. Your head target
-   region and a ring round her thigh.
-- **Your bow sets the target height** (her hip bone, under her waist: 0.97 m);
-   **she closes the rest with her feet**, a step in to you. Target selection is
-   driven by reachable body geometry rather than a fixed exclusion zone.
+  four bones), off v2.0's mesh for you and hers for her. Your cheek (1,176
+  vertices of the side of your face), your face (nose to chin), her flank at
+  the hip and waist, the middle of her front below the waist, and a ring
+  round her thigh.
+- **Your bow sets your cheek's height** (her hip bone, under her waist: 0.97
+  m); **she closes the rest with her feet**, a step in to you. Closing it with
+  your lean instead (the first cut) bowed you to the limit and leaned you
+  sideways after a planned point 9–15 cm off where your turned head arrived,
+  and your cheek met her low on the hip with your face a handspan from her
+  front.
+- **Your face off her front, whatever else**: inside 19 cm of the middle of
+  her front below the waist she steps on past you, which takes your face
+  further round her side. The point of her flank your cheek is planned to is
+  8 cm behind the middle of her depth.
 - **Your body stays facing where it faces** while her hand is in your hair
   (`rvhWho`, read by `revWho`): on your knees (`kept`) the body you are in
   turns to whoever it is with and shuffles after them — she walked round to
@@ -416,13 +429,15 @@ MEASURED, three runs (rest = the cheek resting, 0.5 s on; look = the look up):
 
 | | run 1 | run 2 | run 3 |
 |---|---|---|---|
-| head target gap at rest, median (p90) | 16.1 (32.8) mm | 21.8 (29.0) mm | 21.5 (26.4) mm |
-| head target gap, least over the whole move | 11.2 mm | 15.5 mm | 15.8 mm |
+| cheek to her side at rest, median (p90) | 16.1 (32.8) mm | 21.8 (29.0) mm | 21.5 (26.4) mm |
+| cheek to her side, least over the whole move | 11.2 mm | 15.5 mm | 15.8 mm |
+| your face to the middle of her front below the waist, least | 174 mm | 167 mm | 168 mm |
+| ... to any of her front to her hips, least | 147 mm | 140 mm | 141 mm |
 | your palms on her thigh, median (p90) | 0.1 / 0.1 (3.8) mm | 0.1 / 0.2 (3.5) mm | 0.1 / 0.1 (1.4) mm |
 | her palm in your hair, rest / look, median | 0.3 / 0.1 mm | 0.3 / 0.2 mm | 0.3 / 0.2 mm |
 | her step in to you, and on past you | 0.35 + 0.11 m | 0.31 + 0.09 m | 0.16 + 0.09 m |
 
-The head target rests at 0.974 m, on her belt line at the hip.
+Your cheek rests at 0.974 m, on her belt line at the hip. Never into her.
 
 **WHEN.** Her excitement: heat over the middle, a run of orders kept, a
 spanking in the last 15 s or her hands on a toy in her last three picks —
@@ -467,7 +482,8 @@ draw anywhere in 43-jadrija.js (nothing in it changed); her choices use
   behind it (up to 39 mm).
 - Looking up at her in first person, her forearm reaching to your crown
   crosses the top of your view; her face is above and behind it.
-- Her step in to you during the draw is a foot slid, up to 35 cm.
+- Her step in to you during the draw is a foot slid, up to 35 cm, plus up to
+  11 cm on past you to keep your face off her front.
 - In the kabina the room's small table and stool are where they are: on all
   fours under the table she still reaches round it.
 
@@ -482,9 +498,11 @@ for), `arms()`, `chain(s)`, `armTo(s, d)`, `drawDbg()`, `sets()`.
 Misha, 06:40: *"if at certain intimate moments of show of affection that
 Chloe could slide in lay on the cot next to baye (baye being in fetal pose)
 and spoon ... ultimately we are in love"*. The night-loop plan, item 12. He
-also asked for "very slight hip thrusts" while they lie together. The move is
-the cuddle: two people in love lying close, her arm over you and her hand on
-yours. The safeword is over it like everything else.
+also asked for "very slight hip thrusts" while they lie together; that part
+is declined. What is built is the cuddle: two people in love lying close,
+her arm over you and her hand on yours. Nothing in it moves rhythmically
+against you; her pelvis is never driven. The safeword is over it like
+everything else.
 
 **Curled on your side, loosened for two** (`move:spoon`, src/49-revmoves.js).
 Your own `fetal` (knees to your chest) takes 0.58 m of the 0.66 m mattress,

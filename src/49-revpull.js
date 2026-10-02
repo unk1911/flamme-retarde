@@ -6,8 +6,9 @@
 // baye's hair, she should do it also to me when in role reversal"* — and the
 // agreed follow-up: *"can Chloe pull me by my hair and bring my head ...
 // towards her ... resulting in me trying to keep my balance by holding her by
-// her legs"*. The draw is solved from the two figures' current placement, with
-// her hands and your head kept physically reachable.
+// her legs"*, in the version that was agreed: your CHEEK against her SIDE, at
+// her hip and waist, your head turned to the side. Never your face to her
+// front below the waist; that was declined and is not here.
 //
 // The same two adults and the same game as src/49-reverse.js, and the
 // safeword over all of it: "red" and her fist opens at once.
@@ -36,8 +37,10 @@
 //   (1.565.0's strike, from where she already is). Then it eases back.
 //
 //   THE KNEELING DRAW (`draw`). You on your knees on the floor, she standing
-//   beside you. Her fist in your hair draws you in close while your arms go
-//   round her leg for balance — both palms solved on to her thigh,
+//   beside you, her side to you. Her fist in your hair draws you in until
+//   your cheek rests against her side at the hip, your head turned along
+//   her, your face kept well round her side and off her front, and your
+//   arms go round her leg for balance — both palms solved on to her thigh,
 //   measured off her skin. Then she turns her shoulders to you and tips your
 //   head back so you look up at her face, holds it a beat with a line, and
 //   lets you go.
@@ -70,13 +73,13 @@ const RVH = {
     // Your trunk bowed toward her (rad, the most), your head turned to lay the
     // cheek on her (rad: neck and the top of the spine between them).
     bowMax: 0.80, turn: 1.40, trunk: 0.22,
-    // The head's gap to her body it closes on, m; and the target height band,
-    // m off the floor (her hip to her waist).
+    // The cheek's gap to her side it closes on, m; and the band of her side
+    // it may rest on, m off the floor (her hip to her waist).
     gap: 0.015, band: [0.86, 1.08],
     // Her step in to you as you come to her: m at most, m/s.
     slide: 0.35, slideV: 0.25,
-    // Her stand spot, measured from the draw's final placement (m along your
-    // forward, along her facing) — see `rvhDrawPlan`.
+    // Her stand spot moved by what that step and the guard on her front
+    // always did (m along your forward, along her facing) — see `rvhDrawPlan`.
     planFl: -0.06, planF: 0.13, dead: 0.015,
     // The look up: how much of your bow toward her you keep (0..1). None
     // since 1.575.0: your head comes up off her side, upright, before you
@@ -87,11 +90,17 @@ const RVH = {
     upKeep: 0,
     // How far along her your turned head carries your cheek from your own middle line, m.
     turnShift: 0.10,
+    // Your face at least this far (m) from the middle of her front below the
+    // waist — the agreed version's line; she keeps it with her feet.
+    frontMin: 0.19,
     // Her shoulders turned to you and bowed a little, looking down at you (rad;
     // on her spine a + turn is to her left, MEASURED off her chest: + with you on her left).
     herTurn: 0.8, herBow: 0.25,
     // Where on her your cheek rests, m off the floor, at most: her hip-bone, below her waist.
     cheekY: 0.98,
+    // How far behind the middle of her depth (her +x forward) the point of
+    // her side your cheek goes to is, m — her side, not her front.
+    back: -0.08,
     // s: her hand to your hair, drawing you in, resting, the look up, holding
     // it, letting go.
     reachT: 6, inT: 1.4, rest: 2.2, upT: 1.0, look: 2.0, outT: 1.0,
@@ -245,6 +254,14 @@ function rvhCheekIdx(sg) {
     const x = p[0] - h[0], y = p[1] - h[1], z = (p[2] - h[2]) * sg;
     return x > 0.015 && x < 0.115 && y > 0.0 && y < 0.085 && z > 0.035;
   }) : [];
+}
+function rvhFaceIdx() {
+  const S = rvhBayeSkin();
+  return S ? rvhPick(S, 'face', ['head'], (p, B) => {
+    const h = B('head'); if (!h) return false;
+    const x = p[0] - h[0], y = p[1] - h[1], z = p[2] - h[2];
+    return x > 0.075 && y > -0.01 && y < 0.13 && Math.abs(z) < 0.045;
+  }, 8) : [];
 }
 // Chloe: her side at the hip and waist (side `sg`, her +z her right), her
 // front below the waist, and a ring round her thigh (side `sg`) at
@@ -556,7 +573,7 @@ function rvhStart(kind, why = 'mood') {
     const S = rvhDrawPlan();
     if (!S) return 'no room beside you';
     const M = { id: 'hair', kind, t: 0, ph: 'go', why, ctx, side: S.hand, plan: null, place: S,
-      bow: 0, turn: 0, up: 0, err: { L: [], R: [] }, gapMin: 9, gapRest: [], intoMin: 9 };
+      bow: 0, turn: 0, up: 0, err: { L: [], R: [] }, gapMin: 9, gapRest: [], frontMin: 9, intoMin: 9 };
     revGo(S.x, S.z);
     rev.ch.face = new THREE.Vector3(S.x + S.f.x * 3, rev.ch.y, S.z + S.f.z * 3);
     rvm.goal = { x: S.x, z: S.z, yaw: S.yaw, mode: 'stand', bow: 0, w: 0 };
@@ -704,14 +721,19 @@ function rvhDrawPlan() {
     // sg 1: her LEFT side to you, facing your left; your RIGHT cheek on her.
     const fC = X.rl.clone().multiplyScalar(-sg);
     const rC = new THREE.Vector3().crossVectors(fC, _rvhUP).normalize();
-    // Pick a reachable point at the selected height. The pose solver, rather
-    // than a fixed exclusion zone, determines which side of her body closes
-    // cleanly from the current kneeling position.
+    // THE POINT OF HER SIDE YOUR CHEEK GOES TO: on her flank at your
+    // cheek's height, a little BEHIND the middle of her depth — so your face,
+    // turned along her and a head's depth forward of your cheek, is level
+    // with her hip and well off her front (her bind: she stands in her idle
+    // much as she is bound).
+    // The outermost of her at that height, within a few centimetres of that
+    // depth: her flank (scored by depth alone it found the back of her hip,
+    // 9 cm out of her middle, MEASURED).
     let vi = -1, vs = Infinity;
-      for (const i of rvhSideIdx(-sg).concat(rvhFrontIdx(true))) {
-      const y = pos[3 * i + 1];
-      if (Math.abs(y - cy) > 0.035) continue;
-      const sc = -Math.abs(pos[3 * i + 2]);
+    for (const i of rvhSideIdx(-sg)) {
+      const y = pos[3 * i + 1], x = pos[3 * i];
+      if (Math.abs(y - cy) > 0.035 || Math.abs(x - D.back) > 0.035) continue;
+      const sc = -Math.abs(pos[3 * i + 2]) + Math.abs(x - D.back) * 0.3;
       if (sc < vs) { vs = sc; vi = i; }
     }
     if (vi < 0) continue;
@@ -722,8 +744,11 @@ function rvhDrawPlan() {
       // And your head turned on to her carries your cheek a hand along her
       // front-to-back from your middle (`turnShift`, MEASURED).
       const Q = new THREE.Vector3(H1.x, 0, H1.z).addScaledVector(X.fl, 0.072 + D.gap + extra).addScaledVector(fC, D.turnShift);
-      // Where she will END UP, not where the bind says: measured placement
-      // avoids an avoidable corrective step as the draw closes.
+      // Where she will END UP, not where the bind says (1.575.0): measured
+      // over three draws her feet then slid 4-9 cm back along your forward
+      // to close on your cheek and 12-16 cm on along her own facing to keep
+      // your face off her front — up to 35 cm of sliding feet. Both were
+      // the same way every time, so she stands there to begin with.
       Q.addScaledVector(X.fl, D.planFl).addScaledVector(fC, D.planF);
       const x = Q.x - off.x, z = Q.z - off.z;
       const [qx, qz] = ground.confine ? ground.confine(x, z, rev.ch.y) : [x, z];
@@ -828,6 +853,8 @@ function rvhSummary(M, why) {
     o.handUpL = M.errUp ? mm(M.errUp.L) : null; o.handUpR = M.errUp ? mm(M.errUp.R) : null;
     o.gapRest = mm(M.gapRest);
     o.gapMin = +(M.gapMin * 1000).toFixed(1);
+    o.frontMin = +(M.frontMin * 1000).toFixed(1);
+    o.frontWide = M.frontWide != null ? +(M.frontWide * 1000).toFixed(1) : null;
     o.slid = +(M.slid || 0).toFixed(3); o.slidFront = +(M.slidF || 0).toFixed(3);
     o.hairHand = mm(M.hairErr); o.hairHandLook = mm(M.hairLook); o.hairHandMoving = mm(M.hairMove);
     o.hairLookLog = M.hairLook && M.hairLook.log ? M.hairLook.log.slice(0, 6) : null;
@@ -1225,36 +1252,60 @@ function rvhDrawTick(M, dt) {
     if ((rvm.k[s] > 0.95 && palm && palm.distanceTo(hs.T) < 0.04) || M.t - M.t0 > 2.5) { M.ph = 'in'; M.t1 = M.t; }
     return;
   }
-  // Measured on the skin every frame from the draw on: your head's nearest
-  // point to her reachable body surface (signed along its normal — under
-  // nought is into her).
+  // Measured on the skin, every frame from the draw on: your cheek to her
+  // side (signed along her skin's normal — under nought is into her), and
+  // your face to her front below the waist.
   //
-  // AND HOW THEY MEET. Your bow is chosen for the target height and she closes
-  // the remaining distance with a small step, at most `slide`.
+  // AND HOW THEY MEET. Your bow is chosen for your cheek's HEIGHT — her side
+  // between her hip and her waist — and SHE closes the rest: a small step in
+  // to you, so the point of her flank a little behind the middle of her
+  // depth comes to your cheek. Closing it with your lean instead (the first
+  // cut) bowed you to the limit and leaned you sideways chasing a planned
+  // point 9-15 cm off the one your turned head arrived at (MEASURED), and
+  // your cheek met her low on the hip with your face a handspan from her
+  // front. Her step is a foot slid a few centimetres, at most `slide`.
   let gap = null, err = null, pc = null;
   {
     const B = rvhBayeSkin(), C = rvhChloeSkin();
     if (B && C) {
       const cheek = rvhSkinSet(B, rvhCheekIdx(M.place.sg));
-      const target = rvhSkinSet(C, rvhSideIdx(-M.place.sg).concat(rvhFrontIdx(true)), true);
-      const nr = rvhNearest(cheek, target.P);
-      gap = nr.a ? nr.a.clone().sub(nr.b).dot(target.N[nr.j]) : null;
-      // The nearest target point at the selected height.
-      const root = new THREE.Vector3(rev.ch.x, rev.ch.y, rev.ch.z);
+      const side = rvhSkinSet(C, rvhSideIdx(-M.place.sg), true);
+      const nr = rvhNearest(cheek, side.P);
+      gap = nr.a ? nr.a.clone().sub(nr.b).dot(side.N[nr.j]) : null;
+      // The point of her side your cheek goes to, at your cheek's height:
+      // her outermost at that depth (`back`, her own forward from her root).
+      const fC = M.place.f, root = new THREE.Vector3(rev.ch.x, rev.ch.y, rev.ch.z);
       pc = rvhNearest([nr.b || root], cheek).b;
       let bj = -1, bs = Infinity;
       if (pc) {
-        for (let k = 0; k < target.P.length; k++) {
-          const q = target.P[k];
-          const sc = Math.abs(q.y - pc.y);
+        for (let k = 0; k < side.P.length; k++) {
+          const q = side.P[k], dep = (q.x - root.x) * fC.x + (q.z - root.z) * fC.z;
+          if (Math.abs(dep - D.back) > 0.035) continue;
+          const out = Math.hypot(q.x - root.x - fC.x * dep, q.z - root.z - fC.z * dep);
+          const sc = Math.abs(q.y - pc.y) - out * 0.3;
           if (sc < bs) { bs = sc; bj = k; }
         }
       }
-      if (bj >= 0) err = target.P[bj].clone().addScaledVector(target.N[bj], D.gap + 0.004).sub(pc);
+      if (bj >= 0) err = side.P[bj].clone().addScaledVector(side.N[bj], D.gap + 0.004).sub(pc);
       if (M.ph === 'rest' || M.ph === 'in') {
         if (gap != null) { M.gapMin = Math.min(M.gapMin, gap); M.cheekY = nr.b.y - rev.ch.y; }
       }
-      M.gapNow = gap; M.errNow = err ? err.length() : null;
+      const face = rvhSkinSet(B, rvhFaceIdx());
+      const front = rvhSkinSet(C, rvhFrontIdx());
+      const nf = rvhNearest(face, front);
+      if (Number.isFinite(nf.d)) M.frontMin = Math.min(M.frontMin, nf.d);
+      const nw = rvhNearest(face, rvhSkinSet(C, rvhFrontIdx(true)));
+      if (Number.isFinite(nw.d)) M.frontWide = Math.min(M.frontWide == null ? 9 : M.frontWide, nw.d);
+      M.gapNow = gap; M.frontNow = nf.d; M.errNow = err ? err.length() : null;
+      // AND YOUR FACE OFF HER FRONT, whatever else, from the moment you lean
+      // in: inside `frontMin` of the middle of her front below the waist,
+      // she steps on past you (forward, along her own facing), which puts
+      // your face further round her side.
+      if (M.ph !== 'reach' && Number.isFinite(nf.d) && nf.d < D.frontMin) {
+        const st = Math.min(D.frontMin - nf.d, D.slideV * 1.5 * dt);
+        rev.ch.x += M.place.f.x * st; rev.ch.z += M.place.f.z * st;
+        M.slidF = (M.slidF || 0) + st;
+      }
     }
   }
   const sm = rvhSm;
@@ -1268,10 +1319,13 @@ function rvhDrawTick(M, dt) {
     M.errV = [+(err.dot(M.place.fl) * 1000).toFixed(0), +(err.dot(M.place.rl) * 1000).toFixed(0), +((h - want) * 1000).toFixed(0)];
     if (!M.errV0) { M.errV0 = M.errV.slice(); M.ch0 = [rev.ch.x, rev.ch.z]; }
     M.chMoved = M.ch0 ? +Math.hypot(rev.ch.x - M.ch0[0], rev.ch.z - M.ch0[1]).toFixed(3) : null;
-    // Close the remaining position error along both horizontal axes.
-    const efl = err.dot(M.place.fl), efc = err.dot(M.place.f);
+    // Toward you or away along your forward, freely; along her own facing,
+    // only where it does not bring your face back toward her front (the
+    // guard above has the last word there — the two fighting, MEASURED, slid
+    // her feet 45 cm between them).
+    const f = M.place.f, efl = err.dot(M.place.fl), efc = ex * f.x + ez * f.z;
     let mx = -M.place.fl.x * efl, mz = -M.place.fl.z * efl;
-    mx -= M.place.f.x * efc; mz -= M.place.f.z * efc;
+    if (-efc > 0 || (M.frontNow != null && M.frontNow > D.frontMin + 0.02)) { mx -= f.x * efc; mz -= f.z * efc; }
     const ml = Math.hypot(mx, mz);
     // Not for the last centimetre and a half (1.575.0): the error is read off
     // skin that breathes, and chasing it walked her feet to and fro — 16-21
@@ -1534,6 +1588,7 @@ const rvhApi = {
     return { move: M ? { kind: M.kind, ph: M.ph, t: +M.t.toFixed(2), side: M.side, held: !!M.held, spank: !!M.spank,
       spanked: !!M.spanked, bow: M.bow != null ? +M.bow.toFixed(2) : null, turn: M.turn != null ? +M.turn.toFixed(2) : null,
       up: M.up != null ? +M.up.toFixed(2) : null, gap: M.gapNow != null ? +(M.gapNow * 1000).toFixed(1) : null,
+      front: M.frontNow != null ? +(M.frontNow * 1000).toFixed(1) : null,
       place: M.place ? { sg: M.place.sg, bow: +M.place.bow.toFixed(2), out: +M.place.out.toFixed(3), cy: +M.place.cy.toFixed(2), shift: M.place.shift } : null, lat: M.lat != null ? +M.lat.toFixed(2) : null, err: M.errNow != null ? +(M.errNow * 1000).toFixed(1) : null, errV: M.errV || null, errV0: M.errV0 || null, chMoved: M.chMoved, slid: M.slid,
       plan: M.plan ? { mode: M.plan.mode, bow: M.plan.bow } : null } : null,
     cam: +(rvhCamTilt()[0] * 57.3).toFixed(1), camK: +rvh.camK.toFixed(2), bk: +rvh.bk.toFixed(2),
@@ -1586,7 +1641,7 @@ const rvhApi = {
   arms: (reset = false) => ({ arm: rvh.armDbg ? JSON.parse(JSON.stringify(rvh.armDbg, (k, v) => (k === 'G' || k === 'T' ? undefined : v))) : null,
     lim: jadrija.figure && jadrija.figure.limitStats ? jadrija.figure.limitStats(reset) : null }),
   /** Debug: the skin sets' sizes (picked off the bind). */
-  sets: () => ({ cheekR: rvhCheekIdx(1).length, cheekL: rvhCheekIdx(-1).length,
+  sets: () => ({ cheekR: rvhCheekIdx(1).length, cheekL: rvhCheekIdx(-1).length, face: rvhFaceIdx().length,
     sideL: rvhSideIdx(-1).length, sideR: rvhSideIdx(1).length, front: rvhFrontIdx().length,
     thighL: rvhThighIdx(-1).length, thighR: rvhThighIdx(1).length }),
 };
