@@ -2522,146 +2522,485 @@ def rubble_wall(kit, axis, at, a0, a1, z0, z1, thick=0.30, course=0.17):
         z += h
 
 
+# ── the yard's furniture, at full resolution ────────────────────────────────
+# Misha, 2 Oct: *"the chairs, the tables, etc, look way too low-poly"*. They
+# were the last boxes in the house. The interior had its second pass on 1 Oct
+# and the bojler and the WC on 2 Oct; out here the chairs were twelve prisms
+# in a ring, the table a slab on four sticks, the lounger eleven planks laid
+# in steps, and the gate five flat bars.
+#
+# Everything below is off the loggia photograph of 18 Aug (`1st/… terrace -
+# front.jpeg`): a white moulded table with a parasol hole in the middle and an
+# X under it, and grey rattan tub chairs on anthracite tube, the weave a
+# basket check, its top edge bound round the hoop. None of it draws from RNG
+# or FRNG; the weave's variation is off `_hash3`, so nothing after it moves.
+
+WICKER_STEEL = (0.205, 0.214, 0.226)  # the chairs' frames: anthracite, as filmed
+GLIDE = (0.115, 0.115, 0.118)         # the plastic feet under everything
+
+
+def _frcol(bm):
+    lay = bm.loops.layers.float_color.get("frcol")
+    if lay is None:
+        lay = bm.loops.layers.float_color.new("frcol")
+    return lay
+
+
+def _paint_from(bm, n0, fn):
+    """Write `fn(k)` into every corner of the k-th face made since there were
+    `n0` — one flat colour per face, which is what a weave or a stripe is. The
+    exporter splits a vertex wherever its faces disagree, so the cost is in
+    vertices, and only where the colour actually changes."""
+    lay = _frcol(bm)
+    bm.faces.ensure_lookup_table()
+    for k in range(n0, len(bm.faces)):
+        c = fn(k - n0)
+        for lp in bm.faces[k].loops:
+            lp[lay] = (c[0], c[1], c[2], 1.0)
+
+
+def _resample(pts, step):
+    """A polyline re-cut into equal steps of about `step`, ends kept."""
+    seg = [math.dist(a, b) for a, b in zip(pts, pts[1:])]
+    total = sum(seg)
+    n = max(1, int(round(total / step)))
+    out, i, acc = [], 0, 0.0
+    for s in range(n + 1):
+        d = total * s / n
+        while i < len(seg) - 1 and acc + seg[i] < d:
+            acc += seg[i]
+            i += 1
+        f = 0.0 if seg[i] == 0 else min(1.0, (d - acc) / seg[i])
+        a, b = pts[i], pts[i + 1]
+        out.append(tuple(a[k] + (b[k] - a[k]) * f for k in range(len(a))))
+    return out
+
+
+def _woven(bm, P, nu, nv, thick, tone, relief=0.0):
+    """A sheet off a surface P(u, v), `thick` deep behind it, with a flat
+    colour per face off `tone(i, j)` on both skins.
+
+    `relief` lifts the middle of every 2 × 2 block of faces off the surface —
+    a pillow per block, both sides — which is the over-and-under of a basket
+    weave at the size a strand actually is. The face's normal is taken off
+    the surface by differences, so P must run with u × v pointing out of the
+    side you want to call the front; `new_object` sorts the winding."""
+    e = 1e-4
+
+    def n_at(u, v):
+        du = [P(min(u + e, 1.0), v)[k] - P(max(u - e, 0.0), v)[k] for k in range(3)]
+        dv = [P(u, min(v + e, 1.0))[k] - P(u, max(v - e, 0.0))[k] for k in range(3)]
+        n = (du[1] * dv[2] - du[2] * dv[1], du[2] * dv[0] - du[0] * dv[2],
+             du[0] * dv[1] - du[1] * dv[0])
+        m = math.sqrt(sum(c * c for c in n)) or 1.0
+        return [c / m for c in n]
+
+    F, B = [], []
+    for i in range(nu + 1):
+        fr, br = [], []
+        for j in range(nv + 1):
+            u, v = i / nu, j / nv
+            p, n = P(u, v), n_at(u, v)
+            w = relief * (i % 2) * (j % 2)
+            fr.append(bm.verts.new(tuple(p[k] + n[k] * w for k in range(3))))
+            br.append(bm.verts.new(tuple(p[k] - n[k] * (thick + w)
+                                         for k in range(3))))
+        F.append(fr)
+        B.append(br)
+    n0 = len(bm.faces)
+    cols = []
+    for i in range(nu):
+        for j in range(nv):
+            bm.faces.new((F[i][j], F[i + 1][j], F[i + 1][j + 1], F[i][j + 1]))
+            bm.faces.new((B[i][j], B[i][j + 1], B[i + 1][j + 1], B[i + 1][j]))
+            c = tone(i, j)
+            cols += [c, c]
+    for i in range(nu):
+        for j in (0, nv):
+            bm.faces.new((F[i][j], B[i][j], B[i + 1][j], F[i + 1][j]))
+            cols.append(tone(i, min(j, nv - 1)))
+    for j in range(nv):
+        for i in (0, nu):
+            bm.faces.new((F[i][j], F[i][j + 1], B[i][j + 1], B[i][j]))
+            cols.append(tone(min(i, nu - 1), j))
+    _paint_from(bm, n0, lambda k: cols[k])
+    return F
+
+
+def _basket(seed, lo=0.80):
+    """The tone of face (i, j) in a basket check of 2 × 2 blocks.
+
+    A block of strands running across, then a block running up, alternating
+    both ways, as on the chairs in the photograph. Across, the two strands
+    are lit and shadowed by their own curl; up, both sit a shade darker,
+    which is what makes the check read from across the yard and not only from
+    the seat. Each block varies a little off a hash, as rattan does."""
+    def tone(i, j):
+        bi, bj = i // 2, j // 2
+        if (bi + bj) % 2 == 0:
+            t = (1.06, 0.90)[j % 2]
+        else:
+            t = (0.94, lo)[i % 2]
+        t *= 1.0 + 0.05 * _hash3(bi, bj, seed)
+        return (t, t * 0.99, t * 0.975)
+    return tone
+
+
+def _bound(bm, pts, r, seg=8, seed=0.0):
+    """Cane bound round a tube: a tube re-cut so its faces are square, and
+    painted on the diagonal, so the wrap reads as a helix of strands."""
+    pitch = TAU * r / seg
+    pts = _resample(pts, pitch)
+    n0 = len(bm.faces)
+    _tube(bm, pts, r, seg=seg)
+    nring = (len(pts) - 1) * seg
+
+    def col(k):
+        if k >= nring:
+            return (0.90, 0.90, 0.92)
+        i, j = divmod(k, seg)
+        t = (1.04, 0.80)[(i + j) % 2] * (1.0 + 0.04 * _hash3(i // 6, 0, seed))
+        return (t, t * 0.99, t * 0.975)
+    _paint_from(bm, n0, col)
+
+
 def steel_gate(kit, hx, hy, z, yaw, w=1.16, h=1.06, bars=5):
-    """The gate: a flat frame with five horizontal bars in it, hung on one
-    stile and drawn standing open, because it always is."""
+    """The gate: a frame with five horizontal bars in it, hung on one stile
+    and drawn standing open, because it always is.
+
+    The frame is 40 box section with its rolled corners, the bars are round
+    bar, and it hangs on two barrel hinges and shuts with a lever latch and
+    a drop bolt, which is what every gate on this shore has and what told you
+    this was a gate rather than a ladder lying in the opening."""
+    t, d = 0.040, 0.046
+    M = _M((hx, hy, z), yaw)
     bm = bmesh.new()
-    t = 0.038
     for sx in (t / 2, w - t / 2):
-        bm_box(bm, sx, 0, h / 2, t, 0.046, h)
+        _rr_loft(bm, [(0.0, t / 2, d / 2, 0.005, sx, 0.0),
+                      (h, t / 2, d / 2, 0.005, sx, 0.0)], per=3)
+    for zc in (t / 2, h - t / 2):
+        g = _rr_loft(bm, [(0.0, t / 2, d / 2 - 0.003, 0.005, 0.0, 0.0),
+                          (w - 2 * t, t / 2, d / 2 - 0.003, 0.005, 0.0, 0.0)],
+                     per=3)
+        _xf([v for row in g for v in row], _M((t, 0.0, zc), ry=math.pi / 2))
     for i in range(bars):
-        bm_box(bm, w / 2, 0, h * (i + 0.42) / bars, w - t * 2, 0.032, 0.026)
-    ob = new_object(bm, "gate")
-    bevel(ob, 0.005)
-    _place(ob, hx, hy, z, yaw)
-    kit.adopt(ob, GATE_BLACK)
+        zc = t + (h - 2 * t) * (i + 0.5) / bars
+        _tube(bm, [(t - 0.004, 0.0, zc), (w - t + 0.004, 0.0, zc)], 0.012,
+              seg=14)
+    # The two barrel hinges, on a pin welded to the jamb's flat.
+    for z0 in (0.12, h - 0.22):
+        _lathe(bm, [(0.0, 0.0004), (0.0, 0.015), (0.004, 0.017),
+                    (0.096, 0.017), (0.100, 0.015), (0.100, 0.0004)],
+               seg=16, at=(-0.020, 0.0, z0))
+        _lathe(bm, [(0.100, 0.0004), (0.100, 0.007), (0.112, 0.007),
+                    (0.116, 0.0004)], seg=10, at=(-0.020, 0.0, z0))
+        bm_box(bm, -0.004, 0.0, z0 + 0.05, 0.026, 0.010, 0.07)
+    # The latch: a lever on a square boss on the free stile, both faces.
+    for s in (-1, 1):
+        g = _rr_loft(bm, [(0.0, 0.032, 0.040, 0.006, 0.0, 0.0),
+                          (0.006, 0.030, 0.038, 0.006, 0.0, 0.0),
+                          (0.011, 0.024, 0.032, 0.006, 0.0, 0.0)], per=3)
+        _xf([v for row in g for v in row],
+            _M((w - t / 2, s * d / 2, 0.86), rx=-s * math.pi / 2))
+        _tube(bm, _fillet([(w - t / 2, s * (d / 2 + 0.008), 0.86),
+                           (w - t / 2, s * (d / 2 + 0.040), 0.86),
+                           (w - t / 2 - 0.115, s * (d / 2 + 0.052), 0.852)],
+                          0.025, n=6), 0.0085, seg=12)
+    # The drop bolt down the free stile, and its keeper.
+    _tube(bm, [(w - t / 2, d / 2 + 0.012, 0.03), (w - t / 2, d / 2 + 0.012, 0.36)],
+          0.0065, seg=10)
+    _tube(bm, _fillet([(w - t / 2, d / 2 + 0.012, 0.30),
+                       (w - t / 2, d / 2 + 0.045, 0.30),
+                       (w - t / 2, d / 2 + 0.045, 0.36)], 0.012, n=4),
+          0.0055, seg=10)
+    for zk in (0.10, 0.26):
+        bm_box(bm, w - t / 2, d / 2 + 0.008, zk, 0.030, 0.016, 0.022)
+    _xf(bm.verts, M)
+    _emit(kit, bm, GATE_BLACK, "gate")
 
 
 def patio_table(kit, cx, cy, z, yaw=0.0, w=1.12, d=0.70, h=0.72):
     """The white plastic rectangle with the moulded top. The round one is
-    upstairs on terrace 8; this is the one the back of the house eats at."""
+    upstairs on terrace 8; this is the one the back of the house eats at.
+
+    As in the photograph: a top with a rolled lip 5 cm deep all round and a
+    7.5 cm radius at the corners, a field moulded 2.5 mm down inside a flat
+    border, and the parasol hole in the middle with its collar. Under it, a
+    shallow apron and four tapered legs of rounded square section, braced by
+    an X to a hub under the hole. The legs stand 6 cm in from the long edges
+    and 7.5 from the ends, so the chairs' frames clear them pushed in."""
+    at = (cx, cy, z)
+    hw, hd, R = w / 2, d / 2, 0.075
     bm = bmesh.new()
-    bm_box(bm, 0, 0, h - 0.019, w, d, 0.038)
-    # The apron under the lip, which is what makes a moulded top read as
-    # moulded rather than as a 4 cm plank on four sticks.
-    bm_box(bm, 0, 0, h - 0.068, w - 0.075, d - 0.075, 0.062)
+    _rr_loft(bm, [(h - 0.052, hw - 0.016, hd - 0.016, R - 0.016, 0, 0),
+                  (h - 0.050, hw - 0.005, hd - 0.005, R - 0.005, 0, 0),
+                  (h - 0.044, hw, hd, R, 0, 0),
+                  (h - 0.015, hw, hd, R, 0, 0),
+                  (h - 0.006, hw - 0.004, hd - 0.004, R - 0.004, 0, 0),
+                  (h - 0.0015, hw - 0.011, hd - 0.011, R - 0.011, 0, 0),
+                  (h, hw - 0.021, hd - 0.021, R - 0.021, 0, 0),
+                  (h, hw - 0.052, hd - 0.052, R - 0.052, 0, 0),
+                  (h - 0.0025, hw - 0.057, hd - 0.057, R - 0.057, 0, 0)],
+             per=8)
+    # The apron, which is what makes a moulded top read as moulded rather
+    # than as a 5 cm plank on four sticks.
+    _rr_loft(bm, [(h - 0.088, hw - 0.090, hd - 0.090, 0.040, 0, 0),
+                  (h - 0.084, hw - 0.086, hd - 0.086, 0.044, 0, 0),
+                  (h - 0.050, hw - 0.086, hd - 0.086, 0.044, 0, 0)], per=5)
+    feet = []
     for sx in (-1, 1):
         for sy in (-1, 1):
-            bm_box(bm, sx * (w / 2 - 0.115), sy * (d / 2 - 0.10),
-                   (h - 0.11) / 2, 0.046, 0.046, h - 0.11)
-        bm_box(bm, sx * (w / 2 - 0.115), 0, 0.115, 0.052, d - 0.20, 0.042)
-    ob = new_object(bm, "patiotable")
-    bevel(ob, 0.008)
-    _place(ob, cx, cy, z, yaw)
-    kit.adopt(ob, PLASTIC_W)
+            lx, ly = sx * (hw - 0.075), sy * (hd - 0.060)
+            fx, fy = lx + sx * 0.016, ly + sy * 0.012
+            feet.append((fx, fy))
+            _rr_loft(bm, [(0.010, 0.017, 0.017, 0.006, fx, fy),
+                          (0.30, 0.0195, 0.0195, 0.0065, fx * 0.6 + lx * 0.4,
+                           fy * 0.6 + ly * 0.4),
+                          (h - 0.090, 0.0225, 0.0225, 0.0075, lx, ly),
+                          (h - 0.070, 0.028, 0.028, 0.010, lx, ly),
+                          (h - 0.050, 0.030, 0.030, 0.010, lx, ly)], per=3)
+            # The X: a rib from each leg to the hub, under the apron.
+            _tube(bm, [(lx - sx * 0.012, ly - sy * 0.010, h - 0.105),
+                       (sx * 0.034, sy * 0.022, h - 0.108)], 0.011, seg=10)
+    _lathe(bm, [(h - 0.132, 0.0004), (h - 0.132, 0.026), (h - 0.128, 0.034),
+                (h - 0.092, 0.036), (h - 0.086, 0.040), (h - 0.084, 0.0004)],
+           seg=24)
+    # The parasol hole's collar, standing a hair proud of the field.
+    _lathe(bm, [(h - 0.004, 0.019), (h + 0.0008, 0.020), (h + 0.0018, 0.025),
+                (h + 0.0008, 0.031), (h - 0.004, 0.034)], seg=32)
+    _emit(kit, bm, PLASTIC_W, "patiotable", at, yaw)
+    bm = bmesh.new()
+    bm_cylinder(bm, 0.0, 0.0, h - 0.004, h - 0.0010, 0.0195, 0.0195, seg=24)
+    for fx, fy in feet:
+        _lathe(bm, [(0.0, 0.0004), (0.0, 0.019), (0.004, 0.021),
+                    (0.012, 0.019), (0.012, 0.0004)], seg=12, at=(fx, fy, 0.0))
+    _emit(kit, bm, GLIDE, "patiotable_hole", at, yaw)
 
 
 def wicker_chair(kit, cx, cy, z, yaw):
     """The grey stacking rattan armchair. Four came with the house.
 
-    The weave is not modelled. At the distance you ever stand from one of these
-    what reads is a round-backed shell of one dull grey-brown, higher behind
-    than at the arms, on four thin steel legs — so that is what this is, and
-    the twelve boxes the shell is made of are the twelve the silhouette needs.
-    """
-    bm = bmesh.new()
-    S, R, T = 0.44, 0.255, 0.055
-    bm_box(bm, -0.01, 0, S - 0.025, 0.44, 0.44, 0.050)         # the seat
-    seg = 16
+    Built off the photograph: a tub of woven cane, round at the back and
+    near straight down the sides, higher behind than at the arms, its top
+    bound round a hoop; a woven seat with a rolled front edge; under it a
+    frame of 22 mm anthracite tube. The front legs run up past the seat into
+    the arms and turn back into the hoop. The back legs are one bent U under
+    the seat, splayed out behind so the chairs nest.
 
-    def at(i):
-        a = math.radians(44 + 272 * i / seg)                   # 0 is the front
-        ca, sa = math.cos(a), math.sin(a)
-        return ca, sa, (-0.015 + ca * R * 1.10, sa * R)
+    Front is +X, as before, so the three in the loggia stand where they did.
+    The weave is a 4 cm basket check, half by geometry (a pillow on each
+    block, 1.8 mm) and half by a flat colour per strand (`_basket`). It used
+    to be twelve prisms in a ring, and the comment that defended them said
+    the weave was not worth modelling at the distance you stand from one;
+    from the loggia door that distance is a metre."""
+    at = (cx, cy, z)
+    S = 0.44                       # the seat, as it was
+    XC, RB, Y0F, Y0B = -0.06, 0.238, 0.226, 0.238
+    XF = 0.205                     # where the tub's sides stop, at the arms
 
-    for i in range(seg):
-        ca0, sa0, p0 = at(i)
-        ca1, sa1, p1 = at(i + 1)
-        # A quad footprint per segment, sharing its edges with its neighbours,
-        # so the shell is one continuous band. Built as separate boxes it was a
-        # ring of loose lumps with daylight between them, which is what a
-        # stacking chair looks like from behind if you have taken it apart.
-        poly = [(p0[0] + ca0 * T, p0[1] + sa0 * T),
-                (p1[0] + ca1 * T, p1[1] + sa1 * T),
-                (p1[0] - ca1 * T, p1[1] - sa1 * T),
-                (p0[0] - ca0 * T, p0[1] - sa0 * T)]
-        # Low at the arms, full height behind: one cosine, not a step.
-        cm = math.cos(math.radians(44 + 272 * (i + 0.5) / seg))
-        hgt = 0.125 + 0.205 * max(0.0, -cm) ** 0.75
-        bm_prism(bm, poly, S + 0.008, S + 0.008 + hgt)
-    ob = new_object(bm, "wickershell")
-    bevel(ob, 0.010)
-    _place(ob, cx, cy, z, yaw)
-    kit.adopt(ob, WICKER)
+    # The tub's centreline in plan, front left round the back to front right.
+    line = [(XF + (XC - XF) * s / 8, Y0F + (Y0B - Y0F) * s / 8)
+            for s in range(9)]
+    line += [(XC + RB * math.cos(math.pi / 2 + math.pi * s / 24),
+              RB * math.sin(math.pi / 2 + math.pi * s / 24))
+             for s in range(1, 24)]
+    line += [(x, -y) for x, y in reversed(line[:9])]
+    line = _resample(line, 0.004)
+    ln = len(line) - 1
 
-    frame = bmesh.new()
-    for sx in (-1, 1):
-        for sy in (-1, 1):
-            # Splayed, the way a stacking frame is: the feet stand wider than
-            # the seat or the chairs would not nest.
-            bm_box(frame, sx * 0.185, sy * 0.185, (S - 0.03) / 2,
-                   0.026, 0.026, S - 0.03)
-        bm_box(frame, sx * 0.185, 0, 0.055, 0.024, 0.37, 0.024)
-    ob = new_object(frame, "wickerframe")
-    bevel(ob, 0.004)
-    _place(ob, cx, cy, z, yaw)
-    kit.adopt(ob, TUBE)
+    def plan(u):
+        f = u * ln
+        i = min(int(f), ln - 1)
+        f -= i
+        (x0, y0), (x1, y1) = line[i], line[i + 1]
+        tx, ty = x1 - x0, y1 - y0
+        m = math.hypot(tx, ty) or 1.0
+        # Outward is to the right of the run, which goes anticlockwise.
+        return (x0 + tx * f, y0 + ty * f, ty / m, -tx / m)
+
+    def backness(x):
+        return min(1.0, max(0.0, (XF - x) / (XF - XC + RB)))
+
+    def shell(u, v):
+        x, y, nx, ny = plan(u)
+        b = backness(x)
+        o = -0.010 + 0.024 * v ** 0.85        # in at the seat, flared at the top
+        return (x + nx * o - 0.030 * v * b * b, y + ny * o,
+                S - 0.022 + (0.152 + 0.200 * b ** 1.3) * v)
+
+    wb = bmesh.new()
+    _woven(wb, shell, 64, 12, 0.011, _basket(1.0), relief=0.0018)
+
+    # The seat, woven the same, with a dish in it and its front rolled down.
+    HW, RI = 0.218, RB - 0.020
+
+    def seat(u, v):
+        y = (1 - 2 * v) * HW
+        xb = XC - math.sqrt(max(0.0, RI * RI - y * y))
+        x = 0.228 + (xb - 0.228) * u
+        dish = 0.011 * math.sin(math.pi * u) * math.sin(math.pi * v)
+        roll = 0.016 * max(0.0, 1.0 - u / 0.12) ** 2
+        return (x, y, S - dish - roll)
+    _woven(wb, seat, 20, 20, 0.026, _basket(2.0), relief=0.0016)
+
+    # The binding: round the hoop at the top, down both front edges of the
+    # tub, and along the seat's rolled front.
+    top = []
+    for k in range(97):
+        x, y, zz = shell(k / 96, 1.0)
+        top.append((x, y, zz + 0.006))
+    _bound(wb, top, 0.0135, seg=8, seed=3.0)
+    for u in (0.0, 1.0):
+        _bound(wb, [shell(u, k / 6) for k in range(7)], 0.0085, seg=6,
+               seed=4.0 + u)
+    _bound(wb, [(0.232, -HW - 0.004, S - 0.020), (0.232, HW + 0.004, S - 0.020)],
+           0.0125, seg=8, seed=6.0)
+    _emit(kit, wb, WICKER, "wickershell", at, yaw)
+
+    # The frame. Every piece is one bent tube and every bend has a radius.
+    fb = bmesh.new()
+    r = 0.011
+    zr = S - 0.046                           # the seat ring
+    for s in (-1, 1):
+        x0, y0, z0 = top[0] if s > 0 else top[-1]
+        # Front leg, up past the seat corner into the arm, back into the hoop.
+        _tube(fb, _fillet([(0.250, s * 0.250, 0.012),
+                           (0.236, s * 0.232, zr),
+                           (0.240, s * 0.230, S + 0.070),
+                           (x0 + 0.016, s * abs(y0), z0 - 0.004),
+                           (x0 - 0.030, s * (abs(y0) + 0.001), z0)],
+                          0.045, n=8), r, seg=12)
+        # The side rail, front leg to back leg, under the seat's edge.
+        _tube(fb, [(0.236, s * 0.226, zr), (-0.152, s * 0.216, zr)], r * 0.9,
+              seg=10)
+    # The back U: both back legs and the rail between them, bowed back under
+    # the seat. The corners are bent tight: a wide radius there pulls the
+    # tube 2 cm inside the point the side rails meet it at, and they ended
+    # in the air.
+    bow = [(-0.150 - 0.055 * (1.0 - t * t), 0.216 * t, zr + 0.004 * (1.0 - t * t))
+           for t in [1.0 - 2.0 * k / 10 for k in range(11)]]
+    _tube(fb, _fillet([(-0.262, 0.262, 0.012)] + bow + [(-0.262, -0.262, 0.012)],
+                      0.028, n=6), r, seg=12)
+    # And across the front under the roll.
+    _tube(fb, _fillet([(0.236, 0.232, zr), (0.244, 0.0, zr - 0.002),
+                       (0.236, -0.232, zr)], 0.10, n=6), r * 0.9, seg=10)
+    _emit(kit, fb, WICKER_STEEL, "wickerframe", at, yaw)
+
+    gb = bmesh.new()
+    for fx, fy in ((0.250, 0.250), (0.250, -0.250), (-0.262, 0.262),
+                   (-0.262, -0.262)):
+        _lathe(gb, [(0.0, 0.0004), (0.0, 0.012), (0.004, 0.0135),
+                    (0.016, 0.0125), (0.016, 0.0004)], seg=12, at=(fx, fy, 0.0))
+    _emit(kit, gb, GLIDE, "wickerglides", at, yaw)
 
 
 def sun_lounger(kit, cx, cy, z, yaw, l=1.86, w=0.58):
     """The folding aluminium lounger with the blue striped sling, back up two
-    notches, which is the only way anybody ever leaves one."""
-    bed = bmesh.new()
-    n = 11
-    for i in range(n):
-        t = (i + 0.5) / n
-        # The last third is the backrest, hinged up about 32 degrees.
-        u = max(0.0, (t - 0.62) / 0.38)
-        x = -l / 2 + t * l
-        lift = u * (l * 0.38) * math.sin(math.radians(32))
-        bm_box(bed, x + u * 0.06, 0, 0.345 + lift,
-               l / n * 1.20, w, 0.030 + u * 0.004)
-    ob = new_object(bed, "lounger_sling")
-    bevel(ob, 0.004)
-    _place(ob, cx, cy, z, yaw)
-    # One object per stripe would be four meshes for a deck chair. The sling is
-    # one object in the palest of the four and the bands are drawn on it.
-    kit.adopt(ob, STRIPE[0])
+    notches, which is the only way anybody ever leaves one.
 
-    band = bmesh.new()
-    for i in range(n):
-        t = (i + 0.5) / n
-        if i % 3 == 0:
-            continue
-        u = max(0.0, (t - 0.62) / 0.38)
-        x = -l / 2 + t * l
-        lift = u * (l * 0.38) * math.sin(math.radians(32))
-        bm_box(band, x + u * 0.06, 0, 0.354 + lift,
-               l / n * 1.02, w - 0.05, 0.026)
-    ob = new_object(band, "lounger_stripe")
-    bevel(ob, 0.003)
-    kit.adopt(ob, STRIPE[1])
-    _place(ob, cx, cy, z, yaw)
+    A frame of round tube the full length at 32 cm, rounded at the corners;
+    the backrest a second U hinged at 62 % and held up 32 degrees by a prop
+    in the second notch of a rack; a U leg at each end, with two wheels at
+    the head so it can be dragged after the sun. The sling is one sheet over
+    the bend, sagging between the rails and striped down its length: navy
+    hems, white, blue and a pale blue. It was eleven planks laid in steps,
+    with the blue bands on separate planks a centimetre over them."""
+    at = (cx, cy, z)
+    H, ZR, rt = 0.346, 0.322, 0.0135
+    w2 = w / 2
+    xh = -l / 2 + 0.62 * l
+    a = math.radians(32)
+    L2 = 0.38 * l - 0.03
+    head = (xh + L2 * math.cos(a), H + L2 * math.sin(a))
+    path = _fillet([(-l / 2 + 0.03, 0.0, H), (xh, 0.0, H),
+                    (head[0], 0.0, head[1])], 0.12, n=8)
+    path = _resample([(p[0], p[2]) for p in path], 0.035)
+    np_ = len(path) - 1
 
-    frame = bmesh.new()
-    for sy in (-1, 1):
-        bm_box(frame, 0.02, sy * (w / 2 + 0.012), 0.330, l * 0.66, 0.026, 0.026)
-        for sx in (-1, 1):
-            bm_box(frame, sx * l * 0.30, sy * (w / 2 + 0.012), 0.165,
-                   0.024, 0.024, 0.330)
-    ob = new_object(frame, "lounger_frame")
-    bevel(ob, 0.004)
-    _place(ob, cx, cy, z, yaw)
-    kit.adopt(ob, TUBE)
+    def sling(u, v):
+        i = min(np_, int(round(u * np_)))
+        x, zz = path[i]
+        y = (2 * v - 1) * (w2 - 0.004)
+        return (x, y, zz - 0.016 * (1.0 - (2 * v - 1) ** 2))
+
+    base = STRIPE[0]
+    bands = [3, 0, 0, 1, 1, 0, 2, 2, 2, 2, 0, 1, 1, 0, 0, 3]
+
+    def stripe(i, j):
+        c = STRIPE[bands[j]]
+        return tuple(c[k] / base[k] for k in range(3))
+    sb = bmesh.new()
+    _woven(sb, sling, np_, len(bands), 0.004, stripe)
+    # The hems: the sling's edges rolled round a cord in the rail's channel.
+    n0 = len(sb.faces)
+    for s in (-1, 1):
+        _tube(sb, [(x, s * (w2 - 0.002), zz - 0.004) for x, zz in path],
+              0.007, seg=8)
+    navy = tuple(STRIPE[3][q] / base[q] for q in range(3))
+    _paint_from(sb, n0, lambda k: navy)
+    _emit(kit, sb, base, "lounger_sling", at, yaw)
+
+    fb = bmesh.new()
+    ry = w2 + 0.010
+    # The main frame: one loop the whole length, rounded at the corners.
+    x0f, x1f = -l / 2 + 0.01, l / 2 - 0.06
+    _tube(fb, _fillet([(x0f, 0.0, ZR), (x0f, ry, ZR), (x1f, ry, ZR),
+                       (x1f, -ry, ZR), (x0f, -ry, ZR), (x0f, 0.0, ZR)],
+                      0.06, n=6), rt, seg=12)
+    # The backrest's U, under the sling's raised part, and its hinge bosses.
+    up = [(x, zz - 0.020) for x, zz in path if x >= xh - 0.02]
+    hx, hz = up[0]
+    tx, tz = up[-1]
+    _tube(fb, _fillet([(hx, ry - 0.016, hz), (tx, ry - 0.016, tz),
+                       (tx + 0.010, 0.0, tz + 0.006),
+                       (tx, -(ry - 0.016), tz), (hx, -(ry - 0.016), hz)],
+                      0.06, n=6), rt * 0.9, seg=12)
+    for s in (-1, 1):
+        g = _lathe(fb, [(0.0, 0.0004), (0.0, 0.017), (0.024, 0.017),
+                        (0.024, 0.0004)], seg=14)
+        _xf(g, _M((hx, s * (ry + 0.012), hz - 0.004), rx=s * math.pi / 2))
+    # The prop: from a third of the way up the back down into the rack.
+    pk = up[len(up) // 3]
+    rack_x = xh + 0.30
+    _tube(fb, _fillet([(pk[0], ry - 0.034, pk[1]),
+                       (rack_x, ry - 0.034, ZR + 0.012),
+                       (rack_x, -(ry - 0.034), ZR + 0.012),
+                       (pk[0], -(ry - 0.034), pk[1])], 0.03, n=4),
+          0.0075, seg=10)
+    # The rack it sits in: a notched strip inside each rail.
+    for s in (-1, 1):
+        for k in range(5):
+            bm_box(fb, rack_x - 0.08 + k * 0.045, s * (ry - 0.012), ZR + 0.006,
+                   0.020, 0.008, 0.016)
+    # The legs: a U at each end, down to the floor at the foot and to the
+    # axle at the head.
+    for lx, zb in ((-0.56, 0.014), (0.56, 0.046)):
+        _tube(fb, _fillet([(lx, ry, ZR - 0.004), (lx - 0.02, ry + 0.012, zb),
+                           (lx - 0.02, -(ry + 0.012), zb),
+                           (lx, -ry, ZR - 0.004)], 0.05, n=6), rt, seg=12)
+    _emit(kit, fb, TUBE, "lounger_frame", at, yaw)
+
+    wb = bmesh.new()
+    for s in (-1, 1):
+        g = _lathe(wb, [(-0.013, 0.0004), (-0.013, 0.030), (-0.011, 0.040),
+                        (-0.005, 0.045), (0.005, 0.045), (0.011, 0.040),
+                        (0.013, 0.030), (0.013, 0.0004)], seg=28)
+        _xf(g, _M((0.54, s * (ry + 0.036), 0.046), rx=math.pi / 2))
+        # And the foot's two glides, under the U where it meets the floor.
+        _rr_loft(wb, [(0.0, 0.020, 0.016, 0.006, -0.58, s * (ry - 0.020)),
+                      (0.008, 0.020, 0.016, 0.006, -0.58, s * (ry - 0.020))],
+                 per=3)
+    _emit(kit, wb, GLIDE, "lounger_wheels", at, yaw)
 
 
 def bulkhead(kit, cx, cy, z):
     """The oval opal bulkhead over the back door. Every house on this shore has
-    one and they all have the same moth in them."""
-    kit.span(WHITEGOODS, cx - 0.085, cx + 0.085, cy - 0.058, cy + 0.058,
-             z - 0.022, z, bev=0.006)
-    bm_ball(kit.bm((0.945, 0.930, 0.880), 0.004), cx, cy, z - 0.022,
-            0.105, 0.072, 0.058, rows=4, seg=14, squash_bottom=0.22)
+    one and they all have the same moth in them.
+
+    It is the fitting `wall_lamp` draws on the render by the two outside
+    doors (those were modelled off this one), turned to face the floor. It
+    was a bevelled box and a ball of four rows."""
+    wall_lamp(kit, (cx, cy, z - 0.012), (math.pi, 0.0))
 
 
 def wall_lamp(kit, at, rot):
@@ -2706,9 +3045,19 @@ def loggia(kit):
     wicker_chair(kit, 1.72, 3.36, z, yaw=-math.pi / 2 - 0.12)
     wicker_chair(kit, 2.44, 3.36, z, yaw=-math.pi / 2 + 0.10)
     wicker_chair(kit, 2.86, 2.62, z, yaw=math.pi + 0.15)
-    # The ashtray, which is on that table in both photographs.
-    bm_cylinder(kit.bm(DARKMETAL, 0.004), 2.24, 2.98, z + 0.720, z + 0.744,
-                0.058, 0.066, seg=12)
+    # The ashtray, which is on that table in both photographs: pressed tin,
+    # turned, with its three rests dipped into the rim. It was a 12-sided
+    # drum.
+    bm = bmesh.new()
+    vs = _lathe(bm, [(0.0, 0.052), (0.002, 0.059), (0.018, 0.066),
+                     (0.023, 0.065), (0.024, 0.061), (0.022, 0.056),
+                     (0.009, 0.050), (0.008, 0.0004)], seg=48)
+    for v in vs:
+        if v.co.z > 0.015:
+            ang = math.atan2(v.co.y, v.co.x) % (TAU / 3)
+            dd = min(ang, TAU / 3 - ang)
+            v.co.z -= 0.008 * max(0.0, 1.0 - dd / 0.22) ** 2
+    _emit(kit, bm, DARKMETAL, "ashtray", (2.24, 2.98, z + 0.7175), 0.4)
     bulkhead(kit, 0.86, 2.62, P_CEIL - 0.01)
 
 
