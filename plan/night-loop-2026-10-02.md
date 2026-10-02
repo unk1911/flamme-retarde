@@ -102,6 +102,12 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    a run of obeyed orders, during/after spanks or toy play) and on ask ("pull my hair");
    holds a few seconds, can combine with a spank from her other hand; release eases back.
    Safeword lets go instantly. Starts after item 12 (spooning) lands — both edit 49-revmoves.js.
+   PLUS (Misha, 07:00, agreed version): you kneeling in front of her (standing), her fist in your
+   hair draws you in so your CHEEK rests against her SIDE — hip/waist, head turned to the side —
+   your arms go round her legs (thighs/knees) for balance (both hands solved onto her legs),
+   then she tips your head back so you look up at her, holds a beat with a line, releases.
+   NEVER face-to-crotch / face pressed to her front below the waist (declined); the head goes
+   to her side at waist/hip height only.
 10. [ ] **Third worn toy: the dual-ended wand / G-spot vibrator** (Misha, 06:15: "a 3rd toy,
    which can be used in place of the lovense or plug ... it can go into either hole, for a more
    intense experience"). Reference photo: refs/toys/wand-ref.jpg (git-ignored): soft pink
