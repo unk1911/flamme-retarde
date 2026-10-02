@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.58.0"
+VERSION = "1.59.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4503,7 +4503,34 @@ CHLOE_BEAT = {
     "wait": "you gave them an order a moment ago and they have not done it "
             "yet; you are standing over them, hands on your hips, waiting. "
             "A short impatient line",
+    # 1.59.0 (page 1.567.0, src/49-revtoys.js): the toy they are wearing, in
+    # your hand, and its remote on your phone.
+    "draw": "your hand is on the base of the toy they are wearing and you are "
+            "slowly drawing it partway out of them, to hold it there a moment "
+            "before you push it back in. A slow, teasing line",
+    "tease": "your hand is on the toy they are wearing and you are teasing "
+             "them with it: drawing it a little way out and back in, again and "
+             "again. A playful line",
+    "twist": "you have drawn the toy they are wearing a little way out and are "
+             "turning it slowly to and fro in your fingers. A short line",
+    "pushin": "you have just pushed the toy back in all the way, seated where it "
+              "belongs. A short pleased line",
+    "remote": "you have taken out your phone and are switching on the toy they "
+              "are wearing with its remote, watching what it does to them",
+    "remup": "you are turning the toy they are wearing up a step with the "
+             "remote on your phone. A short teasing line",
+    "remdown": "you are turning the toy they are wearing down a step with the "
+               "remote on your phone. A short line",
+    "remtease": "you are flicking the toy they are wearing on and off with the "
+                "remote, short bursts, to tease them. A playful line",
+    "remoff": "you are switching the toy they are wearing off with the remote. "
+              "One short line",
+    "toyno": "they asked you to do something with the toy they are wearing, "
+             "but you cannot reach it the way they are lying. Tell them so, "
+             "playful, and in charge",
 }
+# A toy Chloe has drawn partway out (1.59.0): the page sends its key.
+TOY_DRAWN = {"plug": "the plug", "lovense": "the Lovense"}
 # The orders (`REV_ORDERS` in src/49-reverse.js), in words, and the plain
 # Croatian of each the page has always captioned: the model may say it its own
 # way, but this is what the order IS.
@@ -5013,10 +5040,16 @@ def clean_scene(raw) -> dict:
         "rev_miss": clamp_num(g("rev_miss"), 0, 999),
         "rev_heat": clamp_num(g("rev_heat"), 0, 1),
         "rev_care": bool(g("rev_care")) or None,
+        # And the toy in her hand (1.59.0, page 1.567.0): which one she has
+        # drawn partway out, if any, and her remote's level, 1..4.
+        "toy_drawn": _enum(g("toy_drawn"), TOY_DRAWN, 8),
+        "remote_level": clamp_num(g("remote_level"), 0, 4),
     }
     if not out["roles"]:
-        for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care"):
+        for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "toy_drawn", "remote_level"):
             out[k] = None
+    if out["remote_level"] is not None:
+        out["remote_level"] = int(round(out["remote_level"])) or None
     for k in ("rev_obey", "rev_miss"):
         if out[k] is not None:
             out[k] = int(out[k]) or None
@@ -5292,6 +5325,14 @@ def chloe_scene_lines(s: dict):
     if s.get("buzz_plug"):
         facts.append("the plug they have in is going this second: you switched "
                      "it on with the remote")
+    lv = s.get("remote_level")
+    if lv and (s.get("buzz") or s.get("buzz_plug")):
+        facts.append(f"the remote on your phone is at {lv} of 4"
+                     + (", as high as it goes" if lv >= 4 else ""))
+    td = s.get("toy_drawn")
+    if td in TOY_DRAWN:
+        facts.append(f"your hand is on {TOY_DRAWN[td]} they are wearing and you "
+                     "have drawn it partway out of them, holding it there")
     h = s.get("rev_heat")
     if h is not None and h >= 0.6:
         facts.append("you are warmed up and enjoying this a lot")

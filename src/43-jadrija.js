@@ -70156,9 +70156,26 @@ async function buildJadrija(scene) {
       if (IS_TOUCH && navigator.vibrate) navigator.vibrate(0);
       return 'off';
     }
+    // Its intensity (1.567.0, Chloe's remote — `signalLevel`): a running
+    // one keeps the level it was turned to; a new one starts at full, which
+    // is what every other road has always meant by "on".
+    const lvl = signals[key] && signals[key].lvl != null ? signals[key].lvl : 1;
     signals[key] = { t: 0, node: rx.node, at: rx.node.position.clone(),
-      until: secs > 0 ? secs : 0 };
+      until: secs > 0 ? secs : 0, lvl };
     return 'on';
+  }
+
+  /**
+   * HOW HARD IT RUNS, 0.15..1 (1.567.0): Chloe's remote turns it up and down
+   * in steps. Scales the motor's shake, its sound, its light and the wine,
+   * and what reaches her face (the nod, from 0.4 of it at the lowest). Every
+   * road that turns a toy on without a level is at 1, as before.
+   */
+  function signalLevel(key, lvl) {
+    const sg = signals[key];
+    if (!sg) return null;
+    if (lvl != null) sg.lvl = Math.max(0.15, Math.min(1, +lvl || 0));
+    return sg.lvl;
   }
 
   /**
@@ -70203,6 +70220,8 @@ async function buildJadrija(scene) {
       part.group.traverse((o) => { if (o.geometry) o.geometry.dispose(); });
     }
     delete worn[key];
+    // And nothing of a draw is kept for the next one (1.567.0, `toyDraw`).
+    delete drawSt[key];
     // Off, and through `signalSet` so the light, the nod and the handset's
     // own motor all stop with it rather than being left lit on a thing that
     // is no longer on anybody.
@@ -70293,7 +70312,10 @@ async function buildJadrija(scene) {
       // WHERE IN THE PATTERN IT IS. Everything below is scaled by it, which
       // is what makes the gaps gaps: the thing stops moving, the sound goes,
       // the wine settles and the light drops back. See `signalAmp`.
-      const beat = signalAmp(sg.t);
+      // And how hard it is turned up (1.567.0, `signalLevel`): 1 unless
+      // Chloe's remote has turned it down.
+      const lv = sg.lvl == null ? 1 : sg.lvl;
+      const beat0 = signalAmp(sg.t), beat = beat0 * lv;
       // A tabletop lets it skid; a hip does not — see `TOY.buzz`, and
       // `PLUG.buzz` for the one that is held all round.
       const amp = (rx.table ? SIGNAL.walk : k === 'plug' ? PLUG.buzz : TOY.buzz) * beat;
@@ -70340,7 +70362,7 @@ async function buildJadrija(scene) {
       // also ignore it outright with the ringer in do-not-disturb, which is
       // not something a page can see or say anything about.
       if (IS_TOUCH && navigator.vibrate && near < SIGNAL.hear) {
-        const run = beat > 0.5;
+        const run = beat0 > 0.5;
         if (run && !sg.vib) {
           sg.buzzed = (sg.buzzed || 0) + 1;
           navigator.vibrate(vibePattern(signalLeft(sg.t)));
@@ -70365,7 +70387,7 @@ async function buildJadrija(scene) {
       // `gazeTick` and `buzzFace`, which are the two ends of it.
       if (!rx.table && show) {
         onHer = 1;
-        herNod = Math.max(herNod, beat);
+        herNod = Math.max(herNod, beat0 * (0.4 + 0.6 * lv));
       }
       // How much of it reaches the glass. Through the tabletop, not through
       // the air: a thing on the same 46 cm top shakes the wine, the same
@@ -70944,7 +70966,24 @@ async function buildJadrija(scene) {
         const k = (v - (1 - F / C)) / (F / C);
         return Math.max(0.0004, r * Math.sqrt(Math.max(0, 1 - k * k)));
       });
+      // DRAWN PARTWAY OUT (1.567.0, Chloe's hand — see `toyDraw`): the same
+      // shorter curve, stopped at `c` of the arc instead of 0.62 — the arc as
+      // far as her skin, wherever the draw has brought it — with a short
+      // dome, which is inside her. The curve and the radius table go with it
+      // for `drawFit`'s rings.
+      m.userData.cutAt = (c) => {
+        const f = Math.min(0.012, c * 0.2), n = 24, ps = [];
+        for (let i = 0; i <= n; i++) ps.push(curve.getPointAt((i / n) * c));
+        return loftAlong(new THREE.CatmullRomCurve3(ps), 32, 16, (v) => {
+          const r = radiusAt(v * c);
+          if (v <= 1 - f / c) return r;
+          const k = (v - (1 - f / c)) / (f / c);
+          return Math.max(0.0004, r * Math.sqrt(Math.max(0, 1 - k * k)));
+        });
+      };
     }
+    m.userData.curve = curve;
+    m.userData.radiusAt = radiusAt;
     // Two buttons and a light on the flat of the arm, near the tip, where the
     // drawing has them.
     const btn = solidMaterial(new THREE.Color(0.960, 0.700, 0.820),
@@ -71063,6 +71102,26 @@ async function buildJadrija(scene) {
       cut.push(new THREE.Vector2(last.x * 0.8, 0.0124), new THREE.Vector2(0, 0.0128));
       m.userData.wornGeo = oval(new THREE.LatheGeometry(cut, SEG));
     }
+    // DRAWN PARTWAY OUT (1.567.0, Chloe's hand — see `toyDraw`): the same
+    // cut as `wornGeo` at any height `h` up its axis, so what is drawn is
+    // always what is outside her and the first 4 mm past it. Its radius at a
+    // height, and the oval's own scale there, for `drawFit`'s rings.
+    m.userData.cutAt = (h) => {
+      const cut = pts.filter((p) => p.y <= h);
+      const last = cut[cut.length - 1];
+      cut.push(new THREE.Vector2(last.x * 0.8, h + 0.0006), new THREE.Vector2(0, h + 0.0010));
+      return oval(new THREE.LatheGeometry(cut, SEG));
+    };
+    m.userData.radAt = (y) => {
+      for (let i = 1; i < pts.length; i++) {
+        if (pts[i].y >= y) {
+          const a = pts[i - 1], b = pts[i];
+          return a.x + (b.x - a.x) * ((y - a.y) / Math.max(1e-9, b.y - a.y));
+        }
+      }
+      return 0;
+    };
+    m.userData.ovalAt = (y) => { const k = sat((y - 0.0072) / 0.0032); return 0.60 + 0.40 * k * k * (3 - 2 * k); };
     // THE LIGHT, in the outer face of the base, off-centre on the long axis
     // where the real ones carry it — and the two charging contacts opposite.
     // Its own material like the Lovense's and for the same reason: dark at
@@ -71379,6 +71438,392 @@ async function buildJadrija(scene) {
       out.mid = mid.sort((p, q) => p[1] - q[1]);
     }
     return out;
+  }
+
+  /**
+   * ── DRAWN PARTWAY OUT, AND PUSHED BACK IN (1.567.0) ────────────────────
+   *
+   * Misha, 2 Oct 2026: *"if while in role reversal, and anal toy was inside
+   * baye (me), if sometimes chloe would pull it out briefly and pull it back
+   * in, same with lovense"*. Chloe's hand is src/49-revtoys.js; this is the
+   * toy's half: an offset ALONG ITS OWN AXIS on top of the worn mount, and
+   * the geometry that goes with it.
+   *
+   * THE MOUNT DOES NOT MOVE. `wearTick` still puts the group on her skin
+   * (the plug) or her pelvis (the Lovense) every frame, and the motor still
+   * shakes the group's `shake`; the draw is the MESH inside it, slid out
+   * along the axis by `d`. So the entrance stays where her body has it and
+   * the toy slides through it, which is the whole of what a draw is.
+   *
+   * AND WHAT IS DRAWN IS WHAT IS OUTSIDE HER, at every point of the travel.
+   * Seated, only the base and 4 mm of neck are drawn (`wornGeo`) because a
+   * body with no volume shows a buried bulb through nothing — the Lovense's
+   * note says how that was found. Drawn out by `d`, the cut moves up the toy
+   * by `d` and stays AT her skin: the plug is lathed again up to 11.8 mm +
+   * `d` (`cutAt`), the Lovense's arm lofted again as far as the arc that
+   * now sits at its exit. Cached by the half millimetre, so a draw builds
+   * each one once.
+   *
+   *   plug     slid out along its local −y (its axis runs +y into her); out
+   *            to 34 mm, where the bulb is 14.8 mm in radius at the entrance
+   *            — short of its widest (17.1 at 56 mm), so it never comes out.
+   *            A twist is a turn about the same axis.
+   *   Lovense  slid out along the arm's own tangent where it leaves her
+   *            (`drawExit`, measured on her mesh), up to 22 mm of extra arm.
+   *
+   * `drawFit` measures it, posed, against the body that is drawn.
+   */
+  const DRAW = {
+    max: { plug: 0.034, lovense: 0.022 },
+    /** The cache's step, m. */
+    q: 0.0005,
+    /** Where the plug's drawn cut sits seated, up its axis (`wornGeo`'s). */
+    plugCut: 0.0118,
+    /** The Lovense cut at its exit as it comes out (true), or its arm as worn, slid (false). */
+    lovCut: false,
+  };
+  const drawSt = {};
+  const _dwY = new THREE.Vector3(0, 1, 0), _dwQ = new THREE.Quaternion();
+  const _dwA = new THREE.Vector3(), _dwB = new THREE.Vector3();
+
+  /** The worn part of `key` that can be drawn, or null. */
+  function drawPart(key) {
+    const p = worn[key] && worn[key][0];
+    return p && p.shake && p.shake.children[0] ? p : null;
+  }
+
+  /**
+   * WHERE THE LOVENSE'S ARM LEAVES HER, seated: the first point along the
+   * arc from its tip that is inside her (v2.0's surface, bind pose, the
+   * rest mount), and the arm's tangent there, in the mesh's own frame.
+   * MEASURED once and kept; without v2.0, the number it measures to.
+   */
+  function drawExit(mesh) {
+    const U = mesh.userData;
+    if (U.exit) return U.exit;
+    const curve = U.curve;
+    if (!curve) return null;
+    let L = curve.getLength(), u0 = 0.08;
+    const part = drawPart('lovense');
+    if (part && appr && skinFig) {
+      const M = new THREE.Matrix4().compose(part.rest, part.shake.quaternion, new THREE.Vector3(1, 1, 1));
+      const bone = skinFig.bones.find((b) => b.name === 'pelvis');
+      if (bone) M.premultiply(new THREE.Matrix4().makeTranslation(bone.t[0], bone.t[1], bone.t[2]));
+      const tip = curve.getPointAt(0, new THREE.Vector3()).applyMatrix4(M);
+      const R = herRays(tip, 0.16, false);
+      for (let u = 0; u < 0.4; u += 0.0025) {
+        const v = R.sd(curve.getPointAt(u, new THREE.Vector3()).applyMatrix4(M));
+        if (v != null && v < 0) { u0 = u; break; }
+      }
+    }
+    const p = curve.getPointAt(u0, new THREE.Vector3());
+    const tan = curve.getTangentAt(u0, new THREE.Vector3()).normalize();
+    U.exit = { u: u0, p, tan, L, cuts: new Map() };
+    return U.exit;
+  }
+
+  /** The Lovense's arc fraction that sits at the exit once drawn out by `d`. */
+  function drawLovCut(X, curve, d) {
+    const k = Math.round(d / DRAW.q);
+    if (X.cuts.has(k)) return X.cuts.get(k);
+    const want = _dwA.copy(X.p).addScaledVector(X.tan, k * DRAW.q);
+    let best = X.u, bd = 1e9;
+    for (let u = X.u; u <= Math.min(0.62, X.u + 0.3); u += 0.001) {
+      const dd = curve.getPointAt(u, _dwB).distanceToSquared(want);
+      if (dd < bd) { bd = dd; best = u; }
+    }
+    X.cuts.set(k, best);
+    return best;
+  }
+
+  /**
+   * DRAW IT: `d` metres out along its own axis (0 is seated), turned `tw`
+   * rad about that axis. Answers the draw as set, or null if it is not worn.
+   */
+  function toyDraw(key, d = 0, tw = 0) {
+    const part = drawPart(key);
+    if (!part) { delete drawSt[key]; return null; }
+    const mesh = part.shake.children[0], U = mesh.userData;
+    const st = drawSt[key] || (drawSt[key] = { d: 0, tw: 0, geo: new Map() });
+    d = Math.max(0, Math.min(DRAW.max[key] || 0, d));
+    const k = Math.round(d / DRAW.q);
+    st.d = d; st.tw = tw;
+    const seated = k === 0;
+    const geoFor = (kk, make) => {
+      if (!st.geo.has(kk)) st.geo.set(kk, make());
+      return st.geo.get(kk);
+    };
+    if (key === 'plug') {
+      mesh.position.set(0, -d, 0);
+      mesh.quaternion.setFromAxisAngle(_dwY, tw);
+      const g = seated || !U.cutAt ? U.wornGeo : geoFor(k, () => U.cutAt(DRAW.plugCut + k * DRAW.q));
+      if (g && mesh.geometry !== g) mesh.geometry = g;
+    } else {
+      const X = drawExit(mesh);
+      if (!X) return null;
+      _dwQ.setFromAxisAngle(X.tan, tw);
+      mesh.quaternion.copy(_dwQ);
+      // Turned about the arm's own line through its exit, then slid out.
+      mesh.position.copy(X.p).sub(_dwA.copy(X.p).applyQuaternion(_dwQ)).addScaledVector(X.tan, -d);
+      // THE ARM AS IT IS, slid: everything of it past the exit is drawn
+      // seated too (to 0.62 of the arc, `armGeo`), and inside her, so the
+      // arm that comes out is arm that was there all along — `drawFit`
+      // measures what the slide does to the rest of it. The egg stays off.
+      const g = !DRAW.lovCut || seated || !U.cutAt ? U.armGeo : geoFor(k, () => U.cutAt(drawLovCut(X, U.curve, d)));
+      if (g && mesh.geometry !== g) mesh.geometry = g;
+    }
+    return { d, tw, k };
+  }
+
+  /**
+   * Where her hand takes hold of it, WORLD, this frame and drawn as it is:
+   * `p` the point, `out` the way out of her along its axis, `long` the
+   * other axis her fingers lie along. The plug: the middle of the base's
+   * outer face, its long axis up the line between the cheeks. The Lovense:
+   * the arm 12 mm out from where it leaves her, its line the arm's.
+   */
+  function toyGrip(key) {
+    const part = drawPart(key);
+    if (!part) return null;
+    const mesh = part.shake.children[0];
+    part.group.updateWorldMatrix(true, true);
+    const M = mesh.matrixWorld;
+    if (key === 'plug') {
+      const p = new THREE.Vector3(0, 0, 0).applyMatrix4(M);
+      const out = new THREE.Vector3(0, -1, 0).transformDirection(M);
+      const long = new THREE.Vector3(1, 0, 0).transformDirection(M);
+      return { p, out, long, d: drawSt.plug ? drawSt.plug.d : 0 };
+    }
+    const X = drawExit(mesh);
+    if (!X) return null;
+    // 12 mm from the exit back toward the tip, along the arc, as drawn.
+    const st = drawSt.lovense;
+    const d = st ? st.d : 0;
+    const u = Math.max(0.005, drawLovCut(X, mesh.userData.curve, d) - 0.012 / X.L);
+    const p = mesh.userData.curve.getPointAt(u, new THREE.Vector3()).applyMatrix4(M);
+    const out = X.tan.clone().negate().transformDirection(M);
+    // Across the arm in its own plane: the loop's plane is her sagittal one,
+    // so the palm meets it from her front.
+    const long = mesh.userData.curve.getTangentAt(u, new THREE.Vector3()).negate().transformDirection(M);
+    return { p, out, long, d };
+  }
+
+  /**
+   * HER SURFACE NEAR A POINT, for ray questions: v2.0's triangles within `R`
+   * of figure point `C` (bind corners), bind or posed through her own bone
+   * weights as `plugFit` does it. `hits(O, D)` every crossing along a ray,
+   * `inside(p, D)` an odd count of them, `first(p, D)` the nearest.
+   */
+  function herRays(C, R, posed) {
+    const g = appr.mesh.geometry, pos = g.getAttribute('position');
+    const BI = g.getAttribute('aBoneIdx'), BW = g.getAttribute('aBoneWt');
+    const ix = g.getIndex();
+    const { start, count } = g.drawRange;
+    const BT = skinFig.bindRest().bindT;
+    const bAt = [], bQ = [], _t = new THREE.Vector3();
+    const carry = (j, p, out) => {
+      if (!bAt[j]) { bAt[j] = skinFig.boneAt(j, new THREE.Vector3()); bQ[j] = skinFig.boneTurn(j, new THREE.Quaternion()); }
+      return out.copy(p).sub(_t.set(BT[j * 3], BT[j * 3 + 1], BT[j * 3 + 2])).applyQuaternion(bQ[j]).add(bAt[j]);
+    };
+    const P = new Map(), tri = [], vb = new THREE.Vector3(), vs = new THREE.Vector3(), vp = new THREE.Vector3();
+    const vert = (v) => {
+      let q = P.get(v);
+      if (q) return q;
+      vb.fromBufferAttribute(pos, v);
+      if (!posed) q = vb.clone();
+      else {
+        q = new THREE.Vector3();
+        for (let j = 0; j < 4; j++) {
+          const w = BW.getComponent(v, j);
+          if (w <= 0) continue;
+          carry(Math.round(BI.getComponent(v, j) * 255), vb, vp);
+          q.addScaledVector(vp, w);
+        }
+      }
+      P.set(v, q);
+      return q;
+    };
+    // The patch is chosen by the BIND corners round the bind point of `C`
+    // when posed — the caller's `C` is in this frame's pose, so it is taken
+    // back to the bind frame through the pelvis first (near enough to pick
+    // triangles by; the radius has room for it).
+    let Cb = C;
+    if (posed) {
+      const pb = skinFig.boneIndex('pelvis');
+      const q = skinFig.boneTurn(pb, new THREE.Quaternion()).invert();
+      Cb = C.clone().sub(skinFig.boneAt(pb, new THREE.Vector3())).applyQuaternion(q)
+        .add(_t.set(BT[pb * 3], BT[pb * 3 + 1], BT[pb * 3 + 2]));
+    }
+    const R2 = R * R;
+    for (let i = start; i + 2 < start + count; i += 3) {
+      const a = ix.getX(i), b = ix.getX(i + 1), c = ix.getX(i + 2);
+      let near = false;
+      for (const v of [a, b, c]) { vs.fromBufferAttribute(pos, v); if (vs.distanceToSquared(Cb) < R2) { near = true; break; } }
+      if (near) tri.push(vert(a), vert(b), vert(c));
+    }
+    const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), pv = new THREE.Vector3();
+    const tv = new THREE.Vector3(), qv = new THREE.Vector3();
+    const hits = (O, D) => {
+      const out = [];
+      for (let k = 0; k < tri.length; k += 3) {
+        const A = tri[k], B = tri[k + 1], Cc = tri[k + 2];
+        e1.subVectors(B, A); e2.subVectors(Cc, A);
+        pv.crossVectors(D, e2);
+        const det = e1.dot(pv);
+        if (Math.abs(det) < 1e-12) continue;
+        tv.subVectors(O, A);
+        const u = tv.dot(pv) / det;
+        if (u < 0 || u > 1) continue;
+        qv.crossVectors(tv, e1);
+        const v = D.dot(qv) / det;
+        if (v < 0 || u + v > 1) continue;
+        const t = e2.dot(qv) / det;
+        if (t > 1e-5) out.push(t);
+      }
+      return out.sort((x, y) => x - y);
+    };
+    // THE SIGNED DISTANCE to that surface: the nearest point on any of its
+    // triangles (Ericson's closest point on a triangle), signed by the
+    // triangle's own face — her mesh is wound outward, so behind a face is
+    // inside her. Rays alone are not enough near the Lovense, whose arm
+    // leaves her almost along her skin: a ray along it runs out of the patch
+    // without crossing anything, and parity reads "outside" for a point a
+    // centimetre deep. − is inside, m.
+    const ab = new THREE.Vector3(), ac = new THREE.Vector3(), ap = new THREE.Vector3();
+    const bp = new THREE.Vector3(), cp = new THREE.Vector3(), q = new THREE.Vector3(), nrm = new THREE.Vector3();
+    const closest = (P, A, B, Cc, out) => {
+      ab.subVectors(B, A); ac.subVectors(Cc, A); ap.subVectors(P, A);
+      const d1 = ab.dot(ap), d2 = ac.dot(ap);
+      if (d1 <= 0 && d2 <= 0) return out.copy(A);
+      bp.subVectors(P, B);
+      const d3 = ab.dot(bp), d4 = ac.dot(bp);
+      if (d3 >= 0 && d4 <= d3) return out.copy(B);
+      const vc = d1 * d4 - d3 * d2;
+      if (vc <= 0 && d1 >= 0 && d3 <= 0) return out.copy(A).addScaledVector(ab, d1 / (d1 - d3));
+      cp.subVectors(P, Cc);
+      const d5 = ab.dot(cp), d6 = ac.dot(cp);
+      if (d6 >= 0 && d5 <= d6) return out.copy(Cc);
+      const vb = d5 * d2 - d1 * d6;
+      if (vb <= 0 && d2 >= 0 && d6 <= 0) return out.copy(A).addScaledVector(ac, d2 / (d2 - d6));
+      const va = d3 * d6 - d5 * d4;
+      if (va <= 0 && d4 - d3 >= 0 && d5 - d6 >= 0) {
+        return out.copy(B).addScaledVector(_t.subVectors(Cc, B), (d4 - d3) / ((d4 - d3) + (d5 - d6)));
+      }
+      const den = 1 / (va + vb + vc);
+      return out.copy(A).addScaledVector(ab, vb * den).addScaledVector(ac, vc * den);
+    };
+    const sd = (P) => {
+      let best = 1e9, sgn = 1;
+      for (let k = 0; k < tri.length; k += 3) {
+        closest(P, tri[k], tri[k + 1], tri[k + 2], q);
+        const d2 = q.distanceToSquared(P);
+        if (d2 < best) {
+          best = d2;
+          nrm.crossVectors(ab.subVectors(tri[k + 1], tri[k]), ac.subVectors(tri[k + 2], tri[k]));
+          sgn = nrm.dot(_t.subVectors(P, q)) < 0 ? -1 : 1;
+        }
+      }
+      return best < 1e8 ? sgn * Math.sqrt(best) : null;
+    };
+    return { tris: tri.length / 3, hits, sd,
+      inside: (p, D) => hits(p, D).length % 2 === 1,
+      first: (p, D) => { const h = hits(p, D); return h.length ? h[0] : null; } };
+  }
+
+  /**
+   * ── AND WHETHER IT IS BELIEVABLE AT EVERY POINT OF THE TRAVEL ──────────
+   *
+   * `plugFit`'s question asked of a toy partway out, in this frame's pose,
+   * against v2.0's surface (her skin through her own weights on the CPU) —
+   * and of the toy AS IT IS DRAWN, off its own matrices, so whatever draw
+   * and twist are on it now are what is measured. Millimetres; counts of
+   * points on rings of 24 (the plug) or 12 (the Lovense's arm):
+   *
+   *   d        the draw, mm
+   *   face     her skin behind the plug's outer face along its axis (the
+   *            base is 8.6 thick, so seated this is about 8, drawn d more);
+   *            the Lovense: its tip's clearance off her (signed distance)
+   *   vis      [buried, of]: points on the part that is DRAWN, outside the
+   *            entrance's last 4 mm, that are inside her — a cheek or a
+   *            thigh through the toy. 0 is right
+   *   deep     the deepest of those, mm (how far a cheek overlaps it)
+   *   hid      [shown, of]: points on the part that is NOT drawn — past the
+   *            cut — that are outside her. 0 is right: the cut is at her
+   *            skin and nothing ends in mid-air
+   *   cut      how far inside her skin the cut's own centre is, along the
+   *            axis, mm (+ inside: the drawn part ends in her, not in air)
+   */
+  function drawFit(key) {
+    const part = drawPart(key);
+    if (!part || !appr || !skinFig) return null;
+    const mesh = part.shake.children[0], U = mesh.userData;
+    const st = drawSt[key] || { d: 0, tw: 0 };
+    part.group.updateWorldMatrix(true, true);
+    const Mi = skinFig.mesh.matrixWorld.clone().invert();
+    const M = mesh.matrixWorld.clone().premultiply(Mi);      // mesh → her figure frame
+    const pt = (x, y, z) => new THREE.Vector3(x, y, z).applyMatrix4(M);
+    const dir = (x, y, z) => new THREE.Vector3(x, y, z).transformDirection(M);
+    const mm = (x) => (x == null ? null : Math.round(x * 10000) / 10);
+    // A millimetre and a half either way is her skin's own facets.
+    const TOL = 0.0015;
+    let vis = 0, visN = 0, deep = 0, hid = 0, hidN = 0, face = null, cut = null, rim = 0, rimN = 0;
+    let R = null;
+    const shown = (p) => { const v = R.sd(p); visN++; if (v != null && v < -TOL) { vis++; deep = Math.max(deep, -v); } };
+    const gone = (p) => { const v = R.sd(p); hidN++; if (v != null && v > TOL) hid++; };
+    if (key === 'plug') {
+      const out = dir(0, -1, 0), into = out.clone().negate();
+      R = herRays(pt(0, DRAW.plugCut + st.d, 0), 0.14, true);
+      const h = DRAW.plugCut + st.d;
+      const ring = (y, fn) => {
+        const r = U.radAt(y), sz = U.ovalAt(y);
+        for (let i = 0; i < 24; i++) {
+          const a = (i / 24) * Math.PI * 2;
+          fn(pt(Math.cos(a) * r, y, Math.sin(a) * r * sz));
+        }
+      };
+      // The base's two rings (its widest, and the rim that meets her) are
+      // `rim`: seated her cheeks close over them (1.560.3's `hid`), so they
+      // count apart from the shaft that comes out with the draw.
+      for (const y of [0.0046, 0.0076]) ring(y, (p) => { rimN++; const v = R.sd(p); if (v != null && v < -TOL) rim++; });
+      for (let y = 0.0100; y <= h - 0.004 + 1e-6; y += 0.003) ring(y, shown);
+      for (let y = h + 0.002; y <= Math.min(h + 0.045, 0.098); y += 0.004) ring(y, gone);
+      const f0 = pt(0, 0, 0);
+      const hf = R.hits(f0.clone().addScaledVector(into, -0.08), into);
+      face = hf.length ? hf[0] - 0.08 : null;
+      const c0 = pt(0, h, 0);
+      const hc = R.hits(c0.clone().addScaledVector(into, -0.08), into);
+      cut = hc.length ? 0.08 - hc[0] : null;
+    } else {
+      const X = drawExit(mesh);
+      if (!X) return null;
+      const curve = U.curve, rAt = U.radiusAt;
+      const c = drawLovCut(X, curve, st.d);
+      R = herRays(pt(X.p.x, X.p.y, X.p.z), 0.16, true);
+      const _p = new THREE.Vector3(), _t = new THREE.Vector3(), _n = new THREE.Vector3();
+      const ring = (u, fn) => {
+        curve.getPointAt(u, _p); curve.getTangentAt(u, _t).normalize();
+        _n.set(-_t.y, _t.x, 0).normalize();
+        const r = rAt(u);
+        for (let i = 0; i < 12; i++) {
+          const a = (i / 12) * Math.PI * 2, ca = Math.cos(a) * r, sa = Math.sin(a) * r;
+          fn(pt(_p.x + _n.x * ca, _p.y + _n.y * ca, sa));
+        }
+      };
+      const fourMm = 0.004 / X.L;
+      for (let u = 0.01; u <= c - fourMm + 1e-6; u += 0.01) ring(u, shown);
+      // Past the exit: the rest of the arm that is drawn (to 0.62), and the
+      // egg, which is not — `egg` counts the egg's points outside her.
+      for (let u = c + 0.01; u <= 0.62; u += 0.02) ring(u, gone);
+      for (let u = 0.64; u <= 1.0; u += 0.02) ring(u, (p) => { rimN++; const v = R.sd(p); if (v != null && v > TOL) rim++; });
+      const tp = curve.getPointAt(0, new THREE.Vector3());
+      face = R.sd(pt(tp.x, tp.y, tp.z));
+      const cp = curve.getPointAt(c, new THREE.Vector3());
+      const sc = R.sd(pt(cp.x, cp.y, cp.z));
+      cut = sc == null ? null : -sc;
+    }
+    return { key, d: mm(st.d), tw: +((st.tw || 0) * 57.3).toFixed(0), face: mm(face),
+      vis: [vis, visN], deep: mm(deep), hid: [hid, hidN], cut: mm(cut),
+      [key === 'plug' ? 'rim' : 'egg']: [rim, rimN], tris: R ? R.tris : 0 };
   }
 
   /**
@@ -80118,6 +80563,72 @@ async function buildJadrija(scene) {
       return signalSet(key, on !== false, secs);
     },
     /**
+     * CHLOE'S REMOTE (1.567.0, src/49-revtoys.js): the same `signalSet`, from
+     * the phone in HER hand rather than yours — so not `signalCan`'s test of
+     * your bag — and its intensity, 0.15..1. `remote(key)` reads it: the
+     * level, or 0 when it is off.
+     */
+    remote: (key, on, secs = 0, lvl = null) => {
+      if (on === undefined) return signals[key] ? (signals[key].lvl == null ? 1 : signals[key].lvl) : 0;
+      const r = signalSet(key, !!on, secs);
+      if (on && lvl != null) signalLevel(key, lvl);
+      return r;
+    },
+    /**
+     * A worn toy drawn partway out along its own axis, and back (1.567.0,
+     * `toyDraw`): `draw(key, d, tw)` sets it (m, rad) and answers what was
+     * set; `draw(key)` reads it. `grip(key)` is where a hand takes hold of
+     * it, world; `drawFit(key)` measures it as it is.
+     */
+    draw: (key, d, tw = 0) => {
+      if (d === undefined) { const st = drawSt[key]; return st ? { d: st.d, tw: st.tw } : (drawPart(key) ? { d: 0, tw: 0 } : null); }
+      return toyDraw(key, d, tw);
+    },
+    drawMax: (key) => DRAW.max[key] || 0,
+    /** Chloe's remote turned up or down while it runs (`signalLevel`). */
+    remoteLevel: (key, lvl) => signalLevel(key, lvl),
+    /**
+     * Whether a worn toy sits ON her in this pose: how far inside her skin
+     * its exit is (m; − it stands off her). The Lovense rides her pelvis
+     * rigidly while her skin there follows her thighs, so with her hips
+     * folded it does not — and Chloe's hand leaves it alone there.
+     */
+    drawSeat: (key) => {
+      const part = drawPart(key);
+      if (!part || !appr || !skinFig) return null;
+      const mesh = part.shake.children[0];
+      part.group.updateWorldMatrix(true, true);
+      const Mi = skinFig.mesh.matrixWorld.clone().invert();
+      let p;
+      if (key === 'plug') p = new THREE.Vector3(0, DRAW.plugCut, 0).applyMatrix4(part.shake.matrixWorld).applyMatrix4(Mi);
+      else { const X = drawExit(mesh); if (!X) return null; p = X.p.clone().applyMatrix4(part.shake.matrixWorld).applyMatrix4(Mi); }
+      const v = herRays(p, 0.12, true).sd(p);
+      return v == null ? null : -v;
+    },
+    /** Debug: DRAW's numbers, set — `{ max: {...}, lovCut }`. */
+    drawSet: (o = {}) => { if (o.max) Object.assign(DRAW.max, o.max); if (o.lovCut != null) DRAW.lovCut = !!o.lovCut; for (const k of Object.keys(drawSt)) drawSt[k].geo.clear(); return { max: DRAW.max, lovCut: DRAW.lovCut }; },
+    grip: (key) => toyGrip(key),
+    drawFit: (key) => drawFit(key),
+    /**
+     * Debug: a toy straight on to her (or off), with no walk to the shelf —
+     * `cuffs`'s road for the two with a motor. The fetch is ten seconds of a
+     * headless page; this is a probe's.
+     */
+    wearToy: (key = 'plug', on = true) => {
+      if (!skinFig || (key !== 'plug' && key !== 'lovense')) return null;
+      if (!on) return doffNow(key) ? 'off' : 'notworn';
+      if (worn[key]) return 'wearing';
+      const i = giftProps.findIndex((m) => m.userData && m.userData.key === key);
+      if (i < 0) return 'not out';
+      const mesh = giftProps.splice(i, 1)[0];
+      const row = typeof satchelRow === 'function' ? satchelRow(key) : null;
+      const parts = wearableParts(key, row && row.wear, mesh);
+      if (!parts) return 'no parts';
+      worn[key] = parts;
+      for (const part of parts) skinFig.mesh.add(part.group);
+      return 'on';
+    },
+    /**
      * What is buzzing right now, and what the phone has been told about it.
      *
      * `buzzed` is how many pulses have been handed to `navigator.vibrate`,
@@ -80140,7 +80651,7 @@ async function buildJadrija(scene) {
       phase: show ? show.phase : null }),
     signals: () => Object.keys(signals).map((k) => ({ key: k,
       t: +signals[k].t.toFixed(2), beat: +signalAmp(signals[k].t).toFixed(2),
-      until: signals[k].until || 0,
+      until: signals[k].until || 0, lvl: signals[k].lvl == null ? 1 : signals[k].lvl,
       buzzed: signals[k].buzzed || 0, near: signals[k].near ?? null })),
     /** Scrub what is on the plate, 0 to 1 — see COKE. */
     coke: (u = 1) => cokeSet(u),

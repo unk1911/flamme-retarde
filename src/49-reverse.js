@@ -253,6 +253,8 @@ function revScene() {
   if (rev.care) o.rev_care = true;
   // Her belt in her hand (1.564.0) — the collar is the page's own `collar_on`.
   if (typeof rvkScene === 'function') rvkScene(o);
+  // A toy she has drawn partway out, and her remote's level (1.567.0).
+  if (typeof rvtScene === 'function') rvtScene(o);
   return o;
 }
 
@@ -403,6 +405,7 @@ function revOn(src = 'typed') {
   rev.walk = v.phase === 'dwell';
   Object.assign(rev.arm, { mode: null, ph: 'idle', t: 0, w: 0, lift: 0, n: 0, posed: false });
   if (typeof rvmClear === 'function') rvmClear();
+  if (typeof rvtClear === 'function') rvtClear();
   Object.assign(rev.dom, { on: rev.dom.on, next: rev.clock + 3.0, order: null, obey: 0, miss: 0, streak: 0,
     heat: REV.heatRest, punish: 0, last: [], moved: 0, stillFrom: null });
   // You into her: the walker where she stands, looking where she looks.
@@ -422,6 +425,8 @@ function revOff(why = 'asked') {
   if (typeof rvkClear === 'function') rvkClear(why);
   // Her moves, hands, knees and look (1.565.0).
   if (typeof rvmClear === 'function') rvmClear();
+  // A toy she had drawn partway out, seated; her phone away (1.567.0).
+  if (typeof rvtClear === 'function') rvtClear();
   rev.on = false;
   if (jadrija && jadrija.ride) jadrija.ride(null);
   revArmClear();
@@ -463,6 +468,9 @@ function revSafe(who = 'you') {
   if (typeof rvkSafe === 'function') rvkSafe();
   // And her moves (1.565.0): a hold, a grip, a hand on your chin — all off.
   if (typeof rvmSafe === 'function') rvmSafe();
+  // And the toys (1.567.0): a draw stops where it is and goes back to its
+  // seat, her hand comes off it, and her remote switches off.
+  if (typeof rvtSafe === 'function') rvtSafe();
   revTrace({ pick: 'SAFEWORD', why: who });
   revHud();
   return 'stopped';
@@ -493,6 +501,12 @@ function revWords(text) {
   if (/^((take |get )?(the |my )?collar off( me)?|(take |get )off (the |my )?collar|unclip( me)?|unleash me|(skini|makni) (mi )?(ogrlicu|povodac)|(enleve|retire)[- ]moi (le |ce )?collier)$/.test(t)) return 'rev.uncollar';
   if (/^((please )?collar me|put (the |a |your )?collar on me|put (a |the )?leash on me|leash me|(the )?collar( please)?|(stavi mi |daj mi )?(ogrlic[au]|povodac)|mets[- ]moi (le |ton |un )?collier|(le |un )?collier)$/.test(t)) return 'rev.collar';
   t = t.replace(/^(ok(ay)?|yes|da|dobro|oui|d'accord)( |$)/, '').replace(/ (for you|mistress|ma'?am|madam|chloe)$/, '').trim();
+  // The toy you are wearing, in her hands (1.567.0, src/49-revtoys.js):
+  // drawn out a little and back, teased, twisted, pushed back in; and her
+  // remote, on, up, down, off. "pull it out" is her drawing it partway — the
+  // whole line, so it never takes a sentence that only mentions a toy.
+  const tw = typeof rvtWords === 'function' ? rvtWords(t) : null;
+  if (tw) return tw;
   const arms = /\b(arms?|ruke|bras)\b/.test(t);
   const v = revView();
   const front = v && REV_FRONT[v.phase];
@@ -545,6 +559,9 @@ function revAct(name) {
   if ((name === 'rev.belt' || name === 'rev.beltback' || name === 'rev.collar' || name === 'rev.uncollar')
     && typeof rvkAsk === 'function') {
     return rvkAsk(name.slice(4));
+  }
+  if ((name.startsWith('rev.toy:') || name.startsWith('rev.remote:')) && typeof rvtAsk === 'function') {
+    return rvtAsk(name.slice(4));
   }
   if (name === 'rev.dom.off' || name === 'rev.dom.on') { rev.dom.on = name === 'rev.dom.on'; return { ok: true, label: 'chloe: ' + (rev.dom.on ? 'in charge' : 'waiting') }; }
   if (name.startsWith('rev.ask:')) {
@@ -899,8 +916,11 @@ function revDecide() {
   // Her moves (1.565.0, src/49-revmoves.js): circling the cot, her hand in
   // your hair, holding you down, sitting by you, your chin, your nape.
   if (typeof rvmCands === 'function') for (const c of rvmCands(ctx, D)) cands.push(c);
+  // The remote: since 1.567.0 a move of hers with the phone in her hand
+  // (`move:remote`, src/49-revtoys.js, among `rvmCands`); the bare buzz is
+  // what is left without that file.
   const toys = revToys();
-  if (toys.length && D.obey >= 1) cands.push({ id: 'buzz', s: 0.25 + 0.6 * D.heat });
+  if (toys.length && D.obey >= 1 && typeof rvtCands !== 'function') cands.push({ id: 'buzz', s: 0.25 + 0.6 * D.heat });
   if (rev.walk && revGap() > 2.2) cands.push({ id: 'prowl', s: 0.6 });
   else cands.push({ id: 'prowl', s: 0.25 });
   // (And with her belt in her hand, the cot is where she wants you.)
@@ -1047,6 +1067,9 @@ function revTick(dt) {
   revDriveChloe(dt);
   // Her belt and the collar (1.564.0): her arms solved, the strap stepped.
   if (typeof rvkTick === 'function') rvkTick(dt);
+  // Her hand on a toy you wear, her phone (1.567.0): the last contact
+  // measured, a draw going back, a move you asked for.
+  if (typeof rvtTick === 'function') rvtTick(dt);
   // Her moves, her hands, her look (1.565.0).
   if (typeof rvmTick === 'function') rvmTick(dt);
   revCamera(dt);
@@ -1110,6 +1133,9 @@ function revCamera(dt) {
   // your head tipped up toward her, a little rolled.
   const tl = typeof rvmCamTilt === 'function' ? rvmCamTilt() : null;
   if (tl && (tl[0] > 0.002 || tl[1] > 0.002)) { camera.rotateX(tl[0]); camera.rotateZ(tl[1]); }
+  // A toy drawn out or pushed back in (1.567.0): a shiver.
+  const sv = typeof rvtCamTilt === 'function' ? rvtCamTilt() : null;
+  if (sv) { camera.rotateX(sv[0]); camera.rotateZ(sv[1]); }
   camera.updateMatrixWorld();
 }
 
@@ -1177,7 +1203,8 @@ function revHud() {
   const O = rev.dom.order ? REV_ORDERS[rev.dom.order.id] : null;
   const T0 = typeof T === 'function' ? T : (k) => k;
   const lang = revLang();
-  const kitTag = typeof rvkHudTag === 'function' && rev.on ? rvkHudTag() : '';
+  const kitTag = [typeof rvkHudTag === 'function' && rev.on ? rvkHudTag() : '',
+    typeof rvtHudTag === 'function' && rev.on ? rvtHudTag() : ''].filter(Boolean).join(' · ');
   const txt = !rev.on ? '' : T0('rev.hud') + (rev.care ? ' · ♥' : '') + (kitTag ? ' · ' + kitTag : '')
     + (O ? '\n' + T0('rev.order') + ': ' + (lang === 'fr' ? O.say[2] : lang === 'hr' ? O.say[0] : O.say[1])
       + (O.key ? ' [' + O.key + ']' : '') : '');
