@@ -79220,6 +79220,12 @@ async function buildJadrija(scene) {
     },
     beltHit: (h, from) => beltHit(h, from),
     /**
+     * The two-bone solve on its elbow's hinge (1.561.1, `hingeArm`), for a
+     * figure that is not hers: Chloe's arms in src/49-revkit.js (1.564.0).
+     * Figure space throughout; it lays two `aim`s on `f` and nothing else.
+     */
+    hingeArm: (f, nU, nL, S, E, W, hinge, goal, pole) => hingeArm(f, nU, nL, S, E, W, hinge, goal, pole),
+    /**
      * Where on her back, her bottom or a thigh the crosshair is — the ray from
      * `o` along `d` — while she lies on her front on the cot; or null. See
      * `cotAim`: the press in 90-app.js asks it first.

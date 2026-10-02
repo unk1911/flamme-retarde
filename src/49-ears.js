@@ -1121,13 +1121,23 @@ const ears = (() => {
     // THE ROLE SWAP (1.561.0) — see src/49-reverse.js. While it is on, the
     // safeword is its own: it ends the swap and Chloe comes to you.
     if (name === 'belt.stop' && typeof revActive === 'function' && revActive()) name = 'rev.safe';
+    // And since 1.564.0 the belt and the collar are hers while it is on
+    // (src/49-revkit.js): asked for them, she uses them on you; the leash's
+    // pose words are your own body's on the end of it.
+    if (/^(belt|collar)\./.test(name) && typeof revActive === 'function' && revActive()) {
+      const RK = { 'belt.out': 'rev.belt', 'belt.key': 'rev.belt', 'belt.back': 'rev.beltback',
+        'collar.on': 'rev.collar', 'collar.key': 'rev.collar', 'collar.off': 'rev.uncollar',
+        'collar.stand': 'rev.ask:rise', 'collar.kneel': 'rev.ask:submit', 'collar.fours': 'rev.ask:fours',
+        'collar.cot': 'rev.ask:recline.bed' };
+      if (RK[name]) name = RK[name];
+    }
     if (/^rev\./.test(name) && typeof revAct === 'function') {
       const r = revAct(name);
       note(r.label, r.ok ? 'did' : 'meta');
       return;
     }
-    // Your belt and the collar are Chloe's while she is in charge, and phase
-    // one does not hand them to her: not while the roles are reversed.
+    // Anything else of the belt's or the collar's, and her own mode: not
+    // while the roles are reversed.
     if (/^(belt|collar)\.|^auto\.on$/.test(name) && typeof revActive === 'function' && revActive()) {
       note('roles: not while the roles are reversed', 'meta');
       return;

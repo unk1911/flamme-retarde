@@ -8,6 +8,221 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.564.0] — 2026-10-02 (baye 1.56.0)
+
+### Roles reversed, phase 2b: her belt and the collar, in Chloe's hands
+
+The night-loop plan, item 2: *"Chloe uses the belt and the collar on
+player-Baye. Belt: she takes it off, the AVBD strap in HER hand
+(third-person arm), swings at the cot targets, same hit path/marks/sounds;
+collar: she buckles it on you, leads you (camera follows), tugs move your
+pose (reuse the leash pose steps). Safeword ends both."*
+
+The two toys the player has used on Baye since 1.552.0 and 1.553.0 are now
+Chloe's while the roles are reversed. It is the same two adults and the same
+game, and the safeword is over all of it. The new file is
+`src/49-revkit.js`, with hooks in 49-reverse.js, 90-app.js, 49-ears.js,
+49-voice.js, 43-belt.js and 43-jadrija.js.
+
+**Her belt.**
+- **Off.** Her right hand goes to the buckle at the front of her waistband.
+  She draws the belt out of the loops and round her right hip, and it comes
+  off her painted waist by the same amount (`you.belt`). She holds it by the
+  buckle with the strap hanging. She says "Sad remen." (Now the belt.) or
+  "Vidiš ovo? Moj remen." His unbuckle clip plays as her fist pulls.
+- **The strap** is 43-belt.js's AVBD net: a second `beltStrap`, so the
+  player's own strap is untouched. It hangs from her right fist and meets
+  your body, the mattress, the pillow and the floor, as the player's does.
+- **Her arm is solved, not typed** (`rvkArm`). Each frame the fist's place is
+  decided first. Her arm is then solved to it with the two-bone hinge solve
+  of 1.561.1 (`hingeArm`, now on the jadrija API), from her clip's own arm
+  carried by her collarbone as it was last drawn. The strap is stepped from
+  the fist the solve actually reached. Every goal is clamped to her reach
+  first (0.535 m from the shoulder; her arm is 0.477 m to the wrist, measured
+  off the bind). So the strap hangs from the hand that is drawn, and the
+  hand is never sent somewhere her arm cannot reach. Her fingers close round
+  the buckle (an aim on `fingersR` / `thumbR` about the carried elbow hinge).
+- **A round, face down on the cot.** She stands off the cot's side, level
+  with your seat and 0.78 m out, square to the cot, turned a little to her
+  left so the belt shoulder faces you. Then for each stroke:
+  - the spot is `cotAim` from her eye: your bottom most of the time, a
+    thigh, now and then the small of your back;
+  - the plane is the upright one through her right shoulder and the spot;
+  - she winds up over her shoulder, and the strike is the first person's
+    over-the-top curve, accelerating, with the strap's width square to the
+    plane;
+  - the belt's own wrist (`BELT.guide`) steers the tongue, firmer on hers
+    (1.6 N/m against 0.4, `beltStrap(scene, { guide })`).
+
+  Two to five strokes a round, 0.9 to 1.6 s apart. She does not start one
+  while her own meter (the belt's: 0.2 + how hard a crack, cooling over 3 s)
+  is over 1.1. Now and then there is a line between strokes ("Još jedan.",
+  "Mirno, curo.", "Broji.").
+- **What lands** is `beltHit` exactly as the player's: the impulse into the
+  cot ragdoll through `cotSpank`, the line of a mark, the recorded crack and
+  whp, the scene's record (`sceneHit('belt')`). Your answer is your body's:
+  a gasp a second or two later, a moan, or nothing, by `BELT_REACT`'s
+  weights. It is never a caption, because what you say in this body is
+  yours to say. Your camera jolts with each hit, a crack more than a pat.
+  Once a stroke has landed, the strap coming round again (its tongue on
+  your arm or calf, slowly) is the same stroke: no second sound, no record.
+- **Back on.** To her waist, fed into the loops, buckled, with the unbuckle
+  clips in their own turn. She keeps it out 45 to 75 s, or until three
+  rounds, then "Dosta za sad." It does not come out again for 50 s.
+
+**Making it land** (MEASURED, single strokes, rounds of four, and a
+three-minute autonomous scene):
+- **First cut:** 1 stroke of 4 landed. She stood 1.05 m off and swung at
+  charge 0.54 (0.33 s strikes). The strap reached your thigh once.
+- **The wind-up was the cause.** Traced frame by frame, the strap's tongue
+  at the top of the wind-up was 0.5 m out in front of her fist, toward you.
+  A metre of leather off a hand that rises and stops swings forward under it
+  like a pendulum. So the strike began with the strap in front, flipped back
+  behind her, and only then whipped on, to your arms, your shins or nothing.
+- **The fix: the strap is flung.** Through the wind-up each step eases the
+  strap toward the curve a flung strap makes: back off the fist along the
+  swing, falling behind her (`RVK.fling`, up to 22% a frame at the top).
+  The velocity of that easing is kept, which is the throw, and the rest is
+  the solver's. Then the strike brings it over the top.
+- **Also:** she stands nearer (0.78 m), strikes harder (charge 0.86 + 0.14 ×
+  her heat, 0.2 s), and has the firmer wrist.
+- **Twelve single strokes after the fixes:** 10 landed where she aimed or
+  next to it (bottom 6, thigh 3, back 1). One went to your calf and one
+  missed. Cracks came in at 5.9-13 m/s, plus one pat.
+- **The autonomous scene:** ten lashes registered on bottom, back and
+  thighs; off-target first contacts were your arms when they were out to
+  the sides.
+
+**The collar.** Baye's side of the leash (`leashStep`) follows "you", and
+while the roles are reversed "you" is Chloe (`revWho`). So the 1.553.0 and
+1.554.0 machinery runs with the ends swapped:
+- She comes to you with it ("Dođi. Ogrlica."). Your body steps to her and
+  kneels up (`leashCome`, `leashKneel`).
+- **Her hands at your neck.** She steps in until your neck is in her reach
+  (0.42 m, because a hand's width in front of her is past it, as it was for
+  the first person). Her right hand goes round the first person's own path
+  (left, front, right, buckle, ring). Her left holds the strap's other side
+  until it has gone round. Both arms are on `rvkArm`.
+- **In first person you look down** while it goes on, then up to her again.
+- You go down on all fours and she backs off as your head comes forward.
+- **She leads you.** She walks round the room and your body crawls after her
+  on her trail. The mouse is yours, and the camera, in your head, goes where
+  you go. The leash is her right hand: `collarSimTickIn` reads her solved
+  hand as its end, and the chain is the same AVBD chain.
+- **Her tugs** are `collarTug`, drawn back with her arm and a step of her
+  body (the first person's slack-leash step, applied to her). Up is all
+  fours to your knees, then your knees to your feet; down is the reverse.
+  If the chain is slack she steps away first, until it is out. MEASURED:
+  tug up from all fours put you kneeling (`did: up`); tug down put you back
+  on all fours (`did: down`).
+- **To the cot.** She leads you beside it and pulls toward it, and you go on
+  to it on the leash (mode `cot`). Beside the cot the chain is often slack,
+  and she cannot step back over the cot to take it up. A pull that does not
+  come taut there becomes the leash's own word for it, `leashPose('cot')`,
+  which is the same road on. Measured: led over, a pull, and you were on the
+  cot (`did: cot`). There her tug lifts your head and
+  shoulders (the cot's own `cotTug`).
+- **Off.** After 55 to 85 s, or when asked, she takes it off ("Gotovo.
+  Skidam je."), with her hands on the first person's taking-off path.
+- **While you are on the leash** your own pose words and keys are the
+  leash's: 1 stand, 4 kneel, 3 on all fours, 2 the cot (`jadrija.leashPose`).
+  Anything else ("legs apart") is refused as "on the leash". W/S do nothing.
+- Baye's own collar lines (`COLLAR_SAY`) are silent while the roles are
+  reversed. The body is yours, and Chloe speaks for herself.
+
+**When she does it.** Her selector (`revDecide`) asks `rvkDecide` first.
+- **The belt comes out** as the scene warms up: heat 0.45, or two missed
+  orders, or five orders in all, with you face down or standing. It is
+  likelier after a miss.
+- **With it in her hand,** a round is her choice six times in ten when you
+  are on your front. Off the cot, the orders that put you there are three
+  times as likely. Her hand spank is off while the belt or the leash is in
+  that hand.
+- **The collar** goes on after three orders, with you standing, kneeling or
+  on all fours.
+- **With you on it,** she leads you, tugs up or down, takes you to the cot,
+  or orders "Pogledaj me".
+- **You can ask:**
+  - "use the belt" / "remen" / "belt me" / "ceinture", or `\`;
+  - "belt back";
+  - "collar me" / "ogrlica" / "collier", or `=`;
+  - "take the collar off".
+
+  Asked for the collar while you are lying down, she orders you up and puts
+  it on once you are standing. The spoken intents (`belt.out`, `collar.on`
+  and the rest) go to her the same way. The HUD tag shows `ROLES REVERSED ·
+  HER BELT` or `· ON HER LEASH`.
+
+**One right hand.** The belt and the leash are never in it together.
+Asked for one with the other out, she says which goes first.
+
+**The safeword** ("red", "crvena", "stop") does this before her aftercare
+(`rvkSafe` from `revSafe`):
+- **A swing stops where it is.** She lets go of the strap: the buckle's
+  joint is switched off (`strap.drop()`, new in 43-belt.js, which also takes
+  85% of the swing's speed out of it), and it falls on the cot and the
+  floor. Nothing it touches after that is a lash. MEASURED: red said 0.15 s
+  into a strike; the strap dropped; 0 hits after it; the aftercare voiced
+  with `safeword_of: rev`.
+- A belt still coming out or going back is snapped on.
+- The collar comes off at once (`leashOff('you')`, with the collar's lock).
+- Then her aftercare as in 1.561.0. She crouches only to a head that is down
+  (off the leash at a safeword you are on your feet). The roles go back,
+  her belt is back on her waist, and the dropped strap is gone.
+- Swapping back, or leaving the room, puts everything away first.
+
+**Her voice** (`server/baye/baye.py` 1.56.0, **needs deploying on mpcn0**).
+- New beats in `CHLOE_BEAT`: `belt`, `lash`, `beltback`, `collar`, `lead`,
+  `tug`, `uncollar` (8 characters at most, as `_enum` takes them).
+- `belt` and `collar` are priority beats on the page (`CHLOE_SAY.prio`),
+  because they carry the scene.
+- `chloe_scene_lines` now reads the page's `lashes`, `belt_out`,
+  `collar_on`, `leashed`, `leading` and `tugs` from her side: "you have used
+  your belt on them 3 times in the last minute on their bottom", "they are
+  wearing your black leather collar ... and you are leading them round by
+  it".
+- `revScene` sends `belt_out` while it is in her hand.
+- An undeployed service refuses the new beats (409) and the phase-one
+  captions show instead. Measured with a stubbed service: the swap, the
+  belt, an order, a lash and the aftercare went out as `who: chloe` with
+  the right `rev` keys, `scene.belt_out` and `scene.lashes`.
+
+**Normal roles are unchanged, proved bit for bit.** 43-avbd.js is untouched:
+`avbdhash` side by side with HEAD gives wrist `0d19fbc1994d5d25` and leash
+`0f8903d81d1d1936` on both, and the full net passes. The strap: 43-belt.js
+gained `drop()`, `dropped` and an optional `opts.guide`. A 900-frame scripted
+swing of the player's strap against capsules, the mattress and a floor
+hashes `ab2bab71035604bf` on HEAD's 43-belt.js and on this one (4 hits, 2
+lashes, 2 pats, no rescues on both). Regression in the page:
+- the belt out and red;
+- the collar on, clipped, and red;
+- flat on the cot, three hand spanks (3 of 3 landed);
+- the autonomous mode;
+- 9 and 8;
+- phase-1 reverse: three hand slaps from Chloe, wrist 3.9-4.9 cm off the
+  spot;
+- talking to her goes to `/talk` as Chloe, and the swap back is voiced.
+
+People 100, blockers 820, no console errors. RULE 4: no `rng()` draw added
+(her choices use `Math.random`, as before).
+
+**Rough, still:**
+- About one stroke in six goes to your calf or misses, and with your arms
+  out to the sides the strap finds them.
+- The strap is dark leather in a dark room: from most angles it reads best
+  in B.
+- She does not twist her torso into a swing; it is all arm.
+- Following on the leash is your body's own crawl after her: you look, she
+  leads, and you cannot crawl off on your own.
+- The dropped strap lies where it fell until the swap back.
+
+Debug: `__fr.reverse.kit`:
+- `belt()`, `beltBack()`, `collar()`, `uncollar()`: the player's asks;
+- `start('belt' | 'collar')`, `round(n)`, `tug(gest, u)`, `cot()`, `lead()`;
+- `state()` (her belt's phase, strokes, hits with their offset from the
+  aim, the strap, the collar, her arms, where she stands against you);
+- `trace()` (the last stroke, frame by frame), `tune(o)`, `pelvis()`.
+
 ## [1.563.0] — 2026-10-02 (baye 1.55.0)
 
 ### Roles reversed, phase 2a: Chloe has her own voice

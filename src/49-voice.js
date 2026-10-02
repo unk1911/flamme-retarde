@@ -304,7 +304,8 @@ const CHLOE_SAY = {
   late: 8,
   hold: 3.2,
   memory: 8,
-  prio: { on: 1, off: 1, order: 1, care: 1 },
+  // (1.564.0: her belt coming off and the collar going on carry the scene too.)
+  prio: { on: 1, off: 1, order: 1, care: 1, belt: 1, collar: 1 },
   cut: { on: 1, off: 1, care: 1 },
 };
 

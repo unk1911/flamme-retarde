@@ -2816,6 +2816,9 @@ function sceneTalk() {
 
 /** A line of hers, captioned: from `COLLAR_SAY[kind]`, or nothing if she spoke a moment ago. */
 function collarSay(kind, force = false) {
+  // Roles reversed (1.564.0): these are Baye's lines, and you are in her body
+  // with the collar on — Chloe says hers (`rvkCollarTick`).
+  if (typeof revActive === 'function' && revActive()) return null;
   const L = COLLAR_SAY[kind];
   if (!L || !L.length) return null;
   if (!force && colClock - colSaidAt < COLLAR_SAY.sayGap) return null;
@@ -3022,6 +3025,24 @@ function collarHandTickIn(dt) {
     if (colKnelt && Yg) { if (!colKnelt.was) Yg.crouch = false; colKnelt = null; }
     return;
   }
+  // ROLES REVERSED (1.564.0): the leash is in Chloe's hand and the collar on
+  // you — her side of it is `rvkCollarTick` in src/49-revkit.js, her words
+  // with it. Your hands, your crouch, your tether and your eyes are not asked
+  // for here; a tug's clock (`colYank`) runs as ever, and its draw is laid on
+  // her arm.
+  if (typeof revActive === 'function' && revActive()) {
+    colK = damp(colK, 0, 8, dt); colGrip = damp(colGrip, 0, 8, dt);
+    colArm = 0; colPressed = false;
+    if (Yg) { Yg.tether = null; Yg.lead = 0; }
+    if (colKnelt && Yg) { if (!colKnelt.was) Yg.crouch = false; colKnelt = null; }
+    if (s.clipped) colDir.subVectors(s.ring, colHand).normalize();
+    if (colYank) {
+      colYank.t += dt;
+      const Y = COLLAR.yank;
+      if (colYank.t > Y.rise + Y.peak + Y.fall) colYank = null;
+    }
+    return;
+  }
   // Her words, when her side says something happened.
   const said = jadrija.leashSaid ? jadrija.leashSaid() : null;
   if (said === 'on') { colLog.on++; collarSay('on', true); }
@@ -3191,7 +3212,11 @@ function collarSimTickIn(dt) {
   // and a tug is that arm swung (`colArm`) and the loop drawn along with it
   // the rest of the way — her arm cannot reach back as far as the first
   // person's draws it.
-  if (bodyCam) {
+  // Roles reversed (1.564.0): Chloe's right hand, where her solved arm has it
+  // (a tug's draw is already in it — `rvkCollarTick`).
+  if (typeof revActive === 'function' && revActive()) {
+    if (!collarThirdHand(colHand)) colHand.copy(colAt);
+  } else if (bodyCam) {
     if (!collarThirdHand(colHand)) colHand.copy(colAt);
     else if (colYank) colHand.addScaledVector(colYank.dir, colYank.D * collarDraw(colYank.t) * 0.8);
   } else colHand.copy(colAt);
