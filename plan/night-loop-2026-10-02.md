@@ -108,7 +108,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    then she tips your head back so you look up at her, holds a beat with a line, releases.
    NEVER face-to-crotch / face pressed to her front below the waist (declined); the head goes
    to her side at waist/hip height only.
-10. [ ] **Third worn toy: the dual-ended wand / G-spot vibrator** (Misha, 06:15: "a 3rd toy,
+10. [x] **Third worn toy: the dual-ended wand / G-spot vibrator** (Misha, 06:15: "a 3rd toy,
    which can be used in place of the lovense or plug ... it can go into either hole, for a more
    intense experience"). Reference photo: refs/toys/wand-ref.jpg (git-ignored): soft pink
    silicone, a round wand-massager head on a short neck at one end, a thin gold band, a handle

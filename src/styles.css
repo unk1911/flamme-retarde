@@ -1006,7 +1006,7 @@ html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
 
 #cell .cell-love {
   flex: 1; display: flex; flex-direction: column; align-items: center;
-  justify-content: center; gap: .5rem;
+  justify-content: center; gap: .34rem;
 }
 #cell .cell-dot {
   width: 1.4rem; height: 1.4rem; border-radius: 50%;
@@ -1023,6 +1023,8 @@ html.touch #satchel { left: .8rem; font-size: .5rem; width: min(40vw, 240px); }
 #cell .cell-toy { font-size: .36rem; color: #b9a6d6; letter-spacing: .12em;
   text-transform: uppercase; margin-top: .3rem; }
 #cell .cell-plug { background: #5b2a86; }
+/* And the third, the wand (1.572.0): its pale pink, deepened to read white on. */
+#cell .cell-wand { background: #c2577f; }
 #cell .cell-buzz:hover { filter: brightness(1.12); }
 #cell .cell-note { font-size: .38rem; color: #8fb3c0; }
 

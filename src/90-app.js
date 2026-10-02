@@ -2765,6 +2765,8 @@ function sceneTalk() {
   if (o.worn && !o.worn.length) delete o.worn;
   if (!o.buzz) delete o.buzz;
   if (!o.buzz_plug) delete o.buzz_plug;
+  if (!o.buzz_wand) delete o.buzz_wand;
+  if (!o.toys) delete o.toys;
   if (!o.on_cot) delete o.on_cot;
   // The hand and the belt, each: how many in the last minute, the last one's
   // seconds, the hardest, and where on her — most-hit first.

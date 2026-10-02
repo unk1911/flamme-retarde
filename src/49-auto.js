@@ -196,6 +196,9 @@ const AUTO_SAY = {
   buzzUp: [["Ah... it's stronger.", 'buzzUp0'], ['Mm! ...yes, like that.', 'buzzUp1']],
   buzzDown: [['Mm... gentler.', 'buzzDown0'], ['Hey... why softer?', 'buzzDown1']],
   buzzOff: [["Hey... why'd you stop?", 'buzzOff0'], ["Aw... that's it?", 'buzzOff1']],
+  // The wand (1.572.0): the big one, and she says so.
+  wandOn: [["Oh god... that's the wand.", 'wandOn0'], ["Whoa— okay, that one's strong.", 'wandOn1'], ['Ahh... fuck, babe.', 'wandOn2']],
+  wandUp: [["Ah! ...that's so much.", 'wandUp0'], ["Mmh— don't stop, don't stop.", 'wandUp1'], ["I can't— hold still—", 'wandUp2']],
   toyMore: [['Stronger... please.', 'toyMore0'], ['Turn it up... just a little.', 'toyMore1']],
   toyLess: [["It's too much... softer.", 'toyLess0'], ['Ah... slow it down a bit.', 'toyLess1']],
   toyOn: [['Turn it on... please?', 'toyOn0'], ['And the toy? ...hehe.', 'toyOn1']],
@@ -1141,10 +1144,25 @@ function autoToyPoll(dt, v) {
   const on = !!(T0 && T0.on && T0.on.length);
   const lvl = on ? T0.lvl : 0;
   const beat = on ? T0.beat : 0;
+  // THE WAND IS MORE (1.572.0): what she feels of a level is `x` times the
+  // Lovense's there (`WAND.intense`, 43-jadrija.js — `beat` has it in
+  // already), so her own moves for it are bigger and come sooner. The
+  // level the remote is at stays the level, for her asks.
+  auto.buzzX = on && T0.x ? T0.x : 1;
+  auto.buzzWand = !!(on && T0.on.includes('wand'));
   // What she feels: the pulse, eased over a second and a half.
   auto.buzzK += (beat - auto.buzzK) * (1 - Math.exp(-dt / 1.5));
-  auto.buzzLvl = lvl;
+  auto.buzzLvl = Math.min(1, lvl * auto.buzzX);
   if (on) auto.heat = Math.min(1, auto.heat + dt * AUTO.toy.heat * auto.buzzK * (1 - 0.4 * auto.heat));
+  // And the wand takes her breath while it runs, not only when it is turned.
+  if (auto.buzzWand && auto.buzzK > 0.45) {
+    auto.wandBreath = (auto.wandBreath || 0) - dt;
+    if (auto.wandBreath <= 0) {
+      autoBreath(Math.min(0.9, 0.2 + 0.4 * auto.buzzK), 0);
+      auto.wandBreath = 2.4 + 3.2 * Math.random();
+      auto.wandBreaths = (auto.wandBreaths || 0) + 1;
+    }
+  }
   const was = auto.toyLvl;
   if (Math.abs(lvl - was) > 0.04) {
     const how = !was ? 'on' : !lvl ? 'off' : lvl > was ? 'up' : 'down';
@@ -1172,17 +1190,22 @@ function autoToyReact(v, ctx) {
   if (!R || auto.clock < R.at) return null;
   auto.toyReact = null;
   const lying = ctx === 'front' || ctx === 'back' || ctx === 'side';
-  const L = R.lvl;
+  // The wand at a level is felt as more than the Lovense at it (1.572.0).
+  const wand = !!auto.buzzWand;
+  const L = Math.min(1, R.lvl * (auto.buzzX || 1));
   let said = null, what = '';
   if (R.how === 'on' || R.how === 'up') {
-    autoBreath(0.3 + 0.5 * L, 0.05);
+    autoBreath(Math.min(1, (0.3 + 0.5 * L) * (wand ? 1.35 : 1)), 0.05);
+    // And on the wand, more of her answers it: her legs too, as well as her back.
+    if (wand && v.rag && L >= 0.5) jadrija.autoMove({ cot: 'wiggle', k: Math.min(1, 0.5 + 0.5 * L) });
     if (v.rag && ctx === 'front') {
       if (L >= 0.7) { jadrija.autoMove({ cot: Math.random() < 0.5 ? 'arch' : 'heels', k: 0.4 + 0.6 * L }); what = 'arched / heels up'; }
       else { jadrija.autoMove({ cot: 'lift', k: 0.5 }); jadrija.autoMove({ glance: 3 }); what = 'a look back'; }
     } else if (v.rag && lying) { jadrija.autoMove({ cot: 'wiggle', k: 0.3 + 0.6 * L }); what = 'a squirm'; }
     else if (v.rag) { jadrija.autoMove({ cot: 'arch', k: 0.3 + 0.6 * L }); what = 'arched'; }
     else if (!v.chest) { jadrija.autoMove({ chest: 0.4 + 0.5 * L }); auto.chestTo = auto.clock + 4; what = 'her back straight'; }
-    said = R.thanks ? autoSay('toyThanks', true) : autoSay(R.how === 'on' ? 'buzzOn' : 'buzzUp', R.how === 'on');
+    said = R.thanks ? autoSay('toyThanks', true)
+      : autoSay(wand ? (R.how === 'on' ? 'wandOn' : 'wandUp') : (R.how === 'on' ? 'buzzOn' : 'buzzUp'), R.how === 'on' || wand);
   } else if (R.how === 'down') {
     if (v.gaze !== Infinity) jadrija.autoMove({ glance: 3 });
     said = R.thanks ? autoSay('toyThanks', true) : Math.random() < 0.6 ? autoSay('buzzDown') : null;
@@ -1193,7 +1216,7 @@ function autoToyReact(v, ctx) {
     said = R.thanks ? autoSay('toyThanks', true) : autoSay('buzzOff', true);
     what = 'a look back';
   }
-  autoDid('toyReact', { why: 'the toy ' + R.how + (R.how === 'off' ? '' : ' (' + Math.round(L * 100) + '%)') + ' — ' + what, said });
+  autoDid('toyReact', { why: (wand ? 'the wand ' : 'the toy ') + R.how + (R.how === 'off' ? '' : ' (' + Math.round(R.lvl * 100) + '%, felt ' + Math.round(L * 100) + '%)') + ' — ' + what, said });
   return 'toyReact';
 }
 
@@ -1345,7 +1368,7 @@ function autoScore(id, M, v) {
   const rw = auto.reward[id] || 0;
   if (rw > 0.05) { s *= 1 + AUTO.reward.k * rw; why.push('you liked it'); }
   // The toy on its pulse: what she does is the toy's, mostly.
-  if (M.tags.includes('toy') && auto.buzzK > 0.35) s *= 1.3;
+  if (M.tags.includes('toy') && auto.buzzK > 0.35) s *= 1.3 * (auto.buzzX || 1);
   // Big ones are rare, and not while things are happening to her — unless
   // the big one IS the answer (up on her knees for a tug).
   const answers = auto.react === 'tug' && id === 'kneelUp';
@@ -1798,7 +1821,8 @@ const autoApi = {
     reward: Object.fromEntries(Object.entries(auto.reward).map(([k, x]) => [k, +x.toFixed(2)])),
     doing: auto.doing, decisions: auto.decisions, moved: auto.moved,
     hand: auto.hand ? { kind: auto.hand.kind, side: auto.hand.side, n: auto.hand.n } : null,
-    toy: { lvl: auto.buzzLvl, k: +auto.buzzK.toFixed(2), high: +auto.toyHigh.toFixed(1), want: auto.toyWant ? auto.toyWant.dir : null },
+    toy: { lvl: auto.buzzLvl, k: +auto.buzzK.toFixed(2), high: +auto.toyHigh.toFixed(1), want: auto.toyWant ? auto.toyWant.dir : null,
+      x: auto.buzzX || 1, wand: !!auto.buzzWand, breaths: auto.wandBreaths || 0 },
     ladder: { dir: auto.ladder.dir, top: !!auto.ladder.topAt }, rhythm: autoRhythm(),
     recovering: +Math.max(0, auto.recoverTo - auto.clock).toFixed(1), braced: +Math.max(0, auto.holdTo - auto.clock).toFixed(1),
     queue: auto.queue.length,
