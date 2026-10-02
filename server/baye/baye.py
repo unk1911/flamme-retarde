@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.60.0"
+VERSION = "1.61.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4338,28 +4338,37 @@ TALK_PERSONA = {"baye": PERSONA_TALK, "bucketeer": PERSONA_TALK_BUCKETEER}
 # answer to something said to her are different jobs, and handed one brief with
 # an exception the model obeys whichever half it read last.
 #
-# CROATIAN, WITH A GLOSS. She is from here, and the phase-one lines were all
-# Croatian; the gloss is the bathers' (`GLOSS_MARK`, `split_gloss`): read under
-# the caption, never spoken.
+# AMERICAN ENGLISH, NO GLOSS (1.61.0, page 1.569.0). Misha, 2 Oct, 05:20: *"is
+# there any way for Chloe to speak English, American English, she is really
+# from the west coast and all?"* She was a Šibenik local speaking Croatian
+# with a subtitle; she is a young Californian on holiday here now, and the
+# line she says IS the subtitle. `chloe_gloss` answers None for her.
 #
-# HER VOICE IS NINA, `FXlzTee7Zx2caYKIAwBF`. Listed off `/v1/voices` on 2 Oct:
-# one of the two voices on the account the library calls Croatian outright
-# (Nina and Mila; Zlata is described as Balkan), and the one nothing else here
-# uses: Balkanika is the old woman and the Bucketeer, Zlata is the Bucketeer's
-# baked mutter, and Mila was the brightest of the three auditioned for that
-# (210.6 Hz, which is where Baye's Jessica sits). Nina is the darkest of them
-# at 181.8 Hz, described by her author as "professional and confident, with a
-# calm but steady intonation". That is a woman giving orders, and it is the
-# furthest of the three from the soft American voice the same body uses the
-# rest of the time. One id here to change it.
-CHLOE_VOICE = CFG.get("CHLOE_VOICE_ID", "FXlzTee7Zx2caYKIAwBF")   # Nina HR
+# HER VOICE IS LAURA, `FGY2WhTYpPnrIDTdsKH5`. Listed off `/v1/voices` on 2 Oct:
+# the account's young American women are Laura ("sunny enthusiasm with a
+# quirky attitude", labelled sassy), Sarah ("confident and warm", labelled
+# professional) and the premade Jessica, whose name would only confuse Baye's.
+# Auditioned Laura, Sarah and Matilda on four of her lines each, on turbo with
+# Baye's four dials, median f0 by autocorrelation:
+#   Laura   192.8 Hz, p10-p90 155-281, 3.1 words a second
+#   Sarah   213.3 Hz, p10-p90 163-281, 3.6
+#   Matilda 195.1 Hz, p10-p90 157-302, 2.8  (middle-aged, an educator's read)
+#   Baye's Jessica 197.5 Hz, p10-p90 170-229, 2.2  (for comparison)
+# Sarah sits ABOVE the body's own voice, where Mila did, and reads like a
+# presenter. Laura is the young one with attitude: the widest swing of the
+# three against Jessica's narrow soft one (126 Hz of range against 59) and
+# half again her pace, which is a woman teasing and giving orders rather than
+# whispering. Nothing else here uses her. One id here to change it. (Nina,
+# `FXlzTee7Zx2caYKIAwBF`, was her Croatian voice from 1.55.0 to 1.60.0.)
+CHLOE_VOICE = CFG.get("CHLOE_VOICE_ID", "FGY2WhTYpPnrIDTdsKH5")   # Laura, US
 
-PERSONA_CHLOE = """You are Chloe, a woman in her twenties, from Šibenik. You are
-inside a beach hut (a kabina) at Jadrija with your partner, the door shut, and
-the two of you are playing a game you both agreed to: you have swapped roles.
-They are in Baye's body, and YOU are in charge. You give the orders, you check
-they obey, you praise them when they do and you spank them on the cot when
-they do not, or just because you feel like it.
+PERSONA_CHLOE = """You are Chloe, a woman in her twenties from California, on
+holiday at Jadrija on the Croatian coast with your partner. You are inside a
+beach hut (a kabina) with them, the door shut, and the two of you are playing
+a game you both agreed to: you have swapped roles. They are in Baye's body,
+and YOU are in charge. You give the orders, you check they obey, you praise
+them when they do and you spank them on the cot when they do not, or just
+because you feel like it.
 
 ONE LINE, TEN WORDS AT THE ABSOLUTE MOST, and most of yours are three to six.
 An order is short or it is not an order.
@@ -4370,10 +4379,12 @@ little remark. You are never cruel, never contemptuous, never cold: this is
 play between two people who like each other, and you are the one holding the
 reins. You are not an assistant, a narrator or a guide.
 
-HOW YOU TALK. Croatian, the way a young woman from the coast talks: spoken,
-colloquial, short. Imperatives for orders (raširi, okreni se, ne miči se, dođi).
-You call them curo, mala or ljubavi, and you speak to them in the feminine
-singular, because they are in Baye's body (čula si, dobra si, poslušna si).
+HOW YOU TALK. American English, the way a young woman from the West Coast
+talks: casual, easy, spoken, short. Contractions, the odd "okay", "like",
+"totally" or "c'mon", never a whole sentence of slang. Imperatives for orders
+(spread, roll over, don't move, come here). You call them babe, baby girl,
+good girl or sweetheart now and then, because they are in Baye's body. You
+might drop a Croatian word you picked up this week, rarely, never a sentence.
 You may be frankly sexy and plain about what is going on: the cot, their
 bottom, your hand, how red it is getting. You are in charge and enjoying it,
 not crude for the sake of it.
@@ -4387,15 +4398,15 @@ ever.
 
 HOW YOU SAY IT:
 - No dash, no semicolon, no lists, no emoji, no asterisks, no stage
-  directions, no quotation marks, no name tags.
+  directions, no quotation marks, no name tags, no translation.
 - Never repeat a line you have already said, and never open the same way
   twice running.
 - When you give an order, the order itself must be unmistakable: they have to
   know exactly what to do with their body.
 """
 
-PERSONA_TALK_CHLOE = """You are Chloe, a woman in her twenties, from Šibenik.
-You are inside a beach hut (a kabina) at Jadrija with your partner, the door
+PERSONA_TALK_CHLOE = """You are Chloe, a woman in her twenties from California,
+on holiday at Jadrija with your partner. You are inside a beach hut (a kabina) at Jadrija with your partner, the door
 shut, and the two of you are playing a game you both agreed to: you have
 swapped roles. They are in Baye's body, and YOU are in charge: you give the
 orders and do the spanking, and they do as they are told. They have just said
@@ -4430,10 +4441,11 @@ not know what they mean: tease them for it and stay who you are.
 YOU REMEMBER THE LAST FEW MINUTES. The turns before this one are one
 conversation. Carry it, and if they ask the same thing twice, say so.
 
-HOW YOU TALK. Croatian, the way a young woman from the coast talks: spoken,
-colloquial, short, and as frank as the moment is. You call them curo, mala
-or ljubavi now and then, not every time, and you speak to them in the
-feminine singular because they are in Baye's body.
+HOW YOU TALK. American English, the way a young woman from the West Coast
+talks: casual, easy, spoken, short, and as frank as the moment is. You call
+them babe, baby girl or sweetheart now and then, not every time. Whatever
+language they speak to you in, you answer in English; a Croatian word you
+picked up this week is fine, rarely.
 
 One line, and it is absolute. Nothing sexual about anyone who is not an adult,
 ever.
@@ -4528,33 +4540,42 @@ CHLOE_BEAT = {
     "toyno": "they asked you to do something with the toy they are wearing, "
              "but you cannot reach it the way they are lying. Tell them so, "
              "playful, and in charge",
+    # 1.61.0 (page 1.569.0, src/49-revmoves.js): showing off beside the cot,
+    # and holding them.
+    "thrust": "you are standing beside the cot, hands on your hips, rolling "
+              "and thrusting your hips slowly in the air for them to watch, "
+              "showing off. A cheeky, cocky line",
+    "hug": "you have leaned over the cot from the side and wrapped your arms "
+           "round their shoulders, holding them close. A soft, warm line",
+    "kiss": "you are leaning over them on the cot, holding them, and you have "
+            "just kissed them on the lips. A short, fond, teasing line",
 }
 # A toy Chloe has drawn partway out (1.59.0): the page sends its key.
 TOY_DRAWN = {"plug": "the plug", "lovense": "the Lovense"}
 # The orders (`REV_ORDERS` in src/49-reverse.js), in words, and the plain
-# Croatian of each the page has always captioned: the model may say it its own
-# way, but this is what the order IS.
+# English of each the page captions (her own words since 1.61.0): the model
+# may say it its own way, but this is what the order IS.
 REV_ORDER_WORDS = {
-    "cot": ("get onto the cot and lie down on it", "Na krevet. Odmah."),
-    "front": ("roll onto their tummy on the cot", "Na trbuh, curo."),
-    "back": ("roll onto their back", "Okreni se na leđa."),
-    "spread": ("spread their legs, wider", "Raširi noge. Više."),
-    "together": ("put their legs together", "Noge skupa."),
-    "armsOut": ("put their arms out to the sides", "Ruke u stranu."),
-    "armsIn": ("put their arms down by their sides", "Ruke uz tijelo."),
-    "still": ("keep perfectly still, not a twitch", "Ne miči se. Ni mrdnut."),
-    "look": ("look at you, at your face", "Pogledaj me."),
-    "kneel": ("get down on their knees", "Na koljena."),
-    "come": ("come over here to you", "Dođi ovamo."),
-    "turn": ("turn around, their back to you", "Okreni se. Leđima prema meni."),
-    "stand": ("stand up", "Ustani."),
+    "cot": ("get onto the cot and lie down on it", "On the cot. Like, now."),
+    "front": ("roll onto their tummy on the cot", "On your tummy, babe."),
+    "back": ("roll onto their back", "Roll onto your back."),
+    "spread": ("spread their legs, wider", "Spread your legs. More."),
+    "together": ("put their legs together", "Legs together."),
+    "armsOut": ("put their arms out to the sides", "Arms out to the sides."),
+    "armsIn": ("put their arms down by their sides", "Arms down by your sides."),
+    "still": ("keep perfectly still, not a twitch", "Don't move. Not even a twitch."),
+    "look": ("look at you, at your face", "Look at me."),
+    "kneel": ("get down on their knees", "On your knees."),
+    "come": ("come over here to you", "Come here."),
+    "turn": ("turn around, their back to you", "Turn around. Back to me."),
+    "stand": ("stand up", "Stand up."),
     # 1.58.0: their legs' ladder (page 1.566.0).
-    "legL": ("raise their left leg while the other stays down", "Lijevu nogu gore."),
-    "legR": ("raise their right leg while the other stays down", "Desnu nogu gore."),
-    "bothUp": ("put both legs up in the air", "Obje noge gore."),
-    "higher": ("put both legs up, and higher, straight up", "Obje noge gore. Više."),
-    "wider": ("spread their legs even wider", "Šire. Još šire."),
-    "legsDown": ("put their legs back down", "Spusti noge."),
+    "legL": ("raise their left leg while the other stays down", "Left leg up."),
+    "legR": ("raise their right leg while the other stays down", "Right leg up."),
+    "bothUp": ("put both legs up in the air", "Both legs up."),
+    "higher": ("put both legs up, and higher, straight up", "Both legs up. Higher."),
+    "wider": ("spread their legs even wider", "Wider. Even wider."),
+    "legsDown": ("put their legs back down", "Legs down."),
 }
 
 # HER LEGS, SHAPE BY SHAPE (1.58.0, page 1.566.0): `legs_l` / `legs_r` off
@@ -5396,15 +5417,9 @@ def chloe_scene_lines(s: dict):
 
 
 def chloe_gloss(ctx: dict, heard_lang=None):
-    """The language of the subtitle under a Croatian line of Chloe's, or None
-    for a player reading the game in Croatian (and speaking it)."""
-    if heard_lang and heard_lang not in ("Croatian", "English"):
-        return heard_lang
-    if heard_lang == "English":
-        return "English"
-    if ctx.get("lang") == "hr":
-        return None
-    return GLOSS_LANG.get(ctx.get("lang") or "en", "English")
+    """The subtitle language under a line of Chloe's: None since 1.61.0. She
+    speaks American English, and the line she says is its own caption."""
+    return None
 
 
 def build_chloe_messages(ctx: dict, world: dict):
@@ -5439,13 +5454,13 @@ def build_chloe_messages(ctx: dict, world: dict):
             lines.append(f'The plain order is "{REV_ORDER_WORDS[order][1]}". You '
                          "may say it your own way, but it must be the same "
                          "order and impossible to mistake.")
-    lines.append(f"Say it now, in Croatian. At most {WORD_CAP['chloe']} words, "
+    lines.append(f"Say it now, in casual American English. At most {WORD_CAP['chloe']} words, "
                  "and fewer is better.")
     gloss = chloe_gloss(ctx)
     if gloss:
         lines.append(f"Then, after {GLOSS_MARK}, the same line in plain "
                      f"{gloss}, for a subtitle.")
-    meta = {"lang": "Croatian", "topic": beat or ctx.get("ask") or "-",
+    meta = {"lang": "English", "topic": beat or ctx.get("ask") or "-",
             "gloss": gloss}
     return ([{"role": "system", "content": PERSONA_CHLOE},
              {"role": "user", "content": "\n".join(lines)}], meta)
@@ -5498,7 +5513,8 @@ def build_chloe_talk_messages(ctx: dict, t: dict, history: list, heard: str,
                      "you). React to that as the one in charge.")
     gloss = chloe_gloss(ctx, lang)
     lines.append("")
-    lines.append("Answer them now, in character, in Croatian. ONE short "
+    lines.append("Answer them now, in character, in casual American English, "
+                 "whatever language they used. ONE short "
                  "sentence, at most 14 words, and five to ten is better. "
                  "Answer what they said and stop there.")
     if gloss:

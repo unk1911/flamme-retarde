@@ -8,6 +8,93 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.569.0] — 2026-10-02 (baye 1.61.0)
+
+### Roles reversed: Chloe is a Californian now, shows off beside the cot, and hugs and kisses you on your back
+
+Misha, 05:20: *"is there any way for Chloe to speak English, American English,
+she is really from the west coast and all?"*; 05:55: *"pelvic humps next to
+me"*; 06:00: the hug and kiss with you on your back, legs raised. The same two
+adults and the same game they both agreed to, and the safeword over all of it.
+
+**She speaks American English** (`server/baye/baye.py` 1.61.0, **needs
+deploying on mpcn0**). `PERSONA_CHLOE` / `PERSONA_TALK_CHLOE` rewritten: a young
+woman from California on holiday at Jadrija with her partner, casual West Coast
+speech (contractions, the odd "okay", "like", "totally"), babe / baby girl /
+good girl / sweetheart, at most a Croatian word she picked up. Everything else
+about her is kept: confident, teasing, warm, never cruel, ten words a line,
+the safeword's aftercare. `chloe_gloss` answers None, so there is no subtitle
+line under her; `/talk` answers in English whatever language you used.
+`REV_ORDER_WORDS` carry English plain orders; three new beats in `CHLOE_BEAT`
+(`thrust`, `hug`, `kiss`).
+
+**Her voice is Laura** (`FGY2WhTYpPnrIDTdsKH5`, `CHLOE_VOICE`). Listed off
+`/v1/voices`; the account's young American women are Laura (labelled sassy,
+"sunny enthusiasm with a quirky attitude"), Sarah (confident, professional)
+and the premade Jessica (a name that would only confuse Baye's). Auditioned
+Laura, Sarah and Matilda on four of her lines each, turbo, Baye's four dials,
+median f0 by autocorrelation: Laura 192.8 Hz (p10–p90 155–281, 3.1 words/s),
+Sarah 213.3 (163–281, 3.6), Matilda 195.1 (157–302, 2.8, middle-aged),
+Baye's Jessica 197.5 (170–229, 2.2). Sarah sits above the body's own voice,
+as Mila did; Laura has twice Jessica's range (126 Hz against 59) and half
+again her pace: teasing and giving orders, not whispering. Synthesis
+0.33–0.40 s a line on turbo.
+
+**Every line on the page is English** (49-reverse.js `REV_SAY` and the
+orders, 49-revmoves.js `RVM_SAY`, 49-revtoys.js `RVT_SAY`), written for her
+rather than translated: "On the cot. Like, now.", "Good girl.", "Mm,
+someone's being obedient today.", "Too slow, babe.", "Hehe. You're already
+pink.", "Okay. Belt time.", "You're gonna wear my collar now.", "Feel
+that?", "Can't reach it from here, babe." (was "Ne odavde, curo."), "Hey,
+hey... it's over. I've got you." A line is one string now and the caption is
+it, no gloss. The HUD's "she wants:" keeps your own language (`hud`), because
+it is your help, not her voice. Your commands stay en/hr/fr. Baye is
+untouched: her normal and autonomous lines are still Croatian.
+
+**Her hip tease** (`move:thrust`, 49-revmoves.js). Beside the cot, never at
+its foot: level with your hips, 0.55–0.72 m off the edge (`rvmBesideSpot`,
+kept only if every bone of yours, a raised leg included, is 0.55 m off it on
+the level), facing you across it, hands on her hips (the `hips` ask). A few
+slow thrusts, 1.15 s each, a raised cosine squared: her hips go FORWARD
+8.5 cm while her boots stay planted (`crouchSolve` gained a `push`, the legs
+re-reached for it, zero for everyone else), knees soft (`w` 0.16), shoulders
+back as they come (a negative bow up her spine) and a 0.10 rad trunk turn
+with each, which is the roll. Measured: push 0.072–0.076 m at the peak, the
+nearest bone of hers to any of yours 0.48 m (legs flat) and 0.43 m (legs up,
+higher). In her selector at heat 0.3–0.85, never twice in four picks; on
+"show me your moves" / "show off" / "pokaži mi" / "montre-moi", and the
+**-** key.
+
+**Her hug and kiss, you on your back** (`move:hug`). She kneels at the cot's
+side at your shoulders (`rvmPlan`, kneeling, bow up to 1.15, preferring the
+room side), leans over, her right palm wrapped over your far shoulder and her
+left on the near one (both solved on, `rvmAsk`), her eyes on yours; at 1.8 s
+she bows the rest of the way by her face against yours, kisses you (the kiss
+sound, "Mm. You taste like the beach."), holds, comes back up into the hug
+and lets go. Measured: faces 0.035–0.054 m at the kiss; her trunk and knees
+never nearer than 0.26 m to any bone of yours with your legs raised (0.10 m
+with them flat, her knee by the cot); never near the cot's foot. In her
+selector on your back, likelier the better your streak; on "hug me", "kiss
+me", "zagrli me", "poljubi me", "embrasse-moi", and **Shift+-**. The hip tease
+is a separate move, so it never runs while she is close or holding you.
+
+**The safeword**: "red" mid-tease or mid-hug ends the move at once (measured
+both: `why: safeword`, the push, bow and turn off, her aftercare in English).
+
+Help sheet: `help.k.revmoves` (en/hr/fr).
+
+**Measured** (two headless runs on the worktree build): the reverse
+transcript was all English captions; thrust, hug + kiss with legs flat and
+with both legs up and higher, safeword mid-hug and mid-tease. RULE 4: no
+`rng()` draw touched (43-jadrija.js unchanged).
+
+**Rough, still:** the hug's arms read from the side more as hands on her
+shoulders than arms round her (she lies on the cot, so nothing goes under
+her); "Eyes up here... kidding" may want a better tease line; her voiced
+lines were not heard here (signed out in the harness, captions only), so
+Laura's read of the lines is untested in play; `__fr.stats()` people /
+blockers were not re-read this run (no world code touched).
+
 ## [1.568.0] — 2026-10-02 (baye 1.60.0)
 
 ### Her own mode, deeper: anticipation, teasing back, recovery, your hands, her toys

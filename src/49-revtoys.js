@@ -65,21 +65,17 @@ const RVT = {
 };
 
 const RVT_SAY = {
-  draw: [['Polako van...', 'Slowly out...', 'Doucement, dehors...'],
-    ['Osjećaš ovo?', 'Feel that?', 'Tu sens ça ?'],
-    ['Samo malo... i natrag.', 'Just a little... and back.', 'Juste un peu... et on le remet.']],
-  tease: [['Van... unutra... van...', 'Out... in... out...', 'Dehors... dedans... dehors...'],
-    ['Hehe. Ne miči se.', "Hehe. Don't move.", 'Hihi. Bouge pas.']],
-  twist: [['Malo ću ga okrenuti.', "I'll turn it a little.", 'Je vais le tourner un peu.']],
-  pushin: [['I natrag unutra. Tako.', 'And back in. There.', 'Et on le remet. Voilà.'],
-    ['Dobra cura. Sve je na mjestu.', 'Good girl. All back in place.', 'Gentille fille. Tout est en place.']],
-  remote: [['Uključujem.', "I'm switching it on.", "Je l'allume."],
-    ['Da vidimo ovo...', "Let's see this...", 'Voyons ça...']],
-  remup: [['Jače?', 'Stronger?', 'Plus fort ?'], ['Još malo jače.', 'A bit stronger.', 'Un peu plus fort.']],
-  remdown: [['Malo slabije.', 'A bit softer.', 'Un peu moins fort.']],
-  remtease: [['Pali... gasi... hehe.', 'On... off... hehe.', 'Allumé... éteint... hihi.']],
-  remoff: [['Dosta. Gasim.', "Enough. I'm switching it off.", "Assez. J'éteins."]],
-  toyno: [['Ne odavde, curo.', 'Not from here, girl.', "Pas d'ici, ma belle."]],
+  // English since 1.569.0, written for her (see `REV_SAY` in 49-reverse.js).
+  draw: ['Slowly out...', 'Feel that?', 'Just a little... and back.'],
+  tease: ['Out... in... out...', "Hehe. Don't move."],
+  twist: ["I'm gonna twist it a little."],
+  pushin: ['And back in. There.', 'Good girl. All snug again.'],
+  remote: ["Ooh, I'm turning it on.", "Let's see what this does..."],
+  remup: ['Stronger?', 'A little more.'],
+  remdown: ['Okay, a bit softer.'],
+  remtease: ['On... off... hehe.'],
+  remoff: ["Okay, enough. I'm turning it off."],
+  toyno: ["Can't reach it from here, babe."],
 };
 
 const rvt = {

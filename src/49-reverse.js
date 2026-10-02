@@ -89,40 +89,29 @@ const REV = {
 };
 
 /**
- * Her lines: [Croatian, English gloss, French gloss]. Chloe is a confident,
- * teasing young woman; short, in the room, a laugh in some of them.
+ * Her lines, in English since 1.569.0 (Misha: "she is really from the west
+ * coast and all"): Chloe is a young Californian on holiday at Jadrija, and
+ * she talks like one. Each line was written for her, not translated from the
+ * Croatian she had before, and the caption is the line itself, no gloss.
+ * Short, in the room, a laugh in some of them.
  */
 const REV_SAY = {
-  on: [['Sad sam ja ti... a ti si ja. Hehe.', "Now I'm you... and you're me. Hehe.", 'Maintenant je suis toi... et toi moi. Hihi.'],
-    ['Moja si sad. Slušaj me.', "You're mine now. Listen to me.", "Tu es à moi maintenant. Écoute-moi."]],
-  off: [['Dobro... vraćamo se.', 'Okay... back to us.', "D'accord... on redevient nous."]],
-  good: [['Dobra cura.', 'Good girl.', 'Gentille fille.'],
-    ['Tako je. Vidiš da možeš.', "That's it. See, you can.", "C'est ça. Tu vois que tu peux."],
-    ['Mm, poslušna si danas.', "Mm, you're obedient today.", "Mm, tu es obéissante aujourd'hui."]],
-  slow: [['Hm? Nisi me čula?', "Hm? Didn't you hear me?", "Hm ? Tu ne m'as pas entendue ?"],
-    ['Prespora si, ljubavi.', 'Too slow, love.', 'Trop lente, chérie.'],
-    ['E, sad ćeš dobiti po guzi.', "Right. Now you're getting spanked.", 'Bon. Maintenant tu vas avoir la fessée.']],
-  spank: [['Ovo je za tebe.', "This one's for you.", 'Celle-là est pour toi.'],
-    ['Broji.', 'Count.', 'Compte.'], ['Još jedna.', 'One more.', 'Encore une.'],
-    ['Hehe. Crvena si već.', "Hehe. You're red already.", 'Hihi. Tu es déjà toute rouge.']],
-  buzz: [['Da vidimo što ovo radi...', "Let's see what this does...", 'Voyons ce que ça fait...']],
-  prowl: [['Mm... gledam te.', "Mm... I'm watching you.", 'Mm... je te regarde.']],
-  care: [['Hej, hej... gotovo je. Tu sam.', "Hey, hey... it's over. I'm here.", "Hé, hé... c'est fini. Je suis là."],
-    ['Bila si super. Dođi.', 'You were amazing. Come here.', 'Tu as été géniale. Viens.']],
+  on: ["Okay. Now I'm you... and you're me. Hehe.", "You're mine now, babe. Listen up."],
+  off: ['Okay, okay... back to us.'],
+  good: ['Good girl.', 'There it is. See? You can totally do it.', "Mm, someone's being obedient today."],
+  slow: ['Hm? Did you not hear me?', 'Too slow, babe.', "Okay. Now you're getting spanked."],
+  spank: ["That one's for you.", 'Count.', 'One more.', "Hehe. You're already pink."],
+  buzz: ["Let's see what this does..."],
+  prowl: ["Mm... I'm watching you."],
+  care: ["Hey, hey... it's over. I've got you.", "You were amazing. C'mere."],
   // Her belt and the collar (1.564.0, src/49-revkit.js).
-  belt: [['Sad remen.', 'Now the belt.', 'Maintenant, la ceinture.'],
-    ['Vidiš ovo? Moj remen. Hehe.', 'See this? My belt. Hehe.', 'Tu vois ça ? Ma ceinture. Hihi.']],
-  lash: [['Još jedan.', 'Another one.', 'Encore un.'], ['Mirno, curo.', 'Stay still, girl.', 'Bouge pas, ma belle.'],
-    ['Broji.', 'Count.', 'Compte.'], ['Hehe. Sva si ružičasta.', "Hehe. You're all pink.", 'Hihi. Tu es toute rose.']],
-  beltback: [['Dosta za sad.', 'Enough for now.', 'Assez pour le moment.'],
-    ['Dobro. Vraćam ga.', "Good. It's going back on.", 'Bon. Je la remets.']],
-  collar: [['Dođi. Ogrlica.', 'Come here. The collar.', 'Viens. Le collier.'],
-    ['Sad ćeš nositi moju ogrlicu.', "Now you'll wear my collar.", 'Maintenant tu vas porter mon collier.']],
-  lead: [['Hajde, za mnom.', 'Come on, follow me.', 'Allez, suis-moi.'],
-    ['Polako... tako. Dobra cura.', 'Slowly... like that. Good girl.', 'Doucement... comme ça. Gentille fille.']],
-  tug: [['Hop. Gore.', 'Hup. Up.', 'Hop. Debout.'], ['Dolje, curo.', 'Down, girl.', 'En bas, ma belle.'],
-    ['Ovamo.', 'Over here.', 'Par ici.']],
-  uncollar: [['Gotovo. Skidam je.', "That's it. I'm taking it off.", "C'est fini. Je l'enlève."]],
+  belt: ['Okay. Belt time.', 'See this? My belt. Hehe.'],
+  lash: ['Another one.', 'Stay still, baby girl.', 'Count.', "Hehe. You're all pink."],
+  beltback: ["That's enough for now.", "Okay. It's going back on."],
+  collar: ['Come here. Collar.', "You're gonna wear my collar now."],
+  lead: ['Come on. Follow me.', 'Slowly... like that. Good girl.'],
+  tug: ['Up. Up you get.', 'Down, girl.', 'Over here.'],
+  uncollar: ["Okay, that's it. Taking it off."],
 };
 
 /**
@@ -133,52 +122,52 @@ const REV_SAY = {
 const REV_FRONT = { flatheld: 1, edgeHeld: 1 };
 const REV_ORDERS = {
   cot: { ctx: { stand: 1, kneel: 1, fours: 1 }, w: 1.2, key: '2',
-    ok: (v) => v.onBed && v.lying, say: ['Na krevet. Odmah.', 'On the cot. Now.', 'Sur le lit. Tout de suite.'] },
+    ok: (v) => v.onBed && v.lying, say: 'On the cot. Like, now.', hud: ['Na krevet. Odmah.', 'On the cot. Now.', 'Sur le lit. Tout de suite.'] },
   front: { ctx: { back: 1.6, side: 1.3, sit: 1, cotKneel: 1, stand: 0.5 }, w: 1.0, key: '3',
-    ok: (v) => v.onBed && REV_FRONT[v.phase], say: ['Na trbuh, curo.', 'On your tummy, girl.', 'Sur le ventre, ma belle.'] },
+    ok: (v) => v.onBed && REV_FRONT[v.phase], say: 'On your tummy, babe.', hud: ['Na trbuh, curo.', 'On your tummy, girl.', 'Sur le ventre, ma belle.'] },
   back: { ctx: { front: 1, side: 1, sit: 0.6 }, w: 0.6, key: '7',
-    ok: (v) => v.onBed && v.phase === 'cradle', say: ['Okreni se na leđa.', 'Roll onto your back.', 'Mets-toi sur le dos.'] },
+    ok: (v) => v.onBed && v.phase === 'cradle', say: 'Roll onto your back.', hud: ['Okreni se na leđa.', 'Roll onto your back.', 'Mets-toi sur le dos.'] },
   spread: { ctx: { front: 1, back: 1, stand: 0.5 }, w: 1.2, key: '5',
-    ok: (v) => v.legsSp > 0.2 * Math.max(0.05, v.legsSpMax), say: ['Raširi noge. Više.', 'Spread your legs. More.', 'Écarte les jambes. Plus.'] },
+    ok: (v) => v.legsSp > 0.2 * Math.max(0.05, v.legsSpMax), say: 'Spread your legs. More.', hud: ['Raširi noge. Više.', 'Spread your legs. More.', 'Écarte les jambes. Plus.'] },
   together: { ctx: { front: 1, back: 1 }, w: 0.6, key: '5',
-    ok: (v) => v.legsSp < 0.05, say: ['Noge skupa.', 'Legs together.', 'Les jambes serrées.'] },
+    ok: (v) => v.legsSp < 0.05, say: 'Legs together.', hud: ['Noge skupa.', 'Legs together.', 'Les jambes serrées.'] },
   armsOut: { ctx: { front: 1, back: 1, side: 0.4 }, w: 0.8, key: '6',
-    ok: (v) => v.arms > 0.5, say: ['Ruke u stranu.', 'Arms out to the sides.', 'Les bras sur les côtés.'] },
+    ok: (v) => v.arms > 0.5, say: 'Arms out to the sides.', hud: ['Ruke u stranu.', 'Arms out to the sides.', 'Les bras sur les côtés.'] },
   armsIn: { ctx: { front: 1, back: 1 }, w: 0.4, key: '6',
-    ok: (v) => v.arms < 0.1, say: ['Ruke uz tijelo.', 'Arms by your sides.', 'Les bras le long du corps.'] },
+    ok: (v) => v.arms < 0.1, say: 'Arms down by your sides.', hud: ['Ruke uz tijelo.', 'Arms by your sides.', 'Les bras le long du corps.'] },
   still: { ctx: { front: 1, back: 1, side: 1, sit: 1, cotKneel: 1, kneel: 1, stand: 1 }, w: 0.7, key: '',
-    still: true, say: ['Ne miči se. Ni mrdnut.', "Don't move. Not a twitch.", 'Ne bouge pas. Pas un geste.'] },
+    still: true, say: 'Don\'t move. Not even a twitch.', hud: ['Ne miči se. Ni mrdnut.', "Don't move. Not a twitch.", 'Ne bouge pas. Pas un geste.'] },
   look: { ctx: { front: 1, back: 1, side: 1, sit: 1, cotKneel: 1, kneel: 1, stand: 1, fours: 1 }, w: 0.8, key: 'mouse',
-    ok: (v, R) => revLooking() || (v.gaze > 0 && v.gaze !== Infinity && !v.away), say: ['Pogledaj me.', 'Look at me.', 'Regarde-moi.'] },
+    ok: (v, R) => revLooking() || (v.gaze > 0 && v.gaze !== Infinity && !v.away), say: 'Look at me.', hud: ['Pogledaj me.', 'Look at me.', 'Regarde-moi.'] },
   kneel: { ctx: { stand: 1 }, w: 0.8, key: '4',
-    ok: (v) => v.phase === 'kept' || v.phase === 'bedKneel', say: ['Na koljena.', 'On your knees.', 'À genoux.'] },
+    ok: (v) => v.phase === 'kept' || v.phase === 'bedKneel', say: 'On your knees.', hud: ['Na koljena.', 'On your knees.', 'À genoux.'] },
   come: { ctx: { stand: 1 }, w: 0.6, key: 'WASD',
-    ok: (v, R) => R.walk && revGap() < 1.3, say: ['Dođi ovamo.', 'Come here.', 'Viens ici.'] },
+    ok: (v, R) => R.walk && revGap() < 1.3, say: 'Come here.', hud: ['Dođi ovamo.', 'Come here.', 'Viens ici.'] },
   turn: { ctx: { stand: 1 }, w: 0.6, key: 'mouse',
-    ok: (v, R) => R.walk && revFacing() < -0.5, say: ['Okreni se. Leđima prema meni.', 'Turn around. Back to me.', 'Retourne-toi. Dos à moi.'] },
+    ok: (v, R) => R.walk && revFacing() < -0.5, say: 'Turn around. Back to me.', hud: ['Okreni se. Leđima prema meni.', 'Turn around. Back to me.', 'Retourne-toi. Dos à moi.'] },
   stand: { ctx: { kneel: 1, fours: 1, sit: 0.3 }, w: 0.4, key: '1',
-    ok: (v) => v.phase === 'dwell', say: ['Ustani.', 'Stand up.', 'Debout.'] },
+    ok: (v) => v.phase === 'dwell', say: 'Stand up.', hud: ['Ustani.', 'Stand up.', 'Debout.'] },
   // YOUR LEGS' LADDER (1.566.0): one up, both up, higher, wider, down — on
   // your back or your front on the cot (`LIFT` in 43-jadrija.js). `can` is
   // whether the order makes sense where you are at all.
   legL: { ctx: { back: 0.9, front: 0.6 }, w: 0.8, key: 'Shift+1',
     ok: (v) => !!v.liftL && !(v.liftR && revRank(v.liftR) >= revRank(v.liftL)),
-    say: ['Lijevu nogu gore.', 'Left leg up.', 'La jambe gauche en l’air.'] },
+    say: 'Left leg up.', hud: ['Lijevu nogu gore.', 'Left leg up.', 'La jambe gauche en l’air.'] },
   legR: { ctx: { back: 0.9, front: 0.6 }, w: 0.8, key: 'Shift+2',
     ok: (v) => !!v.liftR && !(v.liftL && revRank(v.liftL) >= revRank(v.liftR)),
-    say: ['Desnu nogu gore.', 'Right leg up.', 'La jambe droite en l’air.'] },
+    say: 'Right leg up.', hud: ['Desnu nogu gore.', 'Right leg up.', 'La jambe droite en l’air.'] },
   bothUp: { ctx: { back: 1.1, front: 0.7 }, w: 0.9, key: 'Shift+3',
-    ok: (v) => revBothUp(v), say: ['Obje noge gore.', 'Both legs up.', 'Les deux jambes en l’air.'] },
+    ok: (v) => revBothUp(v), say: 'Both legs up.', hud: ['Obje noge gore.', 'Both legs up.', 'Les deux jambes en l’air.'] },
   higher: { ctx: { back: 0.9 }, w: 0.8, key: 'Shift+4',
     can: (v) => v.onBed, ok: (v) => revRank(v.liftL) >= 3 && revRank(v.liftR) >= 3,
-    say: ['Obje noge gore. Više.', 'Both legs up. Higher.', 'Les deux jambes en l’air. Plus haut.'] },
+    say: 'Both legs up. Higher.', hud: ['Obje noge gore. Više.', 'Both legs up. Higher.', 'Les deux jambes en l’air. Plus haut.'] },
   wider: { ctx: { back: 0.9, front: 0.5, stand: 0.4 }, w: 0.8, key: 'Shift+5',
     can: (v) => v.legsSpMax > 1.01, ok: (v) => v.legsSp >= Math.min(v.legsSpMax - 0.05, 1.65),
-    say: ['Šire. Još šire.', 'Wider. Even wider.', 'Plus écartées. Encore.'] },
+    say: 'Wider. Even wider.', hud: ['Šire. Još šire.', 'Wider. Even wider.', 'Plus écartées. Encore.'] },
   legsDown: { ctx: { back: 0.7, front: 0.7 }, w: 0.5, key: 'Shift+3',
     can: (v) => !!(v.liftL || v.liftR || (v.phase === 'cradle' && !v.legsDown)),
     ok: (v) => !v.liftL && !v.liftR && (v.phase !== 'cradle' || !!v.legsDown),
-    say: ['Spusti noge.', 'Legs down.', 'Baisse les jambes.'] },
+    say: 'Legs down.', hud: ['Spusti noge.', 'Legs down.', 'Baisse les jambes.'] },
 };
 /** How high a leg is on the ladder (`LIFT_RANK` in 43-jadrija.js). */
 function revRank(k) { return { 0: 0, 1: 1, s: 1.5, 2: 2, 3: 3, 4: 4 }[k || 0] || 0; }
@@ -198,18 +187,21 @@ if (typeof STRINGS !== 'undefined') {
     'help.k.reverse': 'in the kabina, say or type "reverse roles" — you are in Baye\'s body and Chloe gives the orders (and spanks). Do what she says: the keys below, or type it ("lie on the cot", "spread my legs"). "red" or "crvena" ends it at once; "reverse roles" again swaps back',
     'help.k.revlegs': 'roles reversed, your legs on the cot (Shift and a number): Shift+1 left leg up / down · Shift+2 right leg up / down · Shift+3 both legs up / down · Shift+4 higher · Shift+5 wider · Shift+6 lower. Or type it: "left leg up", "both legs up", "higher", "wider", "legs down"',
     'help.k.revkeys': 'roles reversed: 1 stand up · 2 lie on the cot · 3 on your front · 4 kneel · 5 legs apart / together · 6 arms out / in · 7 on your back · \\ her belt (off, or back on) · = her collar (on, or off). Look at her with the mouse; W gets you up; type the rest ("lotus", "on my side", "bend over", "use the belt", "collar me")',
+    'help.k.revmoves': 'roles reversed: - Chloe shows off beside the cot (or say "show me your moves") · Shift+- she hugs and kisses you, on your back on the cot (or say "hug me", "kiss me")',
     'rev.hud': 'ROLES REVERSED', 'rev.order': 'she wants',
   });
   Object.assign(STRINGS.hr || {}, {
     'help.k.reverse': 'u kabini reci ili utipkaj "zamijenimo uloge" — ti si u Bayeinom tijelu, a Chloe zapovijeda (i udara). Radi što kaže: tipke ispod, ili utipkaj ("lezi na krevet", "raširi noge"). "crvena" odmah završava; "zamijenimo uloge" opet vraća',
     'help.k.revlegs': 'zamijenjene uloge, tvoje noge na krevetu (Shift i broj): Shift+1 lijeva noga gore / dolje · Shift+2 desna noga gore / dolje · Shift+3 obje noge gore / dolje · Shift+4 više · Shift+5 šire · Shift+6 niže. Ili utipkaj: "lijevu nogu gore", "obje noge gore", "više", "šire", "spusti noge"',
     'help.k.revkeys': 'zamijenjene uloge: 1 ustani · 2 lezi na krevet · 3 na trbuh · 4 klekni · 5 noge raširi / skupi · 6 ruke u stranu / uz tijelo · 7 na leđa · \\ njezin remen · = njezina ogrlica. Pogledaj je mišem; W te diže; ostalo utipkaj ("lotos", "na bok", "sagni se", "remen", "ogrlica")',
+    'help.k.revmoves': 'zamijenjene uloge: - Chloe se pokazuje kraj kreveta (ili reci "pokaži mi") · Shift+- grli te i ljubi, na leđima na krevetu (ili reci "zagrli me", "poljubi me")',
     'rev.hud': 'ZAMIJENJENE ULOGE', 'rev.order': 'želi',
   });
   Object.assign(STRINGS.fr || {}, {
     'help.k.reverse': 'dans la cabine, dites ou tapez « inverser les rôles » — vous êtes dans le corps de Baye et Chloe donne les ordres (et la fessée). Faites ce qu’elle dit : les touches ci-dessous, ou tapez-le (« sur le lit », « écarte les jambes »). « rouge » arrête tout de suite ; « inverser les rôles » à nouveau rend les rôles',
     'help.k.revlegs': 'rôles inversés, vos jambes sur le lit (Maj et un chiffre) : Maj+1 jambe gauche en l’air / baissée · Maj+2 jambe droite · Maj+3 les deux en l’air / baissées · Maj+4 plus haut · Maj+5 plus écartées · Maj+6 plus bas. Ou tapez-le : « jambe gauche en l’air », « les deux jambes en l’air », « plus haut »',
     'help.k.revkeys': 'rôles inversés : 1 debout · 2 sur le lit · 3 sur le ventre · 4 à genoux · 5 jambes écartées / serrées · 6 bras écartés / le long du corps · 7 sur le dos · \\ sa ceinture · = son collier. Regardez-la à la souris ; W vous relève ; tapez le reste (« lotus », « sur le côté », « penche-toi », « ceinture », « collier »)',
+    'help.k.revmoves': 'rôles inversés : - Chloe se montre à côté du lit (ou dites « montre-moi ») · Maj+- elle vous serre et vous embrasse, sur le dos sur le lit (ou « serre-moi », « embrasse-moi »)',
     'rev.hud': 'RÔLES INVERSÉS', 'rev.order': 'elle veut',
   });
 }
@@ -262,7 +254,7 @@ function revLang() { return typeof LANG !== 'undefined' ? LANG : 'en'; }
 /**
  * A line of hers. Since 1.563.0 it is SAID, in her own voice, when the voice
  * service can (`voice.chloe` in 49-voice.js: the beat goes up as a key and
- * the words come back from `PERSONA_CHLOE`, Croatian with a gloss). The
+ * the words come back from `PERSONA_CHLOE`, in English since 1.569.0). The
  * phase-one line is still picked here, and it is the caption whenever the
  * line is not voiced: signed out, too soon after the last one, the service
  * slow or saying no. `o.order` is the order a beat is about; `o.still()`
@@ -272,19 +264,21 @@ function revSay(kind, force = false, line = null, o = {}) {
   const L = line ? [line] : REV_SAY[kind];
   if (!L || !L.length) return null;
   if (!force && rev.clock - rev.dom.lastLine < REV.lineGap) return null;
-  const l = L[Math.floor(Math.random() * L.length)];
+  // English since 1.569.0: a line is one string, and the caption is it. A
+  // table entry still written the old way ([hr, en, fr]) speaks its English.
+  let l = L[Math.floor(Math.random() * L.length)];
+  if (Array.isArray(l)) l = l[1] || l[0];
   rev.dom.lastLine = rev.clock;
-  const g = revLang() === 'fr' ? l[2] : revLang() === 'hr' ? '' : l[1];
   const cap = () => {
-    if (typeof voice !== 'undefined' && voice && voice.sub) voice.sub('Chloe: ' + l[0], 3.2, g || '');
+    if (typeof voice !== 'undefined' && voice && voice.sub) voice.sub('Chloe: ' + l, 3.2, '');
   };
   const V = typeof voice !== 'undefined' && voice && voice.chloe
     ? voice.chloe(kind, Object.assign({ fallback: cap }, o)) : 'caption';
   if (V === 'caption') cap();
   rev.said[V] = (rev.said[V] || 0) + 1;
-  rev.log.push([+rev.clock.toFixed(1), l[0], V]);
+  rev.log.push([+rev.clock.toFixed(1), l, V]);
   if (rev.log.length > 40) rev.log.shift();
-  return l[0];
+  return l;
 }
 /** Whether a beat's reply is still worth saying when it lands. */
 const revStill = {
@@ -507,6 +501,9 @@ function revWords(text) {
   // whole line, so it never takes a sentence that only mentions a toy.
   const tw = typeof rvtWords === 'function' ? rvtWords(t) : null;
   if (tw) return tw;
+  // Her hip tease and her hug and kiss (1.569.0, src/49-revmoves.js).
+  if (/^((come on |go on )?show me (your|what you('ve| have) got|some) ?(moves|got)?( then| babe| please)?|show me what you('ve| have) got|show off( for me)?|dance for me|(pokazi|pokazes) mi( sto znas| svoje pokrete| pokrete)?|montre[- ]moi( ce que tu sais faire| tes mouvements)?)$/.test(t)) return 'rev.move:thrust';
+  if (/^((please )?(hug|kiss|cuddle|hold) me( please)?|(give me |i want )?a (hug|kiss)( please)?|come here and (hug|kiss) me|(zagrli|poljubi) me|zagrljaj|pusu|(fais|fait)[- ]moi un (calin|bisou)|embrasse[- ]moi|serre[- ]moi( dans tes bras)?)$/.test(t)) return 'rev.move:hug';
   const arms = /\b(arms?|ruke|bras)\b/.test(t);
   const v = revView();
   const front = v && REV_FRONT[v.phase];
@@ -560,6 +557,7 @@ function revAct(name) {
     && typeof rvkAsk === 'function') {
     return rvkAsk(name.slice(4));
   }
+  if (name.startsWith('rev.move:') && typeof rvmAskMove === 'function') return rvmAskMove(name.slice(9));
   if ((name.startsWith('rev.toy:') || name.startsWith('rev.remote:')) && typeof rvtAsk === 'function') {
     return rvtAsk(name.slice(4));
   }
@@ -610,6 +608,16 @@ function revKey(e) {
       const belt = e.code === 'Backslash';
       const r = rvkAsk(belt ? (rvkBeltInHand() && !rvkBeltRound() ? 'beltback' : 'belt')
         : (rvkCollarOn() ? 'uncollar' : 'collar'));
+      if (typeof toast === 'function') toast(r.label);
+    }
+    return true;
+  }
+  // Her moves, asked by key (1.569.0): - her hip tease beside the cot,
+  // Shift+- her hug and kiss (you on your back on the cot).
+  if (e.code === 'Minus' || e.code === 'NumpadSubtract') {
+    e.preventDefault();
+    if (typeof rvmAskMove === 'function') {
+      const r = rvmAskMove(e.shiftKey ? 'hug' : 'thrust');
       if (typeof toast === 'function') toast(r.label);
     }
     return true;
@@ -723,12 +731,12 @@ function revDriveChloe(dt) {
   let cr = null;
   if (w > 0.003 && typeof crouchSolve === 'function') {
     const st = you.fig.state;
-    cr = crouchSolve(w, 'idle', st && st.curT ? st.curT : 0);
+    cr = crouchSolve(w, 'idle', st && st.curT ? st.curT : 0, B.push || 0);
   }
   if (cr) { crouchAims(cr, 0, 0, 0, 0, 0); A.posed = true; } else if (A.posed) revArmClear();
   // The bow (over the cot, down to you) and the turn of her trunk.
   const bow = B ? B.bow : 0, turn = B ? B.turn : 0, cb = cr ? cr.b : 0;
-  if (bow > 0.003 || Math.abs(turn) > 0.003) {
+  if (Math.abs(bow) > 0.003 || Math.abs(turn) > 0.003) {
     for (let i = 0; i < 3; i++) {
       _rvW.setFromAxisAngle(_rvZ, (cr ? cb * [0.45, 0.33, 0.22][i] : 0) + bow * REV_BOW[i]);
       _rvT.setFromAxisAngle(_rvY, turn * REV_TURN[i]);
@@ -1206,7 +1214,7 @@ function revHud() {
   const kitTag = [typeof rvkHudTag === 'function' && rev.on ? rvkHudTag() : '',
     typeof rvtHudTag === 'function' && rev.on ? rvtHudTag() : ''].filter(Boolean).join(' · ');
   const txt = !rev.on ? '' : T0('rev.hud') + (rev.care ? ' · ♥' : '') + (kitTag ? ' · ' + kitTag : '')
-    + (O ? '\n' + T0('rev.order') + ': ' + (lang === 'fr' ? O.say[2] : lang === 'hr' ? O.say[0] : O.say[1])
+    + (O ? '\n' + T0('rev.order') + ': ' + (lang === 'fr' ? O.hud[2] : lang === 'hr' ? O.hud[0] : O.hud[1])
       + (O.key ? ' [' + O.key + ']' : '') : '');
   if (txt === rev.hudWas) return;
   rev.hudWas = txt;

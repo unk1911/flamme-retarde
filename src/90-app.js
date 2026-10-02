@@ -4023,6 +4023,8 @@ const HELP = [
     ['SHIFT + 1 – 6', 'help.k.revlegs'],
     // And the toy you wear, in her hands (1.567.0).
     ['I · “pull it out a bit”', 'help.k.revtoys'],
+    // Her hip tease and her hug and kiss (1.569.0).
+    ['– · SHIFT + –', 'help.k.revmoves'],
     ['O', 'help.k.pc'],
   ]],
   ['help.g.water', [
@@ -6708,7 +6710,7 @@ function crouchReach(L, dx, dy) {
  * two-bone reach per leg — is the answer to both, and it is also the idle's
  * answer: standing still it lands on the fold above to the millimetre.
  */
-function crouchSolve(w, clip, t) {
+function crouchSolve(w, clip, t, push = 0) {
   if (w < 0.003 || !you) return null;
   if (!crouchIdle) crouchIdle = crouchGeometry(you.fig, 'idle', 0);
   const G = crouchIdle;
@@ -6739,10 +6741,14 @@ function crouchSolve(w, clip, t) {
   // drawn in toward where the idle stands it, an eighth at a time, until the
   // knee clears `knee`; a planted boot never needs it (its knee is 0.3 m up
   // and more), so nothing that is on the ground is moved.
+  // `push` (m, 1.569.0): the hips carried FORWARD of where the crouch puts
+  // them, the boots staying where they stand: Chloe's hip thrust in the
+  // kabina (src/49-revmoves.js). Zero for everybody else.
+  const bk = back - push;
   const floor = C.knee - (N.hy - drop);
   const leg = (L, I) => {
-    const ix = I.t[0] + I.s[0] + back, iy = I.t[1] + I.s[1] + drop;
-    const wx = ix + (L.t[0] + L.s[0] + back - ix) * k, wy = L.t[1] + L.s[1] + drop;
+    const ix = I.t[0] + I.s[0] + bk, iy = I.t[1] + I.s[1] + drop;
+    const wx = ix + (L.t[0] + L.s[0] + bk - ix) * k, wy = L.t[1] + L.s[1] + drop;
     let dx = wx, dy = wy, r = crouchReach(L, dx, dy);
     for (let j = 1; j <= 8 && r[2] < floor; j++) {
       dx = wx + (ix - wx) * j / 8; dy = wy + (iy - wy) * j / 8;
@@ -6756,7 +6762,7 @@ function crouchSolve(w, clip, t) {
   // her face on every step. So the swing is cut back to what a shuffle has:
   // the clip's own departure from the idle arm, taken off in part.
   const swL = (N.armL - G.armL) * C.swing * w, swR = (N.armR - G.armR) * C.swing * w;
-  return { w, b, ch, drop, back, L: leg(N.L, G.L), R: leg(N.R, G.R), swL, swR };
+  return { w, b, ch, drop, back: bk, L: leg(N.L, G.L), R: leg(N.R, G.R), swL, swR };
 }
 
 // Scratch for `crouchAims`.
