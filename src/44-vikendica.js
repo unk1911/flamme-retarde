@@ -181,6 +181,53 @@ async function buildVikendica(scene, field) {
       base *= 1.0 + 0.34 * dn;`,
   });
 
+  // The renovation's roof, drawn with the same roll and one correction to it.
+  //
+  // The roll turns the normal, and the sun term is computed off the turned
+  // normal, so every face it touches is lit by the sun as if it faced the sky.
+  // The shadow map cannot take that back: casters are written back face first,
+  // so the depth in the map over a roof IS its underside, and an underside is
+  // always on the lit side of its own bias. Under the loft's 25 degree
+  // boarding, its rafters and its ridge beam that was the whole picture: every
+  // downward face of the roof took full sun, lifted a third, and the roof came
+  // out one flat glowing yellow with no shade anywhere in it (Misha, 2 Oct:
+  // "the shadows"). Measured at 11:00 looking up from the big room, a board
+  // between two rafters went from (255,255,208), which is clipped, to
+  // (142,125,83).
+  //
+  // So here the roll keeps its job, which is the ambient — a soffit indoors
+  // samples the sky and not the karst — and the lift, and the sun goes back to
+  // what the face's own normal says, which for anything facing down is none.
+  // The shade between the rafters is in the vertex colours. The one exception
+  // is what the roll was written for, a flat white ceiling: the deck's soffit
+  // is the ceiling of the rooms under it and has to match the ceilings beside
+  // it, whose brightness has that leak in it. "Flat and white" is told from
+  // the normal and the albedo, since one material draws the whole blob: the
+  // ridge beam's underside is flat too, and it glowed until it was excluded.
+  const loftMat = solidMaterial(0xffffff, {
+    spec: 0.05,
+    specPower: 30,
+    emissive: VIK.glow,
+    uniforms: { uVikInv: vikInv },
+    decl: 'uniform mat4 uVikInv;',
+    body: `base *= vVCol;
+      vec3 vikP = (uVikInv * vec4(vWorld, 1.0)).xyz;
+      float vikIn = step(abs(vikP.x), 3.40) * step(abs(vikP.z), 3.875);
+      float dn = smoothstep(0.0, -0.55, n.y) * max(vikIn, step(-0.85, n.y));
+      vec3 nGeo = n;
+      float ceilK = smoothstep(-0.95, -0.99, n.y)
+        * smoothstep(0.80, 0.86, min(base.r, min(base.g, base.b)));
+      float slopeDn = dn * (1.0 - ceilK);
+      n = normalize(mix(n, vec3(n.x, 0.30, n.z), dn));
+      base *= 1.0 + 0.34 * dn;`,
+    lit: `float ndlGeo = max(dot(nGeo, uSunDir), 0.0);
+      col -= slopeDn * base * uSunColor * uSunI * max(ndl - ndlGeo, 0.0)
+        * sh * INV_PI;
+      col -= slopeDn * uSunColor * spec * sh * max(0.0,
+        pow(max(dot(n, hv), 0.0), uSpecPower)
+        - pow(max(dot(nGeo, hv), 0.0), uSpecPower));`,
+  });
+
   // The glazing, drawn separately and drawn through.
   //
   // Thirteen square metres of this house is glass and the whole reason for
@@ -276,7 +323,8 @@ async function buildVikendica(scene, field) {
         key.endsWith('_sheer') ? sheerMat : key.endsWith('_glass') ? glassMat
           : key.endsWith('_ware') ? wareMat
             : key.endsWith('_enamel') ? enamelMat
-              : key.endsWith('_kupe') ? kupeMat : mat);
+              : key.endsWith('_kupe') ? kupeMat
+                : key === 'loft' ? loftMat : mat);
       // The kupe cast nothing the slab under them does not: their own laps
       // are finer than a texel of the sun's map.
       mesh.castShadow = !soft(key) && !key.endsWith('_kupe');
