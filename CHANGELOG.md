@@ -8,6 +8,134 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.562.0] — 2026-10-01 (baye 1.54.0)
+
+### Baye on the playground's kit: the swings, the nest, the seesaw, a trampoline, the slide and the horse
+
+Misha: *"Baye on the playground equipment"* — once she is at the
+playground she uses it: sits on a swing and is pushed or pumps it herself,
+rides an end of the seesaw while you take the other, bounces on a
+trampoline, climbs the tower and goes down the slide, rocks on the spring
+rider, and gets off when asked or when she has had enough.
+
+**Asking.** Typed (matched in the page, so it works signed out) or said:
+"get on the swing", "swing", "the nest swing", "seesaw", "jump on the
+trampoline", "go down the slide", "ride the horse" / "spring rider", and
+"get off"; "ljuljačka", "sjedni na ljuljačku", "klackalica", "trampolin",
+"tobogan", "konjić", "siđi". The noun with a verb of getting on or going to
+it, or the noun alone (`rideWords` in 49-ears.js, `pg_of` in baye.py).
+Matched ahead of the playground's own words, so "go to the playground and
+get on the swing" is the swing. "Trampoline" is the playground's when she
+or you are at a playground; on the beach it is still the beach's (`tramp`).
+"Get up" and "get out" on the kit are "get off". Names: `pg:swing`,
+`pg:nest`, `pg:seesaw`, `pg:tramp`, `pg:slide`, `pg:rider`, `pg.off`.
+
+**Getting there.** From anywhere, by `groundsRoute` (A*, at a jog when it
+is far); from the kabina by its door first; and with you at the grounds and
+her a long way off, MEET's own `meetGo` brings her round unseen and she goes
+on to the kit from there (`show.pgWant`). The swing is the nearest free one
+to you — playground A's four by the white row count. On the spot it is one
+of the `here` asks (HERE_GO), so from the grounds, from beside the hammock
+or from another piece of kit she goes straight to it. Anything else asked
+while she is on something gets her off first and is done after; her face
+and your hand are taken where she sits.
+
+**The physics is the kit's** (src/46-playground.js, `HER ON IT`). She goes
+into each AVBD net:
+
+- **Swing and nest.** Her 55 kg on the seat body, her inertia about it, and
+  her hands as two joints from the chains' last links to the seat
+  (`grip`, 20 kN/m): without them a seat with a woman on it hangs from two
+  points on one line and rocks on it like a hinge. Her pump is a force with
+  the seat's motion up to the height she means (0.78 rad), and her legs go
+  out on the way forward and tuck on the way back with it. From still she
+  reaches 0.6 rad in about eight swings and rides 0.82. Your push with her
+  on it is 34 N·s a press, 210 N held (an empty seat's 5 would be a nudge
+  on 58 kg); pushed, she lets you swing her. She laughs and says a line at
+  a big swing. To get off, her feet go down and scuff it still, then the
+  sit plays backwards.
+- **Seesaw.** She sits on the end that is down, astride, facing the axle.
+  Her mass and its lever are in the beam's inertia, and her weight is laid
+  on at her own height as a torque. At the bottom, once the beam has landed
+  and stopped, she kicks off the ground (175 N·s): on her own that lifts her
+  end to level and back, every 1.4 s. You push the far end down (130 N·s,
+  900 N held, your weight leant on it) and she goes all the way up
+  (MEASURED: −0.18 → +0.18 rad in 0.8 s), comes down and kicks off again.
+- **Spring rider.** At 400 N·m/rad an adult tips the coil straight over
+  (her 566 N·m/rad against it), so it stands at 1500 while she rides, with
+  her weight laid on at her own height. She rocks it with the way it is
+  going, 12–15° each way.
+- **Trampoline.** She is the bed's second body, `pgBed`'s `you`, exactly as
+  you are. Her flight is stepped by the kit (`herBedStep`); each landing she
+  pumps as hard as the last bounce came in short of her height (`press(k)`,
+  a new fraction of the leg's drive), and her legs soak up what would carry
+  her past it. Bounces of 0.8–1.3 m, and at the top of about a third of
+  the high ones a tuck or a star. A bed she is on is hers: the walker does
+  not mount it.
+- **Her capsules** are on the body she sits on, so you walk into her legs
+  and back, not through them. With her on it a piece is stepped wherever
+  you are and never sleeps.
+
+**The poses are her own clips with the contacts solved.** Sat on anything
+she is `hamIn` held on HAM_SIT — sat on an edge 0.45 m up, a swing seat to a
+centimetre — and every contact is solved each frame on the elbow's and the
+knee's own hinges (`hingeArm`, so 1.561.1's joint limits hold): her hands
+to her grip joints, the seesaw's T-bar, the horse's handles; her feet out
+and tucked with the swing, astride round the beam, on the ground under the
+seesaw's low end, on the horse's footrests, never into the floor. Her back
+leans only as far as her hands need (`pgLean`, solved: hunched forward on
+the horse, upright on the swing). On the bed and the ladder, `idle` with all
+four limbs solved to the bed, the rungs and the rails. On the slide,
+`sitHeld` laid along the trough. No angle is typed. Where she is drawn is
+read off the body each frame and again after the kit has stepped
+(`pgAfter`, and the drawn v2.0 with it), so she and the seat are never a
+frame apart at 3 m/s.
+
+**The slide.** Up the ladder a rung at a time, both feet to each, hands on
+the rails; across the deck; sat down at the mouth; down the slide's own line
+with the plastic's friction (μ 0.24) against the slope, 1.8 m/s at the
+fastest, hands up for the fast part; off the run-out and up on to her feet.
+
+**No clipping, MEASURED** (`__fr.play.clip()`: v2.0's mesh skinned on the
+CPU with the frame's palette, in the seat's frame, the deepest vertex under
+the seat's top over its footprint): swing worst −12 mm at the deepest tuck
+(median 4 mm above; a rubber strap seat gives more than that), nest 0, seesaw
+0 (was −17 before her seat was raised by it), rider −4 (was −33).
+
+**Autonomous mode** at the playground may pick the kit itself (`pgSwing`,
+`pgNest`, `pgSeesaw`, `pgTramp`, `pgSlide`, `pgRider`, only standing at a
+playground) and gets off it again after a while (`pgOff`, context `ride`).
+Traced: from the grounds she chose the slide two seconds after engaging.
+
+**Her lines** (`PG_SAY`, `pg.g.*`): "Ljuljaj me!", "Juhuuu!", "Jače!
+Hehe!", "Gledaj, letim!", "Ajde, ti na drugu stranu!", "Gore!", "Hop!",
+"Gledaj kako visoko!", "Pazi sad!", "Đi-ha!", "Dosta mi je, hehe.", "Vrti
+mi se!".
+
+**The voice service is 1.54.0, and it needs deploying** for the spoken
+commands: `pg_of` (ahead of `grounds_of`), the `pg:*` skills, "jump on the
+trampoline" now heard as `tramp`, `SHORE_DOING` for `pgGo`/`pgTurn`/`pgOn`/
+`pgOff` and the piece she is on (`pgswing` … — the page sends that in the
+ten characters `her` has), and `AUTO_DOING` for her own picks. Offline, the
+882 quoted sentences in this changelog parse identically before and after.
+Typed, everything works without it.
+
+Probes: `__fr.play.her()`, `.ask(name)`, `.state(i)`, `.clip()`;
+`__fr.jad.raw().pg()`, `pgClip()`.
+
+**Rough:** an adult on a child's spring horse is knees-out and hunched, as
+one is. The rider's hop on and off is a blend, not a clip. A seesaw push only
+lands while you stand within reach of the far end; "sit on the other end"
+for you is not built (the push is your weight). The slide's legs are
+straight, so on the bend her feet sit a little to the outside of the
+trough.
+
+RULE 4: no `rng()` draw added, removed or moved. People 100, blockers 820,
+census 446/333/86/27. Empty kit swings and sleeps as before (nobody on,
+pushed, all of B asleep within 40 s). Regression: meet at the playground,
+the kabina's door, the walk there, autonomous mode, typed commands. No
+console errors.
+
 ## [1.561.1] — 2026-10-01
 
 ### The ventriloquist's arms: "arms out" solved against an arm from another pose

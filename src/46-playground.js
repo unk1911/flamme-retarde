@@ -114,6 +114,50 @@ const PGP = {
   youR: 0.22, youK: 1500,
 };
 
+// ── HER ON IT (1.562.0) ─────────────────────────────────────────────────────
+//
+// Baye on the swings, the nest, the seesaw, the beds and the rider: her mass
+// in each net while she is on it, the drives she makes (a pump on a swing, a
+// kick off the ground on the seesaw, a rock on the rider, her legs on a bed),
+// and the push you give her. Her pose and where she is drawn are hers — see
+// `── THE PLAYGROUND KIT, RIDDEN ──` in 43-jadrija.js — and are read off the
+// body each frame (`her.frame`), so she is wherever the solve has the seat.
+const PGH = {
+  kg: 55,              // her, as the hammock and the ragdoll have her (HAMMOCK.herMass)
+  caps: 4,             // her capsules on a seat's body, off until she sits
+  // Her centre of mass over the seat, m, sitting up — for the inertia she
+  // adds about the body's own origin, and the rider's lever.
+  comUp: 0.26,
+  // Her own inertia about that centre, sitting (pitch/roll, yaw), kg·m².
+  Isit: 1.6, Iyaw: 0.7,
+  // THE SWING. The pump: a force along the swing, with the seat's motion,
+  // up to `pumpTop` rad of swing — what leaning back with her legs out on the
+  // way forward and tucking them on the way back is worth, as a drive. Each
+  // half swing she adds about a hundredth of her weight's work to it, which
+  // builds a still seat to 0.6 rad in about eight swings.
+  pumpN: 34, pumpTop: 0.78,
+  // Your push with her on it: a shove (N·s) and a held push (N). Empty, a
+  // seat takes 5 N·s; with 58 kg on it that is a nudge nobody would see.
+  shoveSeat: 34, holdSeat: 210, shoveNest: 40, holdNest: 240,
+  // THE SEESAW. Her end comes down under her (her weight at her seat, as a
+  // torque about the axle); and at the bottom she kicks off the ground with
+  // her legs, once a landing, `kickNs` N·s up at her seat. On her own that
+  // lifts her end about a third of the way; with you on the other end it goes.
+  kickNs: 175, kickEvery: 0.9,
+  // You pushing the far end down with her on it — your weight leant on it —
+  // and lifting it.
+  shoveSaw: 130, holdSaw: 900,
+  // THE RIDER. An adult on a child's coil: at 400 N·m/rad her weight, a metre
+  // over the foot, tips it straight over (her 566 N·m/rad against its 400).
+  // So the coil stands stiffer while she rides it, and her weight is laid on
+  // at her own height rather than the horse's (`comRider`).
+  riderK: 1500, comRider: 1.02, rockNm: 70, rockTop: 0.17,
+  // A BED: how high she bounces (m over the bed), and the tricks at the top.
+  bedTop: [1.0, 1.45],
+  // THE SLIDE: plastic and a swimsuit, sliding friction; and where she leaves it.
+  slideMu: 0.24, slideV0: 0.6, slideEnd: 0.985,
+};
+
 /** A quaternion turning +x on to unit d (shortest arc), [x, y, z, w]. */
 function pgQuatX(d) {
   const c = d[0];
@@ -147,6 +191,8 @@ function pgSim(o) {
   const stats = { steps: 0, ms: 0, msLast: 0, rescues: 0, wakes: 0 };
   const caps = new Float64Array(8);
   let youOn = false;
+  // Kept awake while this answers true — somebody on it (1.562.0).
+  let busy = o.busy || null;
   function wake() { if (asleep) stats.wakes++; asleep = false; still = 0; }
   /** Velocity added at world point p by impulse J (N·s), on body i. */
   function impulse(i, p, J) {
@@ -221,7 +267,7 @@ function pgSim(o) {
         + Math.hypot(W[3 * i], W[3 * i + 1], W[3 * i + 2]) * (o.arm || 0.3);
       if (v > vmax) vmax = v;
     }
-    still = vmax < (o.still || PGP.still) && !youOn && !(o.busy && o.busy()) ? still + dt : 0;
+    still = vmax < (o.still || PGP.still) && !youOn && !(busy && busy()) ? still + dt : 0;
     if (still > (o.sleepAfter || PGP.sleepAfter)) {
       asleep = true;
       for (const i of o.bodies) {
@@ -232,7 +278,26 @@ function pgSim(o) {
     stats.ms += stats.msLast;
     return n;
   }
-  return { net, step, wake, impulse, you, reset, stats,
+  /**
+   * A turn and nothing else: torque `F` (N) applied at world point p for h s,
+   * on body i — its angular velocity only. For a load on a body that is
+   * pinned (the seesaw's axle, the rider's foot): a linear kick there is
+   * only taken straight back out by the joint (1.562.0).
+   */
+  function torque(i, p, F, h) {
+    const q = [Q[4 * i], Q[4 * i + 1], Q[4 * i + 2], Q[4 * i + 3]];
+    const qi = [-q[0], -q[1], -q[2], q[3]];
+    const r = [p[0] - P[3 * i], p[1] - P[3 * i + 1], p[2] - P[3 * i + 2]];
+    const t = [(r[1] * F[2] - r[2] * F[1]) * h, (r[2] * F[0] - r[0] * F[2]) * h, (r[0] * F[1] - r[1] * F[0]) * h];
+    const tl = pgRot(qi, t);
+    const I = net.inert;
+    const wl = [tl[0] / Math.max(1e-4, I[6 * i]), tl[1] / Math.max(1e-4, I[6 * i + 1]),
+      tl[2] / Math.max(1e-4, I[6 * i + 2])];
+    const ww = pgRot(q, wl);
+    W[3 * i] += ww[0]; W[3 * i + 1] += ww[1]; W[3 * i + 2] += ww[2];
+  }
+  return { net, step, wake, impulse, torque, you, reset, stats,
+    setBusy: (fn) => { busy = fn || null; },
     get asleep() { return asleep; }, set asleep(v) { asleep = v; } };
 }
 
@@ -253,8 +318,8 @@ function pgHang(o) {
   const nChains = o.chains.length;
   const NB = (o.body ? 1 : 0) + nChains * NL;
   const net = avbdNet({
-    maxBodies: NB, maxJoints: nChains * (NL + 1), maxStrings: 0, maxPoints: 0, maxBoxes: 0,
-    maxCaps: NB + 4, maxContacts: 64, maxWorldCaps: 1, worldCapK: PGP.youK,
+    maxBodies: NB, maxJoints: nChains * (NL + 2), maxStrings: 0, maxPoints: 0, maxBoxes: 0,
+    maxCaps: NB + 4 + PGH.caps, maxContacts: 64, maxWorldCaps: 1, worldCapK: PGP.youK,
     iterations: PGP.iterations, alpha: PGP.alpha, alphaContact: 0.9, beta: PGP.beta,
     betaAng: PGP.betaAng, gamma: PGP.gamma, gravity: [0, -9.81, 0], drag: o.drag || 0.1,
     vMax: 20, wMax: 60, margin: 0.02, deep: 0.12, mu: 0.4, floorMu: 0.6, capK: 1e4,
@@ -288,11 +353,35 @@ function pgHang(o) {
     if (ch.at && body >= 0) net.addJoint(ids[NL - 1], [l / 2, 0, 0], body, ch.at);
     links.push({ ids, l });
   }
+  // HER HANDS ON THE CHAINS (1.562.0): a joint from each chain's last link
+  // to the seat, off until she takes hold (`grip` below). Without them a seat
+  // with a woman on it hangs from two points on one line and rocks about
+  // that line like a hinge; her arms are what make seat, chains and her one
+  // frame, which is what a person on a swing is.
+  const grips = [];
+  if (body >= 0) {
+    for (let k = 0; k < nChains; k++) {
+      if (o.chains[k].at) grips.push(net.addJoint(links[k].ids[NL - 1], [0, 0, 0], body, [0, 0, 0], 0, 0));
+      else grips.push(-1);
+    }
+  }
   let nc = 0;
   for (const c of (o.caps || [])) {
     const b = c[7] != null ? c[7] : body;
     const k = net.addCap(b, nc++);
     net.setCap(k, c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[6]);
+  }
+  // Her, sitting on it (1.562.0): capsules on the body, off until she is —
+  // so the walker meets her legs and back, and not a seat swinging through
+  // a woman. Laid by `herCapsSet` when she sits.
+  const herCaps = [];
+  if (body >= 0) {
+    for (let k = 0; k < PGH.caps; k++) {
+      const c = net.addCap(body, nc++);
+      net.setCap(c, 0, 0, 0, 0, 0.01, 0, 0.01, 0.01);
+      net.cpOn[c] = 0;
+      herCaps.push(c);
+    }
   }
   net.finish();
   const bodies = [];
@@ -319,7 +408,29 @@ function pgHang(o) {
     }
     return out;
   }
-  return Object.assign(sim, { body, links, NL, chainPts, nChains });
+  /**
+   * Chain k held `up` m above where it meets the seat (along its last link),
+   * with arms of `kN` N/m — or let go (`kN` 0). Laid where the chain and the
+   * seat are now, so taking hold moves nothing. Answers the grip in the
+   * seat's frame, which is where her hand goes.
+   */
+  function grip(k, up, kN) {
+    const j = grips[k];
+    if (j == null || j < 0) return null;
+    if (!kN) { net.setJointK(j, 0, 0); return null; }
+    const L = links[k], i = L.ids[NL - 1];
+    const xl = Math.max(-L.l / 2, L.l / 2 - up);
+    const qi = [net.Q[4 * i], net.Q[4 * i + 1], net.Q[4 * i + 2], net.Q[4 * i + 3]];
+    const w = pgRot(qi, [xl, 0, 0]);
+    w[0] += net.P[3 * i]; w[1] += net.P[3 * i + 1]; w[2] += net.P[3 * i + 2];
+    const qb = [net.Q[4 * body], net.Q[4 * body + 1], net.Q[4 * body + 2], net.Q[4 * body + 3]];
+    const rb = pgRot([-qb[0], -qb[1], -qb[2], qb[3]],
+      [w[0] - net.P[3 * body], w[1] - net.P[3 * body + 1], w[2] - net.P[3 * body + 2]]);
+    net.setJointArms(j, [xl, 0, 0], rb);
+    net.setJointK(j, kN, 0);
+    return rb;
+  }
+  return Object.assign(sim, { body, links, NL, chainPts, nChains, herCaps, grip });
 }
 
 /**
@@ -336,7 +447,7 @@ function pgHang(o) {
  */
 function pgSeesaw(o) {
   const net = avbdNet({
-    maxBodies: 1, maxJoints: 2, maxStrings: 0, maxPoints: 0, maxBoxes: 0, maxCaps: 3,
+    maxBodies: 1, maxJoints: 2, maxStrings: 0, maxPoints: 0, maxBoxes: 0, maxCaps: 3 + PGH.caps,
     maxContacts: 16, maxWorldBoxes: 2, maxWorldCaps: 1, worldCapK: PGP.youK,
     iterations: PGP.iterations, alpha: PGP.alpha, alphaContact: 0.9, beta: PGP.beta,
     betaAng: PGP.betaAng, gamma: PGP.gamma, gravity: [0, -9.81, 0], drag: o.drag || 0.3,
@@ -361,6 +472,13 @@ function pgSeesaw(o) {
   // And the beam itself, for the walker to bump.
   const cb = net.addCap(b, 2);
   net.setCap(cb, 0, 0.06 - o.com, -o.HL, 0, 0.06 - o.com, o.HL, 0.07, 0.07);
+  const herCaps = [];
+  for (let k = 0; k < PGH.caps; k++) {
+    const c = net.addCap(b, 3 + k);
+    net.setCap(c, 0, 0, 0, 0, 0.01, 0, 0.01, 0.01);
+    net.cpOn[c] = 0;
+    herCaps.push(c);
+  }
   net.finish();
   // The tyres: a box under each bumper, its top where the bumper is when the
   // beam rests on that end at `rest` — so it lies at the angle drawn.
@@ -415,7 +533,7 @@ function pgSeesaw(o) {
     out[0] += net.P[3 * b]; out[1] += net.P[3 * b + 1]; out[2] += net.P[3 * b + 2];
     return out;
   }
-  return Object.assign(sim, { body: b, angle, end, q0: q });
+  return Object.assign(sim, { body: b, angle, end, q0: q, herCaps, rest: o.rest, HL: o.HL, com: o.com });
 }
 
 /**
@@ -425,7 +543,7 @@ function pgSeesaw(o) {
  */
 function pgRider(o) {
   const net = avbdNet({
-    maxBodies: 1, maxJoints: 1, maxStrings: 0, maxPoints: 0, maxBoxes: 0, maxCaps: 1,
+    maxBodies: 1, maxJoints: 1, maxStrings: 0, maxPoints: 0, maxBoxes: 0, maxCaps: 1 + PGH.caps,
     maxContacts: 8, maxWorldCaps: 1, worldCapK: PGP.youK,
     iterations: PGP.iterations, alpha: PGP.alpha, alphaContact: 0.9, beta: PGP.beta,
     betaAng: PGP.betaAng, gamma: PGP.gamma, gravity: [0, -9.81, 0], drag: o.drag || 1.2,
@@ -440,6 +558,13 @@ function pgRider(o) {
   net.setTarget(j, F[0], F[1], F[2], q);
   const c = net.addCap(b, 0);
   net.setCap(c, 0, 0.62 - o.com, 0.42, 0, 0.66 - o.com, -0.45, 0.15, 0.15);
+  const herCaps = [];
+  for (let k = 0; k < PGH.caps; k++) {
+    const hc = net.addCap(b, 1 + k);
+    net.setCap(hc, 0, 0, 0, 0, 0.01, 0, 0.01, 0.01);
+    net.cpOn[hc] = 0;
+    herCaps.push(hc);
+  }
   net.finish();
   const sim = pgSim({ net, bodies: [b], c: [F[0], F[1] + o.com, F[2]], reach: 0.9, caps: true, arm: 0.6,
     far: 1.0, still: 0.02 });
@@ -447,7 +572,7 @@ function pgRider(o) {
   for (let k = 0; k < 60; k++) net.step(PGP.sub);
   net.V.fill(0, 0, 3); net.W.fill(0, 0, 3);
   sim.asleep = true;
-  return Object.assign(sim, { body: b });
+  return Object.assign(sim, { body: b, joint: j, k: o.k, com: o.com, herCaps });
 }
 
 /**
@@ -516,6 +641,9 @@ function pgBed(o) {
   sim.asleep = true;
 
   let on = false, legLen = T.stand, phase = 'stand', pT = 0, buffered = -1, flew = 0;
+  // How hard this pump drives, 0..1 of the leg's full straightening — 1 for
+  // the walker; Baye picks hers to the height she wants (1.562.0).
+  let driveK = 1, bufK = 1;
   const st = { bounces: 0, pumps: 0, maxDip: 0 };
   /** How far down the bed is from where it rests, m (positive down). */
   const dip = () => rest - net.P[3 * bed + 1];
@@ -529,7 +657,7 @@ function pgBed(o) {
     net.kick(you, 0, vy, 0);
     net.setString(leg, null, legLen, true);
     sim.wake();
-    if (buffered >= 0 && flew - buffered < T.buffer) { phase = 'absorb'; pT = 0; st.pumps++; }
+    if (buffered >= 0 && flew - buffered < T.buffer) { phase = 'absorb'; pT = 0; st.pumps++; driveK = bufK; }
     else phase = 'stand';
     buffered = -1;
   }
@@ -540,12 +668,13 @@ function pgBed(o) {
     phase = 'stand';
   }
   /** Enter: pump now, or as you land if you are in the air over it. */
-  function press() {
+  function press(k = 1) {
     if (on) {
-      if (phase === 'stand') { phase = 'absorb'; pT = 0; st.pumps++; }
+      if (phase === 'stand') { phase = 'absorb'; pT = 0; st.pumps++; driveK = k; }
       return true;
     }
     buffered = flew;
+    bufK = k;
     return true;
   }
   /**
@@ -567,11 +696,12 @@ function pgBed(o) {
           if (u >= 1) { phase = 'drive'; pT = 0; }
         } else if (phase === 'drive') {
           const u = Math.min(1, pT / T.driveT);
-          legLen = T.absorb + (T.reach - T.absorb) * (u * u);
+          legLen = T.absorb + (T.reach - T.absorb) * driveK * (u * u);
           if (u >= 1) { phase = 'settle'; pT = 0; }
         } else if (phase === 'settle') {
           const u = Math.min(1, pT / 0.25);
-          legLen = T.reach + (T.stand - T.reach) * u;
+          const top = T.absorb + (T.reach - T.absorb) * driveK;
+          legLen = top + (T.stand - top) * u;
           if (u >= 1) phase = 'stand';
         }
         net.setString(leg, null, legLen, true);
@@ -952,6 +1082,8 @@ function buildPlayground(scene, jad) {
       caps: [[-w / 2, -0.02, 0, w / 2, -0.02, 0, 0.06]], c: body, reach: 0.7,
     });
     p.c = body; p.H = H;
+    // For her (1.562.0): where the chains meet the seat, and its top.
+    p.hw = hw; p.w = w; p.seatY = -0.03;
     for (let k = 0; k < 2; k++) chainList.push({ sim: p.sim, k, col: chainCol });
     shackles(H, X, [-hw, hw]);
     return p;
@@ -1237,6 +1369,7 @@ function buildPlayground(scene, jad) {
   // a porthole in it, an eight-panel roof in red and yellow — the round top
   // the aerial has at 0:46 — the ladder up the west face and the slide off
   // the east one, curving down toward the sea side and the trampoline.
+  let tower = null;
   function buildTower() {
     const t = 521.6, s = 45.6;
     const fr = frame(t, s, 0);
@@ -1312,6 +1445,11 @@ function buildPlayground(scene, jad) {
       ];
       const curve = new THREE.CatmullRomCurve3(path.map((p) => new THREE.Vector3(...p)),
         false, 'centripetal');
+      // For her (1.562.0): the slide's line, the trough's bottom 5 cm under
+      // it (the section's `h - 0.05`), the deck and the ladder.
+      tower = { t, s, y, R, DECK, curve, fr, trough: 0.05,
+        ladder: { foot: -R - 0.78, top: -R, rails: [-0.26, 0.26], rungs: [1, 2, 3, 4].map((k) => k / 5),
+          rise: DECK + 0.1 } };
       const NS = 40;
       // The section, (across, up) from the trough's bottom: inner surface
       // left lip to right lip, then the outer back.
@@ -1441,6 +1579,11 @@ function buildPlayground(scene, jad) {
         caps: [[-RR, 0, 0, RR, 0, 0, 0.06], [0, 0, -RR, 0, 0, RR, 0.06]], c: body, reach: 1.0,
       });
       p.c = body; p.H = hinge;
+      // For her (1.562.0): the web's middle, the ring, and the four chains'
+      // feet on it and heads on the swivels, in the body's frame.
+      p.RR = RR; p.seatY = -0.035;
+      p.chainFeet = ch.map((c) => c.at.slice());
+      p.chainHeads = ch.map((c) => [c.a ? 0.45 : -0.45, L - 0.12, 0]);
       for (let k = 0; k < 4; k++) chainList.push({ sim: p.sim, k, col: PG.GALV });
       WEAR.push([t, s - 1.6, 1.2, 0.7, 0.6]);
       WEAR.push([t, s + 1.6, 1.2, 0.7, 0.6]);
@@ -1520,7 +1663,7 @@ function buildPlayground(scene, jad) {
     // seats a metre and three quarters out each side.
     p.sim = pgSeesaw({ hinge, X, Z, HL, mass: 25, com: COM, I: [52, 52, 0.4], rest,
       start: -rest * 0.98 });
-    p.c = body; p.H = hinge;
+    p.c = body; p.H = hinge; p.COM = COM;
     WEAR.push([t - HL + 0.15, s, 0.5, 0.45, 0.6]);
     WEAR.push([t + HL - 0.15, s, 0.5, 0.45, 0.6]);
     block(t - HL - 0.05, t + HL + 0.05, s - 0.24, s + 0.24, y, 0.9);
@@ -1666,7 +1809,7 @@ function buildPlayground(scene, jad) {
     // 12 kg of moulded horse; 400 N·m/rad of coil, which rocks it at a
     // little over a hertz and puts it back upright in four seconds.
     p.sim = pgRider({ foot: hinge, X, Z, mass: 12, com: COM, I: [0.81, 0.75, 0.18], k: 400 });
-    p.c = body; p.H = hinge;
+    p.c = body; p.H = hinge; p.COM = COM;
     WEAR.push([t, s, 0.8, 0.7, 0.4]);
     block(t - 0.45, t + 0.45, s - 0.25, s + 0.25, y, 1.0);
     return p;
@@ -2355,6 +2498,8 @@ function buildPlayground(scene, jad) {
   const bedUnder = (x, z) => {
     for (const p of tramps) {
       if ((x - p.c[0]) ** 2 + (z - p.c[2]) ** 2 > 1) continue;
+      // Hers while she is on it (1.562.0): one body a bed, and it is her.
+      if (p.her) continue;
       const d = bedD(p, x, z);
       if (d < PGT.RB - 0.05) return [p, d];
     }
@@ -2426,6 +2571,347 @@ function buildPlayground(scene, jad) {
     },
   };
 
+  // ── HER ON IT (1.562.0) ────────────────────────────────────────────────────
+  //
+  // See PGH. `on(i, o)` puts her in part i's net: her mass on the body she
+  // sits on, about where she sits; her hands on a swing's chains (`grip`);
+  // her capsules on it for the walker to meet; and on the rider a coil that
+  // will carry an adult. `off(i)` takes it all out again. `drive(i, o)` is
+  // what she is doing with it — a pump, a kick, a rock, her feet down to stop
+  // — laid on every substep by `herDrive`. On a bed she is the bed's second
+  // body, `pgBed`'s `you`, exactly as the walker is (`bouncer`), and her
+  // flight between bounces is stepped here (`herBedStep`).
+  const RIDE_KINDS = { swing: ['seat', 'seatA'], nest: ['nest'], seesaw: ['seesaw'], tramp: ['tramp'],
+    rider: ['rider'] };
+  const G_W = 9.81;
+  const qOf = (p) => {
+    const n = p.sim.net, b = p.sim.body;
+    return [n.Q[4 * b], n.Q[4 * b + 1], n.Q[4 * b + 2], n.Q[4 * b + 3]];
+  };
+  const pOf = (p) => {
+    const n = p.sim.net, b = p.sim.body;
+    return [n.P[3 * b], n.P[3 * b + 1], n.P[3 * b + 2]];
+  };
+  /** Body-local point l of part p in the world, now. */
+  const toW = (p, l) => {
+    const r = pgRot(qOf(p), l), o = pOf(p);
+    return [o[0] + r[0], o[1] + r[1], o[2] + r[2]];
+  };
+  /** A pure turn on part p's body about world axis `ax`: tau N·m for h s. */
+  function spin(p, ax, tau, h) {
+    const n = p.sim.net, b = p.sim.body, q = qOf(p);
+    const al = pgRot([-q[0], -q[1], -q[2], q[3]], ax);
+    const I = n.inert;
+    const wl = [al[0] * tau * h / Math.max(1e-4, I[6 * b]), al[1] * tau * h / Math.max(1e-4, I[6 * b + 1]),
+      al[2] * tau * h / Math.max(1e-4, I[6 * b + 2])];
+    const ww = pgRot(q, wl);
+    n.W[3 * b] += ww[0]; n.W[3 * b + 1] += ww[1]; n.W[3 * b + 2] += ww[2];
+  }
+  /** A swing's angle off hanging, rad, along its own swing (+ toward +Z). */
+  const swingTh = (p) => {
+    const at = hitPoint(p, [0, 0, 0]), H = p.H;
+    const dx = at[0] - H[0], dy = at[1] - H[1], dz = at[2] - H[2];
+    return Math.atan2(dx * p.Z[0] + dz * p.Z[2], -dy);
+  };
+  let herClock = 0;
+  /** Every substep she is on part p: her weight where it really is, and her drive. */
+  function herDrive(p, h) {
+    const H = p.her;
+    if (!H) return;
+    const n = p.sim.net, b = p.sim.body, D = H.drive;
+    if (p.kind === 'seat' || p.kind === 'seatA' || p.kind === 'nest') {
+      // The swing's way, flat, and how fast the seat is going along it.
+      const Zw = pgRot(qOf(p), [0, 0, 1]);
+      const zl = Math.hypot(Zw[0], Zw[2]) || 1;
+      const zx = Zw[0] / zl, zz = Zw[2] / zl;
+      const v = n.V[3 * b] * zx + n.V[3 * b + 2] * zz;
+      if (D.pump > 0 && Math.abs(v) > 0.02) {
+        // With the seat's motion, and only a breath of it past the height
+        // she means to reach — she pumps up to it and then rides it.
+        const k = H.peak > (D.top || PGH.pumpTop) ? 0.12 : 1;
+        const a = D.pump * PGH.pumpN * k * Math.sign(v) / n.mass[b];
+        n.kick(b, zx * a * h, 0, zz * a * h);
+      } else if (D.pump > 0 && H.peak < 0.03) {
+        // From dead still a lean starts it: she rocks once to get going.
+        n.kick(b, zx * 0.6 * h, 0, zz * 0.6 * h);
+      }
+      // Her feet down to stop it, scuffed along the rubber at the bottom.
+      if (D.brake > 0) {
+        const f = Math.max(0, 1 - D.brake * 2.2 * h);
+        n.V[3 * b] *= f; n.V[3 * b + 2] *= f;
+        n.W[3 * b] *= f; n.W[3 * b + 1] *= f; n.W[3 * b + 2] *= f;
+      }
+      return;
+    }
+    if (p.kind === 'seesaw') {
+      const S = p.sim, sg = H.sg;
+      // Her weight at her seat, a hand's breadth over it. The solve already
+      // carries her mass at the beam's own centre, so this is the lever.
+      const at = toW(p, [0, 0.015 + PGH.comUp, sg * (S.HL - 0.22)]);
+      S.torque(b, at, [0, -PGH.kg * G_W, 0], h);
+      // And at the bottom she kicks off the ground, once a landing.
+      const down = S.angle() * sg > S.rest * 0.80;
+      // Once it has landed and stopped: a kick into a beam still coming down
+      // only cancels the fall.
+      const Xw = pgRot(qOf(p), [1, 0, 0]);
+      const w = n.W[3 * b] * Xw[0] + n.W[3 * b + 1] * Xw[1] + n.W[3 * b + 2] * Xw[2];
+      if (down && Math.abs(w) < 0.25) H.downFor = (H.downFor || 0) + h; else H.downFor = 0;
+      if (D.kick > 0 && down && H.landed && H.downFor > 0.15 && herClock - H.kicked > PGH.kickEvery) {
+        H.kicked = herClock;
+        H.landed = false;
+        H.kicks = (H.kicks || 0) + 1;
+        const e = toW(p, [0, 0.015, sg * (S.HL - 0.22)]);
+        S.torque(b, e, [0, PGH.kickNs * D.kick, 0], 1);
+      }
+      if (S.angle() * sg < S.rest * 0.62) H.landed = true;
+      return;
+    }
+    if (p.kind === 'rider') {
+      // Her weight at her own height and not the horse's (PGH.comRider).
+      const at = toW(p, [0, PGH.comRider - p.COM, 0.06]);
+      p.sim.torque(b, at, [0, -PGH.kg * G_W, 0], h);
+      if (D.rock > 0) {
+        // Fore and aft, with the way it is already going, up to a height.
+        const Xw = pgRot(qOf(p), [1, 0, 0]);
+        const w = n.W[3 * b] * Xw[0] + n.W[3 * b + 1] * Xw[1] + n.W[3 * b + 2] * Xw[2];
+        const up = pgRot(qOf(p), [0, 1, 0]);
+        const tilt = Math.acos(Math.min(1, up[1]));
+        const k = tilt > PGH.rockTop ? 0 : 1;
+        const sgn = Math.abs(w) > 0.03 ? Math.sign(w) : 1;
+        spin(p, Xw, D.rock * PGH.rockNm * k * sgn, h);
+      }
+      if (D.brake > 0) {
+        const f = Math.max(0, 1 - D.brake * 3 * h);
+        n.W[3 * b] *= f; n.W[3 * b + 1] *= f; n.W[3 * b + 2] *= f;
+      }
+    }
+  }
+  /** Her on a bed: on it (the bed's second body), or in the air over it. */
+  function herBedStep(p, dt) {
+    const H = p.her, B = H.bed, g = GROUND.hopG;
+    const sim = p.sim;
+    B.t += dt;
+    if (B.on) {
+      if (B.pumpNow && sim.phase === 'stand') { sim.press(0.32); B.pumpNow = false; B.pumps++; }
+      const r = sim.step2(dt, false);
+      if (r) {
+        B.y = r.y; B.vy = r.vy; B.knees = r.knees;
+        if (r.off) {
+          B.on = false; B.air = true; B.apex = r.y; B.offAt = B.t; B.bounces++;
+          B.knees = 0;
+          // Her legs soak up what would take her past her height, and with
+          // no height wanted, half of it: she is letting it die.
+          if (B.want > 0) B.vy = Math.min(B.vy, Math.sqrt(2 * g * (B.want * 1.06 + 0.04)));
+          else B.vy *= 0.5;
+        }
+      }
+    } else if (B.air) {
+      B.vy -= g * dt;
+      B.y += B.vy * dt;
+      if (B.y > B.apex) B.apex = B.y;
+      if (B.vy < 0 && B.y <= p.top) {
+        B.lastApex = B.apex - p.top;
+        // A pump as she lands, as hard as the last bounce came in short.
+        if (B.want > 0 && B.lastApex < B.want) {
+          const k = Math.min(1, 0.25 + 1.5 * (B.want - B.lastApex) / B.want);
+          sim.press(k); B.pumps++;
+        }
+        sim.mount(p.top, B.vy);
+        B.on = true; B.air = false; B.y = p.top;
+        const r = sim.step2(dt, false);
+        if (r) { B.y = r.y; B.knees = r.knees; }
+      }
+    } else {
+      sim.mount(p.top, 0);
+      B.on = true;
+      const r = sim.step2(dt, false);
+      if (r) { B.y = r.y; B.knees = r.knees; }
+    }
+    p.stepped = true;
+    // Standing on it and still: no bounce left in it.
+    B.still = B.on && sim.phase === 'stand' && Math.abs(B.vy) < 0.15 && sim.dip() < 0.09;
+  }
+  function herFind(kind, x, z) {
+    const ks = RIDE_KINDS[kind];
+    if (!ks) return -1;
+    let best = -1, bd = Infinity;
+    parts.forEach((p, i) => {
+      if (!ks.includes(p.kind) || p.her) return;
+      // A bed you are bouncing on is yours.
+      if (p.kind === 'tramp' && (onBed === p || p.sim.on)) return;
+      const d = Math.hypot(p.c[0] - x, p.c[2] - z);
+      if (d < bd) { bd = d; best = i; }
+    });
+    return best;
+  }
+  function herCapsSet(p, caps) {
+    const n = p.sim.net, hc = p.sim.herCaps || [];
+    hc.forEach((c, k) => {
+      const q = caps && caps[k];
+      if (!q) { n.cpOn[c] = 0; return; }
+      n.setCap(c, q[0], q[1], q[2], q[3], q[4], q[5], q[6], q[6]);
+      n.cpOn[c] = 1;
+    });
+  }
+  function herOn(i, o = {}) {
+    const p = parts[i];
+    if (!p || p.her) return false;
+    const sim = p.sim, net = sim.net;
+    p.her = { t: 0, sg: o.sg || 1, drive: {}, kicked: -9, landed: true, peak: 0, lastTh: 0, dth: 0,
+      laughs: 0, grips: [] };
+    if (p.kind === 'tramp') {
+      p.her.bed = { on: false, air: false, y: p.top, vy: 0, knees: 0, apex: p.top, lastApex: 0, want: 0,
+        pumpNow: false, pumps: 0, bounces: 0, t: 0, still: false };
+      sim.setBusy(() => !!p.her);
+      sim.wake();
+      return true;
+    }
+    const b = sim.body;
+    p.her.mass0 = net.mass[b];
+    p.her.I0 = Array.from(net.inert.subarray(6 * b, 6 * b + 6));
+    const a = o.at || [0, 0, 0];
+    const M = PGH.kg, cx = a[0], cz = a[2];
+    const cy = p.kind === 'rider' ? PGH.comRider - p.COM : a[1] + PGH.comUp;
+    net.mass[b] += M;
+    // Parallel axes about the body's own origin, and her own about her centre.
+    net.inert[6 * b] += M * (cy * cy + cz * cz) + PGH.Isit;
+    net.inert[6 * b + 1] += M * (cx * cx + cz * cz) + PGH.Iyaw;
+    net.inert[6 * b + 2] += M * (cx * cx + cy * cy) + PGH.Isit;
+    if (p.kind === 'rider') net.setJointK(sim.joint, Infinity, PGH.riderK);
+    if (p.kind === 'seat' || p.kind === 'seatA' || p.kind === 'nest') {
+      // On a swing she is carried at the seat: her hands on the chains hold
+      // her up there, and a centre of mass laid above where the chains meet
+      // the seat would tip it over backwards about that line. She has hold
+      // of it as she sits, so it is still.
+      for (const L of sim.links) for (const k of L.ids) { net.V.fill(0, 3 * k, 3 * k + 3); net.W.fill(0, 3 * k, 3 * k + 3); }
+      net.V.fill(0, 3 * b, 3 * b + 3); net.W.fill(0, 3 * b, 3 * b + 3);
+      if (sim.grip) {
+        const up = o.gripUp || 0.42;
+        for (const k of (o.grips || [0, 1])) p.her.grips.push([k, sim.grip(k, up, 2.0e4)]);
+      }
+    }
+    herCapsSet(p, o.caps);
+    sim.setBusy(() => !!p.her);
+    sim.wake();
+    return true;
+  }
+  function herOff(i) {
+    const p = parts[i];
+    if (!p || !p.her) return false;
+    const sim = p.sim, net = sim.net;
+    if (p.kind === 'tramp') {
+      if (sim.on) sim.unmount();
+    } else {
+      const b = sim.body;
+      if (p.her.mass0 != null) {
+        net.mass[b] = p.her.mass0;
+        for (let k = 0; k < 6; k++) net.inert[6 * b + k] = p.her.I0[k];
+      }
+      if (p.kind === 'rider') net.setJointK(sim.joint, Infinity, sim.k);
+      for (const [k] of p.her.grips) sim.grip(k, 0, 0);
+      herCapsSet(p, null);
+    }
+    p.her = null;
+    // A bed goes back to being kept awake by the walker on it (`pgBed`).
+    sim.setBusy(p.kind === 'tramp' ? () => sim.on : null);
+    sim.wake();
+    return true;
+  }
+  /** Where she is on part i now — the body she sits on, or the bed under her feet. */
+  function herFrame(i) {
+    const p = parts[i];
+    if (!p) return null;
+    if (p.kind === 'tramp') {
+      const B = p.her && p.her.bed;
+      return { P: [p.c[0], B ? B.y : p.top, p.c[2]], Q: [0, 0, 0, 1], bed: B || null,
+        dip: p.sim.dip(), phase: p.sim.phase, top: p.top };
+    }
+    return { P: pOf(p), Q: qOf(p) };
+  }
+  // Each frame, after the step: her swing's height, for the pump and the laugh.
+  function herWatch(p, dt) {
+    const H = p.her;
+    H.t += dt;
+    if (p.kind === 'seat' || p.kind === 'seatA' || p.kind === 'nest') {
+      const th = swingTh(p);
+      // The height of the swing: the biggest angle lately, let go slowly.
+      // Let go faster while her feet are down: it is dying, and she is
+      // watching it die to get off.
+      H.peak = Math.max(H.peak * Math.exp(-dt * (H.drive.brake ? 2.0 : 0.25)), Math.abs(th));
+      H.dth = th - H.lastTh;
+      H.lastTh = th;
+      H.th = th;
+    } else if (p.kind === 'seesaw') {
+      H.th = p.sim.angle();
+    } else if (p.kind === 'rider') {
+      const up = pgRot(qOf(p), [0, 1, 0]);
+      H.th = Math.acos(Math.min(1, up[1])) * Math.sign(up[0] * p.Z[0] + up[2] * p.Z[2] || 1);
+      H.peak = Math.max(H.peak * Math.exp(-dt * 0.4), Math.abs(H.th));
+    }
+  }
+  // What your hand is worth on part p with her on it — see PGH.
+  const herShove = (p) => (p.kind === 'seesaw' ? PGH.shoveSaw : p.kind === 'nest' ? PGH.shoveNest
+    : p.kind === 'tramp' ? SHOVE.tramp : p.kind === 'rider' ? SHOVE.rider * 3 : PGH.shoveSeat);
+  const herHold = (p) => (p.kind === 'seesaw' ? PGH.holdSaw : p.kind === 'nest' ? PGH.holdNest
+    : p.kind === 'tramp' ? HOLD.tramp : p.kind === 'rider' ? HOLD.rider * 3 : PGH.holdSeat);
+  const her = {
+    kinds: RIDE_KINDS,
+    find: herFind,
+    on: herOn,
+    off: herOff,
+    frame: herFrame,
+    /** What she is doing on part i: { pump, top, brake, kick, rock } (0..1 each; top rad). */
+    drive: (i, o) => {
+      const p = parts[i];
+      if (p && p.her) Object.assign(p.her.drive, o || {});
+      return !!(p && p.her);
+    },
+    /** Her on part i: the swing (`th`, `peak`), the seesaw, the bed. */
+    state: (i) => {
+      const p = parts[i];
+      if (!p || !p.her) return null;
+      const H = p.her;
+      const o = { i, kind: p.kind, t: +H.t.toFixed(2), th: +(H.th || 0).toFixed(3), peak: +H.peak.toFixed(3),
+        drive: { ...H.drive }, kicks: H.kicks || 0,
+        pushedAgo: H.pushedAt != null ? +(herClock - H.pushedAt).toFixed(2) : 99 };
+      if (p.kind === 'tramp') {
+        const B = H.bed;
+        Object.assign(o, { on: B.on, air: B.air, y: +B.y.toFixed(3), vy: +B.vy.toFixed(2), knees: +B.knees.toFixed(3),
+          apex: +(B.apex - p.top).toFixed(3), lastApex: +B.lastApex.toFixed(3), bounces: B.bounces,
+          pumps: B.pumps, still: B.still, phase: p.sim.phase, dip: +p.sim.dip().toFixed(3) });
+      }
+      if (p.kind === 'seesaw') o.sg = H.sg;
+      return o;
+    },
+    /** The bed: how high she wants to go (0 lets it die away), and a pump now. */
+    bed: (i, want, pumpNow = false) => {
+      const p = parts[i];
+      if (!p || !p.her || !p.her.bed) return null;
+      p.her.bed.want = want;
+      if (pumpNow) p.her.bed.pumpNow = true;
+      return p.her.bed;
+    },
+    /** Part i, for posing her on it: its kind and geometry, body frame. */
+    info: (i) => {
+      const p = parts[i];
+      if (!p) return null;
+      const o = { kind: p.kind, c: p.c.slice(), H: p.H ? p.H.slice() : null, X: p.X ? p.X.slice() : null,
+        Z: p.Z ? p.Z.slice() : null };
+      if (p.kind === 'seat' || p.kind === 'seatA') Object.assign(o, { hw: p.hw, w: p.w, seatY: p.seatY });
+      if (p.kind === 'nest') Object.assign(o, { RR: p.RR, seatY: p.seatY, feet: p.chainFeet, heads: p.chainHeads });
+      if (p.kind === 'seesaw') Object.assign(o, { HL: p.sim.HL, COM: p.COM, rest: p.sim.rest });
+      if (p.kind === 'rider') Object.assign(o, { COM: p.COM });
+      if (p.kind === 'tramp') Object.assign(o, { top: p.top, rim: p.rim, RB: PGT.RB });
+      return o;
+    },
+    /** Body-local point l of part i, in the world. */
+    toWorld: (i, l) => toW(parts[i], l),
+    /** The slide and its tower: the line, the trough, the deck, the ladder. */
+    slide: () => tower,
+    /** Which part she is on, or -1. */
+    which: () => parts.findIndex((p) => p.her),
+  };
+
   // ── what you stand on ──────────────────────────────────────────────────────
   // The rubber is 8 cm over the hill `walkY` knows (5 of gravel, 3 of
   // rubber), the beds are on their springs, the rims stand 3.5 cm proud,
@@ -2465,17 +2951,22 @@ function buildPlayground(scene, jad) {
     const fx = who ? who.x : cam.x, fz = who ? who.z : cam.z;
     const feet = who ? [who.x, who.y, who.z] : null;
     awake = 0;
+    herClock += dt;
     let laid = false;
     for (const p of parts) {
-      const near = (p.c[0] - fx) ** 2 + (p.c[2] - fz) ** 2 < NEAR * NEAR;
+      // With her on it, it goes on wherever you are (1.562.0).
+      const near = !!p.her || (p.c[0] - fx) ** 2 + (p.c[2] - fz) ** 2 < NEAR * NEAR;
       if (!near) { if (p.kind !== 'tramp') p.sim.you(null); continue; }
       if (p.kind !== 'tramp') p.sim.you(feet);
       if (jet) hose(p, jet, who, dt);
       let n;
       if (p.kind === 'tramp') {
-        // A bed with you on it is stepped by the walk (`bouncer`).
-        if (p.stepped || onBed === p) { p.stepped = false; n = 1; } else n = p.sim.step2(dt, true) ? 1 : (p.sim.asleep ? 0 : 1);
-      } else n = p.sim.step(dt);
+        // A bed with you on it is stepped by the walk (`bouncer`); with her
+        // on it, by `herBedStep`.
+        if (p.her) { herBedStep(p, dt); p.stepped = false; n = 1; }
+        else if (p.stepped || onBed === p) { p.stepped = false; n = 1; } else n = p.sim.step2(dt, true) ? 1 : (p.sim.asleep ? 0 : 1);
+      } else n = p.sim.step(dt, p.her ? p.herBefore || (p.herBefore = (h) => herDrive(p, h)) : null);
+      if (p.her) herWatch(p, dt);
       if (!p.sim.asleep) awake++;
       if (n || p.drawn !== false) draw(p);
       p.drawn = n > 0;
@@ -2541,15 +3032,20 @@ function buildPlayground(scene, jad) {
     press: (a, fx, fz) => {
       const p = parts[a.i];
       const fl = Math.hypot(fx, fz) || 1;
-      return shove(p, a.at, fx / fl, fz / fl, SHOVE[p.kind] || 4);
+      // With her on it, a push worth her weight (1.562.0, PGH).
+      if (p.her) p.her.pushedAt = herClock;
+      return shove(p, a.at, fx / fl, fz / fl, p.her ? herShove(p) : SHOVE[p.kind] || 4);
     },
     /** And held: a steady push for dt. */
     hold: (a, fx, fz, dt) => {
       const p = parts[a.i];
       const fl = Math.hypot(fx, fz) || 1;
       const at = p.kind === 'seesaw' ? a.at : hitPoint(p, [0, 0, 0]);
-      return shove(p, at, fx / fl, fz / fl, (HOLD[p.kind] || 30) * dt);
+      if (p.her) p.her.pushedAt = herClock;
+      return shove(p, at, fx / fl, fz / fl, (p.her ? herHold(p) : HOLD[p.kind] || 30) * dt);
     },
+    /** Baye on the kit (1.562.0) — see `HER ON IT`. */
+    her,
     /**
      * Debug: kick part i (all if i < 0) — v m/s along its swing (z of its
      * hinge frame) for a seat, the nest, the rope and the rider; the +z end
@@ -2581,6 +3077,7 @@ function buildPlayground(scene, jad) {
         o.yaw = +(Math.atan2(xv[0] * p.Z[0] + xv[2] * p.Z[2], xv[0] * p.X[0] + xv[2] * p.X[2])).toFixed(3);
       }
       o.msLast = +p.sim.stats.msLast.toFixed(4);
+      if (p.her) o.her = true;
       if (p.kind === 'rider') {
         const n = p.sim.net, b = p.sim.body;
         const yv = pgRot([n.Q[4 * b], n.Q[4 * b + 1], n.Q[4 * b + 2], n.Q[4 * b + 3]], [0, 1, 0]);

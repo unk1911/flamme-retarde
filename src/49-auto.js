@@ -189,7 +189,7 @@ const AUTO_MOVES = {
     can: (v) => v.rag && v.gaze !== Infinity,
     go: (v, k) => { jadrija.autoMove({ glance: 3 + 2 * k }); jadrija.autoMove({ cot: 'lift', k }); return true; } },
   // Her eyes: on you for a few seconds, away from you, lowered, up.
-  glance: { ctx: { front: 1, back: 1, side: 1, sit: 1, cotKneel: 1, kneel: 1, fours: 1, stand: 1, leash: 1, ham: 1, out: 1 },
+  glance: { ctx: { front: 1, back: 1, side: 1, sit: 1, cotKneel: 1, kneel: 1, fours: 1, stand: 1, leash: 1, ham: 1, out: 1, ride: 1 },
     w: 0.9, tags: ['look'], can: (v) => v.gaze !== Infinity && !(v.gaze > 0 && !v.away),
     go: (v, k) => (jadrija.autoMove({ glance: 3 + 3 * k }) ? true : 'busy') },
   away: { ctx: { front: 1, back: 1, side: 1, ham: 1 }, w: 0.6, tags: ['shy'], inv: 'glance',
@@ -243,6 +243,24 @@ const AUTO_MOVES = {
     can: (v) => v.leash.pose === 'kneel', go: () => (jadrija.leashPose('fours') === 'ok' ? true : 'leash') },
   standUp: { ctx: { leash: 1 }, w: 0.25, tags: ['play'], big: 1,
     can: (v) => v.leash.pose === 'kneel' && v.heat < 0.45, go: () => (jadrija.leashPose('stand') === 'ok' ? true : 'leash') },
+  // AT THE PLAYGROUND (1.562.0): on to its kit of her own accord — the
+  // swings, the nest, the seesaw, a trampoline, the slide, the horse — and
+  // off again when she has had it a while. Only standing at the playground
+  // (`atPlay`), never from the promenade: the mode never walks her off.
+  pgSwing: { ctx: { out: 1 }, w: 0.45, tags: ['play'], say: 'play', big: 1,
+    can: (v) => !!v.atPlay && !jadrija.autoWhy('pg:swing'), go: _autoAsk('pg:swing') },
+  pgNest: { ctx: { out: 1 }, w: 0.25, tags: ['play', 'calm'], big: 1,
+    can: (v) => !!v.atPlay && !jadrija.autoWhy('pg:nest'), go: _autoAsk('pg:nest') },
+  pgSeesaw: { ctx: { out: 1 }, w: 0.3, tags: ['play', 'look'], big: 1,
+    can: (v) => !!v.atPlay && !jadrija.autoWhy('pg:seesaw'), go: _autoAsk('pg:seesaw') },
+  pgTramp: { ctx: { out: 1 }, w: 0.4, tags: ['play', 'heat'], say: 'play', big: 1,
+    can: (v) => !!v.atPlay && !jadrija.autoWhy('pg:tramp'), go: _autoAsk('pg:tramp') },
+  pgSlide: { ctx: { out: 1 }, w: 0.35, tags: ['play'], say: 'play', big: 1,
+    can: (v) => !!v.atPlay && !jadrija.autoWhy('pg:slide'), go: _autoAsk('pg:slide') },
+  pgRider: { ctx: { out: 1 }, w: 0.2, tags: ['play'], big: 1,
+    can: (v) => !!v.atPlay && !jadrija.autoWhy('pg:rider'), go: _autoAsk('pg:rider') },
+  pgOff: { ctx: { ride: 1 }, w: 0.5, tags: ['calm'], big: 1,
+    can: (v) => !!v.pg && v.pg.t > 25 && v.pg.kind !== 'slide' && !jadrija.autoWhy('pg.off'), go: _autoAsk('pg.off') },
   // In the hammock: a little push of her own.
   rock: { ctx: { ham: 1 }, w: 1.0, tags: ['play', 'calm'], say: 'ham',
     can: (v) => !!v.hamSwing && Math.abs(v.hamSwing.peak || 0) < 0.2,
@@ -282,6 +300,8 @@ function autoCtx(v) {
   if (p === 'fours') return 'fours';
   if (p === 'dwell' && v.inKab) return 'stand';
   if (p === 'hamHeld') return 'ham';
+  // On the playground's kit (1.562.0): riding it, a stage of its own.
+  if (v.pg && p === 'pgRide') return 'ride';
   if (!v.inKab && AUTO_OUT[p]) return 'out';
   return null;
 }

@@ -3491,6 +3491,9 @@ async function boot() {
   // The two playgrounds and the ping pong, on the ground 43-jadrija.js cleared
   // for them — src/46-playground.js. Its colliders go into the same list.
   playground = jadrija ? buildPlayground(scene, jadrija) : null;
+  // And Baye on its kit (1.562.0): the resort's show is handed the playground
+  // it was built before — see `── THE PLAYGROUND KIT, RIDDEN ──`.
+  if (playground && jadrija.setPlayground) jadrija.setPlayground(playground);
 
   await step(80, 'load.streets');
   airfield = buildAirfield(scene);
@@ -10691,6 +10694,8 @@ function tick(wall, draw) {
       let jet = a ? { x: a[0], y: a[1], z: a[2] } : null;
       if (playJet && playJet.t > 0) { playJet.t -= dt; jet = playJet.at; }
       playground.tick(dt, camera.position, who, jet);
+      // Her, drawn where the seat she is on has just been put (1.562.0).
+      if (jadrija.pgAfter) jadrija.pgAfter();
     }
     // The strap, against her as she has just been posed — see `beltSimTick`.
     beltSimTick(dt);
@@ -12012,6 +12017,16 @@ window.__fr = {
     pushes: () => playPushes,
     beds: () => (playground ? playground.beds() : null),
     jump: () => (ground && ground.ok ? jumpOut() : null),
+    /**
+     * Baye on the kit (1.562.0): `her()` her state on it, `ask(name)` asks
+     * her (`pg:swing`, `pg:nest`, `pg:seesaw`, `pg:tramp`, `pg:slide`,
+     * `pg:rider`, `pg.off`), `state(i)` the kit's side of it.
+     */
+    her: () => (jadrija && jadrija.pg ? jadrija.pg() : null),
+    ask: (name) => (jadrija && jadrija.askShow ? jadrija.askShow(name) : null),
+    state: (i) => (playground ? playground.her.state(i) : null),
+    /** Her skin against the seat she is on: the deepest vertex under its top, m. */
+    clip: () => (jadrija && jadrija.pgClip ? jadrija.pgClip() : null),
   },
   crabs: {
     raw: () => crabs,

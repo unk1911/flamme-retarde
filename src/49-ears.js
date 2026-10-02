@@ -571,10 +571,25 @@ const ears = (() => {
         draw();
         if (!AUTH.baye || !AUTH.user) return;
       }
+      // AND THE PLAYGROUND'S KIT (1.562.0), ahead of the playground itself
+      // so "go to the playground and get on the swing" is the swing — armed
+      // here like the playground, and the line goes on signed in. See
+      // `rideWords`.
+      const rw = rideWords(blob);
+      if (rw) {
+        note('“' + blob + '”  typed · here  → ' + rw, 'heard');
+        const J0 = typeof jadrija !== 'undefined' && jadrija;
+        const got = J0 && J0.askShow ? J0.askShow(rw) : false;
+        note('baye: ' + (got === true ? DOES[rw] : (WHY[got] || 'cannot do that here')),
+          got === true ? 'did' : 'meta');
+        armedHere = rw;
+        draw();
+        if (!AUTH.baye || !AUTH.user) return;
+      }
       // AND THE PLAYGROUND (1.555.2): armed here, and — signed in — the line
       // goes on so she says yes to it; her `does` coming back for the same
       // name is then skipped rather than asked twice. See `groundsWords`.
-      const gw = groundsWords(blob);
+      const gw = rw ? null : groundsWords(blob);
       if (gw) {
         note('“' + blob + '”  typed · here  → ' + gw, 'heard');
         const J0 = typeof jadrija !== 'undefined' && jadrija;
@@ -900,6 +915,11 @@ const ears = (() => {
     hammock: 'off to the hammock in the pines', 'hammock.out': 'getting out of the hammock',
     // And the playground behind the kabine (1.555.2) — see MEET.
     grounds: 'off to the playground behind the kabine',
+    // And its kit (1.562.0) — see `── THE PLAYGROUND KIT, RIDDEN ──`.
+    'pg:swing': 'off to the swings', 'pg:nest': 'off to the nest swing',
+    'pg:seesaw': 'off to the seesaw', 'pg:tramp': 'off to bounce on the trampoline',
+    'pg:slide': 'up the ladder and down the slide', 'pg:rider': 'off to ride the spring horse',
+    'pg.off': 'getting off',
     // And the recon missions. She walks off and there is nothing else to see
     // until she is back, so the panel says where she has gone.
     'see.slast': 'off to the ice cream place, back in a minute',
@@ -987,6 +1007,12 @@ const ears = (() => {
     // The playground's (1.555.2). On the leash the way there is you.
     leadher: 'she is on the leash — lead her there yourself',
     cotleashed: 'she is collared to the cot — take the collar off first',
+    // The kit's (1.562.0).
+    nopg: 'there is nothing like that at the playground',
+    pgbusy: 'somebody is already on that one',
+    pgon: 'she is already on it',
+    notpg: 'she is not on anything at the playground',
+    pgoff: 'she is already getting off',
   };
 
   /**
@@ -1007,6 +1033,47 @@ const ears = (() => {
     if (/^(the |to the |na |u |a l'|au )?(play ?ground|igraliste|ping ?pong|aire de jeux)$/.test(t)) return 'grounds';
     const go = /\b(come|coming|go|going|let'?s|lets|meet|see you|join|head|walk|run|race|take me|follow|bring|over|idemo|hajdemo|ajmo|ajde|hajde|dodi|dodji|idi|nadimo|nadjimo|nadi|vidimo|pridruzi\w*|allons|allez|viens|va|vas|rejoins|retrouve|on va|treffen|gehen|komm)\b/;
     return go.test(t) ? 'grounds' : null;
+  }
+
+  /**
+   * THE PLAYGROUND'S KIT, typed (1.562.0) — "get on the swing", "swing",
+   * "the nest swing", "seesaw", "jump on the trampoline", "go down the
+   * slide", "ride the horse", and "get off"; "ljuljačka", "sjedni na
+   * ljuljačku", "klackalica", "trampolin", "tobogan", "konjić", "siđi";
+   * "balançoire", "bascule", "toboggan", "cheval". The noun with a verb of
+   * using it or going to it, or the noun as the whole line. "Trampoline" is
+   * the playground's only when she or you are at the playground: on the
+   * beach it is still the beach's trampolines (the service's `tramp`). "Get
+   * off" only while she is on something; otherwise the line goes on to her.
+   */
+  function rideWords(text) {
+    const t = String(text).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/đ/g, 'd').replace(/[.!?,;:]+/g, ' ').replace(/\s+/g, ' ').trim();
+    if (!t) return null;
+    const J0 = typeof jadrija !== 'undefined' && jadrija;
+    const v = J0 && J0.pg ? J0.pg() : null;
+    const onIt = !!(v && v.pg && /^pg/.test(v.phase));
+    if (onIt && /^((get|hop|jump|climb|come) (off|down)( of)?( it| that| the \w+( \w+)?)?|off|sidi|sidji|silazi|sici|sidi (s|sa) (toga|nje|njega|ljuljacke|klackalice|trampolina|konjica)|descends?)( please| baye)?$/.test(t)) return 'pg.off';
+    const kinds = [
+      ['nest', /\b(nest( swing)?|basket swing|gnijezd\w*|nid)\b/],
+      ['seesaw', /\b(see-?saws?|teeter[- ]?totter|klackalic\w*|tape-?cul|bascule|wippe)\b/],
+      ['tramp', /\b(trampolin\w*)\b/],
+      ['slide', /\b(slides?|tobogan\w*|toboggan|rutsche)\b/],
+      ['rider', /\b(spring rider|rocking horse|horsey|horse|pony|konjic\w*|konj\w*|cheval\w*)\b/],
+      ['swing', /\b(swings?|ljuljack\w*|ljuljaj\w*|balancoire\w*|schaukel\w*)\b/],
+    ];
+    let kind = null;
+    for (const [k, re] of kinds) if (re.test(t)) { kind = k; break; }
+    if (!kind) return null;
+    // "swing me" in the hammock is the hammock's.
+    if (kind === 'swing' && /\bswing (me|her|it|you|us)\b/.test(t)) return null;
+    // The trampoline at the playground is the playground's; anywhere else
+    // it is the beach's errand, which the service names.
+    if (kind === 'tramp' && !(J0 && J0.pgNear && J0.pgNear())) return null;
+    const words = t.split(' ').length;
+    const bare = words <= 4 && /^(the |a |on the |onto the |na |u |sur la |le |la |to the )?\S+( swing| rider| horse)?$/.test(t);
+    const verb = /\b(get|hop|jump|bounce|go|goes|going|climb|sit|ride|riding|try|use|play|on|onto|down|come|let'?s|lets|wanna|want|can you|could you|will you|idi|idemo|ajde|hajde|sjedni|sjedi|popni|penji|skoci|skaci|skakati|skakuci|spusti|spustaj|jasi|jahati|zajasi|ljuljaj|zaljuljaj|klackaj|monte|va|vas|allez|allons|essaie|fais|saute|glisse|descends)\b/.test(t);
+    return bare || verb ? 'pg:' + kind : null;
   }
 
   /**
