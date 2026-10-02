@@ -69,7 +69,7 @@ merged + released before the next starts. Consensual adult kabina play; safeword
    expanding-hole shader; pooled, cheap (dozens, one shader). RULE 4 for any 43-jadrija.js
    bather change (own RNG). people 100 / blockers 820.
 
-11. [ ] **Baye speaks English** (Misha, 06:20: "the speech for baye should be in English, not
+11. [x] **Baye speaks English** (Misha, 06:20: "the speech for baye should be in English, not
    croatian ... keep using that same eleven labs voice" = Jessica `LEnmbrrxYsUYS7vsRRwD`,
    unchanged). Every Baye line she SPEAKS and captions becomes English, rewritten to sound
    natural (not word-for-word from the gloss), no gloss line: baye.py PERSONA / PERSONA_TALK
