@@ -37548,6 +37548,8 @@ async function buildJadrija(scene) {
     const f = K.floor, dc = K.dc;
     // Where the room's own lights are, for `roomLightInit` (1.552.1).
     let shelfAt = null, candleAt = null, pendAt = null;
+    // And where the plug stands on that shelf (1.560.1) — see PLUG.
+    let plugAt = null;
     const along = (d) => dc + d * KAB.grow, back = (d) => K.s0 + d * KAB.grow;
     const tv = tvPanel(), radio = radioPanel();
 
@@ -38765,6 +38767,16 @@ async function buildJadrija(scene) {
         const SW = K.s1 - 0.002, sy = f + 1.60, YT = sy + 0.032;
         const ST0 = dc - 0.70, ST1 = dc + 0.70, SD = 0.26, sI = SW - 0.12;
         shelfAt = { t0: ST0, t1: ST1, s0: SW - SD, s1: SW, y: YT };
+        // ── AND THE PLUG STANDS HERE (1.560.1) ──
+        //
+        // Misha, 1 Oct 2026: *"a butt plug that can stand on that shelf by the
+        // tv"*. Between the candle and the photograph, and forward of both:
+        // the candle's dish is 0.053 across the middle at `sI + 0.01`, so
+        // its edge is 27 mm from the plug's base at the nearest, and the
+        // photograph leans on the wall 70 mm behind it. In the candle's light,
+        // which is the only light on that shelf. Nothing is drawn here: it is
+        // a prop like the Lovense on the tabouret — see `plugMesh`.
+        plugAt = [dc - 0.035, SW - 0.150, YT];
         knRR(W, ST0, ST1, SW - SD, SW, sy, YT, 0.012, 0.009, KIT.wood, KIT.woodT,
           { bottom: true });
         // The brackets: a board cut to a scooped profile, one each end.
@@ -39121,9 +39133,27 @@ async function buildJadrija(scene) {
           return [bt + o[0] / L * 0.74, bs + o[1] / L * 0.74,
             Math.atan2(-o[1] / L, -o[0] / L) + 0.10];
         };
+        // ── AND THE MARK UNDER THE SHELF (1.560.1) ──
+        //
+        // Where she stands to take the plug down: square to the back wall
+        // and a stride short of it, with the plug off her right shoulder by
+        // the same 0.35 rad `LEAD` puts every other object there. 0.38 m out
+        // along that bearing is 0.36 m short of the plug in depth, so her
+        // face is a hand's width from the shelf's front edge rather than under
+        // it — the plank is at her eye height. See PLUG.
+        const plug = plugAt ? (() => {
+          // A number here and not a row of PLUG, which is declared thirty
+          // thousand lines on and is in its dead zone while this is built —
+          // the `lovenseMesh` lesson.
+          const ph = -Math.PI / 2 - LEAD, R = 0.38;
+          return [plugAt[0] + Math.cos(ph) * R, plugAt[1] + Math.sin(ph) * R,
+            Math.atan2(-Math.sin(ph), -Math.cos(ph)) + LEAD];
+        })() : null;
         return { coke: at(LAY.plate), line: face(LAY.plate),
-          lift: at(LAY.spot), out: OUT };
+          lift: at(LAY.spot), out: OUT, plug };
       })(),
+      // Where the plug lives when nobody is wearing it — see PLUG.
+      plugSpot: plugAt,
       // The cot, for the dog: where he lies on it, how high the mattress is,      // The cot, for the dog: where he lies on it, how high the mattress is,
       // and where he stands on the floor to get up. Off `cm`/`cs0` rather than
       // typed, because the furniture moved outward on its own when the hut went
@@ -57187,7 +57217,7 @@ async function buildJadrija(scene) {
       // deck there is no stool to fetch anything from — see `placeIt`, which
       // puts a thing down at her feet out there and is a different errand.
       if (!sheIsIn()) return 'outside';
-      if (!kit || !kit.work) return 'nokit';
+      if (!donMark(key)) return 'nokit';
       return null;
     }
     if (name.startsWith('doff:')) {
@@ -57202,7 +57232,7 @@ async function buildJadrija(scene) {
       if (!row || !row.wear) return 'notwearable';
       if (!worn[key]) return 'notworn';
       if (giftHeld) return 'holding';
-      if (sheIsIn() && (!kit || !kit.spot)) return 'nokit';
+      if (sheIsIn() && (!kit || !(key === 'plug' ? kit.plugSpot : kit.spot))) return 'nokit';
       return null;
     }
     if (name === 'side.left' || name === 'side.right') {
@@ -58802,9 +58832,11 @@ async function buildJadrija(scene) {
         show.queue.length = 0;
         show.side = 0;
         showSay('trill', d);
-        if (kit && kit.work
-            && Math.hypot(show.t - kit.work.lift[0], show.s - kit.work.lift[1]) > 0.26) {
-          show.goMark = kit.work.lift;
+        // The plug is on the shelf and not the stool (1.560.1): its own mark,
+        // and the same walk to it. See `donMark`.
+        const mk = donMark(show.don);
+        if (mk && Math.hypot(show.t - mk[0], show.s - mk[1]) > 0.26) {
+          show.goMark = mk;
           show.goNext = 'liftIt';
           go('stepTo', 'walk', 0.34);
         } else go('liftIt', 'idle', 0.40);
@@ -59824,9 +59856,10 @@ async function buildJadrija(scene) {
         // the wood, which is the same job the plate is and wants the same
         // arm's length. From the pour mark the set-down spot is 0.56 m away,
         // which is past her reach; from this one it is 0.280 m. See `work`.
-        show.want = kit && kit.work ? kit.work.lift[2] : show.want;
+        const mk = donMark(show.don);
+        show.want = mk ? mk[2] : show.want;
         showHold(dt);
-        if (show.tmr < DON.settle && kit && kit.work) showSettle(kit.work.lift, dt, 10.0);
+        if (show.tmr < DON.settle && mk) showSettle(mk, dt, 10.0);
         // Published for the arm, which is solved a long way below this and
         // after the pose — the crouch and the cut have the same arrangement
         // and the note over `cokeStoop` says why.
@@ -59841,13 +59874,20 @@ async function buildJadrija(scene) {
             && m.userData.key === show.don);
           if (ix < 0) { show.don = null; show.donAt = 0; showNext(); break; }
           const m = giftProps.splice(ix, 1)[0];
+          const stands = show.don === 'plug';
           giftHeld = { key: show.don, mesh: m, up: 0, grip: 0,
             from: m.position.clone(), fromQ: m.quaternion.clone(),
             // How it sits in the fist: its long axis along the grip, which is
             // the direction `GRIP_UP` was measured in for the bottle. Left at
-            // identity the loop lies across her palm like a plate.
+            // identity the loop lies across her palm like a plate. The plug's
+            // long axis is its own +y, base to tip, and the base goes to the
+            // little-finger side, where a fist holds the handle of a thing.
             hold: new THREE.Quaternion().setFromUnitVectors(
-              new THREE.Vector3(1, 0, 0), vAx.copy(GRIP_UP).normalize()) };
+              new THREE.Vector3(stands ? 0 : 1, stands ? 1 : 0, 0),
+              vAx.copy(GRIP_UP).normalize()),
+            // And where along it her fist closes, which for the Lovense is
+            // its origin and for the plug is the waist of the bulb.
+            mid: stands ? PLUG.grab : 0 };
           showSay('squee', d);
         }
         if (giftHeld) {
@@ -59861,8 +59901,9 @@ async function buildJadrija(scene) {
       // thing from the stool to her own hip, and at the end the prop is thrown
       // away and the worn group takes over — the same swap `wearIt` makes, so
       // there is never two of it.
-      case 'strapIt':
-        show.want = kit && kit.work ? kit.work.lift[2] : show.want;
+      case 'strapIt': {
+        const mk = donMark(show.don);
+        show.want = mk ? mk[2] : show.want;
         showHold(dt);
         show.donAt = 1;
         if (!giftHeld) { show.don = null; show.donAt = 0; showNext(); break; }
@@ -59890,6 +59931,7 @@ async function buildJadrija(scene) {
           showNext();
         }
         break;
+      }
 
       case 'placeIt':
         show.want = Math.atan2(ps - show.s, pt - show.t);
@@ -62505,6 +62547,12 @@ async function buildJadrija(scene) {
         // which is untouched.
         qHold.copy(qHand);
         if (giftHeld.hold) qHold.multiply(giftHeld.hold);
+        // Held by its middle and not by its origin — the plug's origin is the
+        // face of its base (1.560.1). Along its own long axis, which `hold`
+        // has just laid on the grip.
+        if (giftHeld.mid) {
+          vPalm.addScaledVector(vAx.set(0, 1, 0).applyQuaternion(qHold), -giftHeld.mid);
+        }
         if (giftHeld.from && giftHeld.grip < 1) {
           const k = giftHeld.grip * giftHeld.grip * (3 - 2 * giftHeld.grip);
           giftHeld.mesh.position.lerpVectors(giftHeld.from, vPalm, k);
@@ -62883,6 +62931,57 @@ async function buildJadrija(scene) {
     m.userData.key = 'lovense';
     giftProps.push(m);
   }
+
+  /**
+   * ── AND THE OTHER ONE, ON THE SHELF ────────────────────────────────────
+   *
+   * Misha, 1 Oct 2026: *"can we add a butt plug that can stand on that shelf
+   * by the tv, and can be used, to stimulate, similar to lovense"*, and of
+   * why it is the same feature: *"our lovense does go into baye for
+   * stimulation and works very nicely so the butt toy would be the same as
+   * that just for the other entrance"*.
+   *
+   * So it is the Lovense's every path with a second key on it — `plug` in
+   * CARRY, a receiver `signalSet` finds in `giftProps`, `wear:` to fetch it
+   * and `doff:` to put it back — and this table is the handful of numbers
+   * that are its own. Declared HERE, above the pre-placement, and not beside
+   * TOY: the shelf copy is set down while the file is still being built, and
+   * a `const` further down is in its dead zone at that moment (rule 3, and
+   * the `lovenseMesh` note says what that looks like — a page that stops at
+   * 78 per cent).
+   *
+   * WHERE ON HER, in her BIND frame — +x in front, +y up, the pelvis bone at
+   * (0.0152, 0.9344, 0) — and it is v2.0's body it is fitted to, because v2.0
+   * is the one drawn: `plugFit` measures against her mesh, not v1.0's. `at`
+   * is the middle of the base's OUTER face, the flat with the light in it;
+   * `tilt` is how far the plug's own axis rises above her forward, which is
+   * the way that entrance runs. Both were swept through `__fr.jad.raw().plug`
+   * against `plugFit`'s numbers, the way TOY's two were.
+   */
+  const PLUG = {
+    at: [-0.0225, 0.8175, 0],
+    tilt: 1.05,
+    /** Metres the motor moves it while it is in her — less than TOY.buzz: it is held all round. */
+    buzz: 0.0007,
+    /** How far up its own axis her fist closes on it: the waist of the bulb. */
+    grab: 0.052,
+  };
+
+  /**
+   * Stand it on the shelf: base down, the long way of the base along the
+   * plank. The pre-placement and `doffNow` both put it here, so taking it out
+   * leaves the room exactly as it was built.
+   */
+  function plugHome(m) {
+    const at = kit.plugSpot;
+    const w = toWorld(at[0], at[1]);
+    m.position.set(w[0], at[2], w[2]);
+    m.rotation.set(0, faceYaw(at[0], 0), 0);
+    restOn(m, at[2]);
+    m.userData.key = 'plug';
+    return m;
+  }
+  if (kit && kit.plugSpot) giftProps.push(plugHome(giftMesh('plug')));
 
   /**
    * ── AND SHE CAN FETCH IT OFF THERE AND PUT IT ON ───────────────────────
@@ -65421,7 +65520,34 @@ async function buildJadrija(scene) {
   const DON_ARM = { up: 0.104, fwd: -0.020, follow: 9.0, pole: REACH_POLE };
   const DON_AT = { up: 0.104, fwd: -0.020 };
   const DON_HIP = { up: 0.035, fwd: 0.080 };
+  /**
+   * AND THE PLUG'S TWO (1.560.1). Off the shelf her wrist comes at the bulb's
+   * waist from in front and a little above — a hand taking a thing down off
+   * a shelf at eye height closes round it from the side, not from over the
+   * top of it — and the length is the hand's own 0.088 plus a few millimetres,
+   * which is the arithmetic `COKE_HAND.liftWrap` writes down.
+   *
+   * AT THE MOUNT IT IS ABOVE AND A SHADE BEHIND, with the elbow out and BACK
+   * rather than out and forward. Swept, six ways, for the closest her grip
+   * comes to the base while she presses it in (`plug().palm.mount`): the
+   * wrist straight behind it, which was the first guess, never came within
+   * 106 mm — an arm straight down her back is an arm at full stretch — and
+   * 0.09 over it and 15 mm behind comes to 50. That is a fist round the
+   * bulb's waist with the base under the heel of her hand, which is what
+   * holding it by the middle and pushing looks like: PLUG.grab is 52.
+   */
+  const DON_SHELF = { up: 0.030, fwd: -0.086 };
+  const DON_BACK = { up: 0.060, fwd: -0.110,
+    pole: new THREE.Vector3(-0.8, 0.1, 0.6).normalize() };
   const _dnTo = new THREE.Vector3();
+  /**
+   * Where she stands to fetch a thing that is out: the plate's mark at the
+   * stool for the Lovense, the mark under the shelf for the plug (1.560.1).
+   */
+  function donMark(key) {
+    if (!kit || !kit.work) return null;
+    return key === 'plug' && kit.work.plug ? kit.work.plug : kit.work.lift;
+  }
   function donReach(f, dt) {
     const lift = show.phase === 'liftIt', strap = show.phase === 'strapIt';
     const want = lift || strap ? (show.donAt || 0) : 0;
@@ -65435,10 +65561,24 @@ async function buildJadrija(scene) {
     // hand stays on the wood until it has actually closed on the thing, which
     // is `grip` reaching 1, and only then starts for her hip.
     const home = strap || (giftHeld && giftHeld.grip >= 1);
+    const plug = show.don === 'plug';
     if (home) {
-      if (!toyMount(f, _dnTo)) return;
-      DON_ARM.up = DON_HIP.up;
-      DON_ARM.fwd = DON_HIP.fwd;
+      if (!toyMount(f, _dnTo, show.don)) return;
+      DON_ARM.up = plug ? DON_BACK.up : DON_HIP.up;
+      DON_ARM.fwd = plug ? DON_BACK.fwd : DON_HIP.fwd;
+      DON_ARM.pole = plug ? DON_BACK.pole : REACH_POLE;
+    } else if (plug) {
+      // Up on the shelf, by the waist of it — see DON_SHELF.
+      if (giftHeld && giftHeld.from) _dnTo.copy(giftHeld.from);
+      else {
+        const m = giftProps.find((x) => x.userData && x.userData.key === 'plug');
+        if (!m) return;
+        _dnTo.copy(m.position);
+      }
+      _dnTo.y += PLUG.grab;
+      DON_ARM.up = DON_SHELF.up;
+      DON_ARM.fwd = DON_SHELF.fwd;
+      DON_ARM.pole = REACH_POLE;
     } else {
       // Where it is lying, which is where it was lying: the prop is being
       // ramped into her palm by then and reading its live position would be
@@ -65451,6 +65591,7 @@ async function buildJadrija(scene) {
       }
       DON_ARM.up = DON_AT.up;
       DON_ARM.fwd = DON_AT.fwd;
+      DON_ARM.pole = REACH_POLE;
     }
     reachRight(f, dt, 'don', _dnTo, show.donArm, DON_ARM);
   }
@@ -67813,7 +67954,9 @@ async function buildJadrija(scene) {
       // And the light goes out with it.
       if (rx.led) rx.led.uniforms.uEmissive.value = 0;
       if (show) { show.buzzNod = 0; show.buzzBlink = 0; }
-      if (audio && audio.buzz) audio.buzz(false);
+      // Its OWN motor: with two receivers there are two voices, and turning
+      // the plug off must not silence a Lovense that is still running.
+      if (audio && audio.buzz) audio.buzz(false, 0, 0, key);
       // And the phone stops with it, mid-pulse if that is where it is.
       if (IS_TOUCH && navigator.vibrate) navigator.vibrate(0);
       return 'off';
@@ -67834,7 +67977,9 @@ async function buildJadrija(scene) {
    * room to do it.
    */
   function wornBuzz(key) {
-    if (key !== 'lovense') return;
+    // Both of the things with a motor in them — the plug announces itself
+    // going in exactly as the Lovense does (1.560.1).
+    if (key !== 'lovense' && key !== 'plug') return;
     signalSet(key, true, BUZZ_FOR.wear);
   }
 
@@ -67874,7 +68019,10 @@ async function buildJadrija(scene) {
     // be tidy and wrong — you could not carry them out of the room.
     // And out of doors there is no tabouret within reach, so the Lovense
     // goes where the others go — to you (1.559.1). Indoors it is furniture.
-    if (key !== 'lovense' || !sheIsIn()) {
+    // The plug the same, and its furniture is the shelf (1.560.1).
+    const home = key === 'lovense' ? kit && kit.spot
+      : key === 'plug' ? kit && kit.plugSpot : null;
+    if (!home || !sheIsIn()) {
       if (typeof satchelPut === 'function') satchelPut(key, 1);
       return true;
     }
@@ -67885,6 +68033,10 @@ async function buildJadrija(scene) {
         mh.geometry = mh.userData.geoWas;
         mh.userData.geoWas = null;
       }
+    }
+    if (key === 'plug') {
+      giftProps.push(plugHome(giftMesh(key)));
+      return true;
     }
     if (kit && kit.spot) {
       const m = giftMesh(key);
@@ -67914,7 +68066,12 @@ async function buildJadrija(scene) {
       if (show) show.buzzNod = 0;
       return;
     }
-    let near = 1e9, shake = 0, loud = 0;
+    let near = 1e9, shake = 0;
+    // WHAT REACHES HER is one envelope and not one per receiver (1.560.1): the
+    // larger of the beats of whatever is IN her, this frame. Two toys running
+    // together are not twice the nod or two blinks a pulse — her face follows
+    // whichever is pulsing, and a pulse of either starts the blink.
+    let onHer = 0, herNod = 0;
     for (const k of keys) {
       const sg = signals[k];
       // WHERE IT IS THIS FRAME, and not where it was when the signal was
@@ -67923,7 +68080,9 @@ async function buildJadrija(scene) {
       // `liftIt` — and the honest thing for a motor in a hand is to keep
       // running and move nothing, which is what skipping this does.
       const rx = receiverOf(k);
-      if (!rx) continue;
+      // Silent in her fist, as it always was: the one voice used to fall to
+      // the loudest of the receivers it could find, and this one it cannot.
+      if (!rx) { if (audio && audio.buzz) audio.buzz(true, SIGNAL.hear, 0, k); continue; }
       if (sg.node !== rx.node) {
         sg.node = rx.node;
         sg.at.copy(rx.node.position);
@@ -67940,8 +68099,9 @@ async function buildJadrija(scene) {
       // is what makes the gaps gaps: the thing stops moving, the sound goes,
       // the wine settles and the light drops back. See `signalAmp`.
       const beat = signalAmp(sg.t);
-      // A tabletop lets it skid; a hip does not — see `TOY.buzz`.
-      const amp = (rx.table ? SIGNAL.walk : TOY.buzz) * beat;
+      // A tabletop lets it skid; a hip does not — see `TOY.buzz`, and
+      // `PLUG.buzz` for the one that is held all round.
+      const amp = (rx.table ? SIGNAL.walk : k === 'plug' ? PLUG.buzz : TOY.buzz) * beat;
       sg.node.position.set(
         sg.at.x + Math.sin(a) * amp,
         sg.at.y + Math.abs(Math.sin(a * 2)) * amp * 0.4,
@@ -67959,8 +68119,10 @@ async function buildJadrija(scene) {
       // moved rather than on the one after it.
       sg.node.updateWorldMatrix(true, false);
       _sigW.setFromMatrixPosition(sg.node.matrixWorld);
+      let nearK = SIGNAL.hear;
       if (ear) {
-        near = Math.min(near, Math.hypot(ear.x - _sigW.x, ear.z - _sigW.z));
+        nearK = Math.hypot(ear.x - _sigW.x, ear.z - _sigW.z);
+        near = Math.min(near, nearK);
         sg.near = +near.toFixed(2);
       }
       // ── AND THE PHONE IN YOUR HAND, once a pulse ─────────────────────────
@@ -67998,15 +68160,17 @@ async function buildJadrija(scene) {
         rx.led.uniforms.uEmissive.value =
           (0.72 + 0.28 * Math.sin(sg.t * 5.7)) * (0.22 + 0.78 * beat);
       }
-      if (beat > loud) loud = beat;
+      // ITS OWN VOICE, each — see `BUZZ_VOICE` in 80-audio.js. It used to be
+      // the loudest of them through one voice, and two motors in one voice
+      // cannot be told apart, which is the point of having two channels.
+      if (audio && audio.buzz) audio.buzz(true, Math.min(nearK, SIGNAL.hear), beat, k);
       // AND WHAT IT DOES TO HER, which is only a question when the thing is
       // ON her: a toy buzzing on a tabouret is furniture. The nod follows the
       // envelope and the blink is struck on each pulse's onset — see
       // `gazeTick` and `buzzFace`, which are the two ends of it.
       if (!rx.table && show) {
-        show.buzzNod = beat;
-        if (beat > 0.5 && !sg.lid) show.buzzBlink = 1;
-        sg.lid = beat > 0.5;
+        onHer = 1;
+        herNod = Math.max(herNod, beat);
       }
       // How much of it reaches the glass. Through the tabletop, not through
       // the air: a thing on the same 46 cm top shakes the wine, the same
@@ -68027,9 +68191,14 @@ async function buildJadrija(scene) {
       kit.wineBuzz.value = shake;
       kit.wineT.value += dt;
     }
-    // The loudest of them, so two receivers do not cancel each other out in
-    // the one voice they share.
-    if (audio && audio.buzz) audio.buzz(true, Math.min(near, SIGNAL.hear), loud);
+    // Her face, off the one envelope — see `onHer` above. The blink's latch
+    // is hers and not the signal's, so the onset it is struck on is the
+    // onset of the combined beat.
+    if (onHer && show) {
+      show.buzzNod = herNod;
+      if (herNod > 0.5 && !show.buzzUp) show.buzzBlink = 1;
+      show.buzzUp = herNod > 0.5;
+    }
   }
 
   /**
@@ -68184,17 +68353,23 @@ async function buildJadrija(scene) {
    */
   const _mtV = new THREE.Vector3(), _mtQ = new THREE.Quaternion();
   let pelvisB = null;
-  function toyMount(f, out) {
+  function toyMount(f, out, key = 'lovense') {
     if (pelvisB === null) pelvisB = f.boneIndex('pelvis');
     if (pelvisB < 0) return null;
     const bone = f.bones[pelvisB];
+    // And the plug's, which is the middle of its base, carried by her skin
+    // the way the worn one is — see `plugCarry`.
+    if (key === 'plug' && appr) {
+      return plugCarry(plugSkin(), out, null).applyMatrix4(f.mesh.matrixWorld);
+    }
+    const T = key === 'plug' ? PLUG.at : TOY.tip;
     // The exit point and not the object's middle, because the middle of this
     // one is inside her: what her hand has to arrive at is where the thing
     // goes in, which is `TOY.tip` — a figure-space point, so it comes off the
     // bone's REST position and is then carried by whatever the bone has done
     // since. The same arithmetic `wearTick` does for the group itself.
-    _mtV.set(TOY.tip[0] - bone.t[0], TOY.tip[1] - bone.t[1],
-      TOY.tip[2] - bone.t[2]).applyQuaternion(f.boneTurn(pelvisB, _mtQ));
+    _mtV.set(T[0] - bone.t[0], T[1] - bone.t[1],
+      T[2] - bone.t[2]).applyQuaternion(f.boneTurn(pelvisB, _mtQ));
     f.boneAt(pelvisB, out).add(_mtV);
     return out.applyMatrix4(f.mesh.matrixWorld);
   }
@@ -68280,6 +68455,7 @@ async function buildJadrija(scene) {
   function wearableParts(key, where, mesh) {
     if (key === 'headphones') return [{ group: headphonesGroup(), bone: 'head' }];
     if (key === 'lovense') return [toyWorn(mesh)];
+    if (key === 'plug') return [plugWorn(mesh)];
     if (where === 'wrists') {
       // Three parts and not two: the pair, and the thing between them. The
       // chain is not on a bone — it is on both of them — so it comes last
@@ -68351,6 +68527,13 @@ async function buildJadrija(scene) {
           if (!part.group.parent) skinFig.mesh.add(part.group);
           part.group.visible = true;
           chainTick(part.chain, dt);
+          continue;
+        }
+        // On her skin rather than on a bone — the plug, see `plugCarry`.
+        if (part.skin) {
+          if (!part.group.parent) skinFig.mesh.add(part.group);
+          plugCarry(part.skin, part.group.position, part.group.quaternion);
+          part.group.visible = true;
           continue;
         }
         if (wearBone[part.bone] === undefined) {
@@ -68612,6 +68795,398 @@ async function buildJadrija(scene) {
   }
 
   /**
+   * ── THE PLUG, AS AN OBJECT ─────────────────────────────────────────────
+   *
+   * Misha, 1 Oct 2026: *"a butt plug that can stand on that shelf by the tv"*.
+   * The remote-controlled kind: a smooth silicone body of revolution — a
+   * tapered bulb, a narrow neck, and a flat flared base with the light and
+   * the charging contacts in it — in a deep aubergine rather than the
+   * Lovense's pink, so the two are told apart across the room.
+   *
+   *     101.5 mm  overall, base to tip        34 mm  the bulb, at its widest
+   *      16 mm    the neck                    46 x 28 mm  the base, an oval
+   *
+   * A LATHE, and so it is drawn off a radius table against height rather than
+   * off a curve: the bulb's waist and the tip's round-over are where the
+   * table is dense, and a Catmull-Rom through it gives 110 rings without a
+   * facet in the silhouette.
+   *
+   * THE BASE IS AN OVAL and not a disc, which is the one thing about the shape
+   * that is not decoration. A flared base is there to stay outside, and the
+   * place it stays is between her cheeks — so the long way of it runs along
+   * that line and the short way across it, as the real ones are made. A
+   * round one the same length would stand 9 mm into each cheek. Scaled in
+   * `z` below the neck only, blended over the top of the flare so the neck is
+   * still round, and the normals carried through the same scale inverted.
+   *
+   * AND THE SAME TRICK THE LOVENSE PLAYS, for the same reason: worn, only the
+   * base and the first of the neck are drawn (`wornGeo`). The bulb is inside
+   * her by `plugFit`'s numbers, and a body with no volume to be inside of
+   * shows the swell through nothing — TOY's note says how that was found.
+   *
+   * Built during the build — the shelf copy is pre-placed — so nothing in here
+   * may reach a `const` declared further down the file. See `lovenseMesh`.
+   */
+  function plugMesh() {
+    // [radius, height] in metres, the base's outer face at 0 and the tip up.
+    const P = [
+      [0.0000, 0.0000], [0.0150, 0.0000], [0.0200, 0.0007], [0.0226, 0.0026],
+      [0.0231, 0.0046], [0.0222, 0.0064], [0.0190, 0.0076], [0.0128, 0.0086],
+      [0.0090, 0.0108], [0.0080, 0.0150], [0.0083, 0.0210], [0.0103, 0.0290],
+      [0.0138, 0.0390], [0.0163, 0.0490], [0.0171, 0.0560], [0.0164, 0.0630],
+      [0.0140, 0.0720], [0.0106, 0.0810], [0.0069, 0.0895], [0.0036, 0.0960],
+      [0.0012, 0.1003], [0.0000, 0.1015],
+    ];
+    const pts = new THREE.SplineCurve(P.map(([r, y]) => new THREE.Vector2(r, y)))
+      .getPoints(110);
+    for (const p of pts) p.x = Math.max(0, p.x);
+    pts[0].set(0, 0);
+    pts[pts.length - 1].set(0, P[P.length - 1][1]);
+    // The oval: `z` taken in to 0.60 across the flare and back to round by
+    // the top of it. A normal goes through the inverse of the same scale.
+    const oval = (geo) => {
+      const pos = geo.attributes.position, nrm = geo.attributes.normal;
+      for (let i = 0; i < pos.count; i++) {
+        const k = sat((pos.getY(i) - 0.0072) / 0.0032);
+        const sz = 0.60 + 0.40 * k * k * (3 - 2 * k);
+        pos.setZ(i, pos.getZ(i) * sz);
+        const nx = nrm.getX(i), ny = nrm.getY(i), nz = nrm.getZ(i) / sz;
+        const L = Math.hypot(nx, ny, nz) || 1;
+        nrm.setXYZ(i, nx / L, ny / L, nz / L);
+      }
+      return geo;
+    };
+    const SEG = 48;
+    const geo = oval(new THREE.LatheGeometry(pts, SEG));
+    const skin = solidMaterial(new THREE.Color(0.170, 0.050, 0.235),
+      { spec: 0.85, specPower: 90, vcol: false });
+    const m = new THREE.Mesh(geo, skin);
+    // Worn: the base and 4 mm of neck, closed on the axis just inside her.
+    {
+      const cut = pts.filter((p) => p.y <= 0.0118);
+      const last = cut[cut.length - 1];
+      cut.push(new THREE.Vector2(last.x * 0.8, 0.0124), new THREE.Vector2(0, 0.0128));
+      m.userData.wornGeo = oval(new THREE.LatheGeometry(cut, SEG));
+    }
+    // THE LIGHT, in the outer face of the base, off-centre on the long axis
+    // where the real ones carry it — and the two charging contacts opposite.
+    // Its own material like the Lovense's and for the same reason: dark at
+    // rest, and `signalTick` writes `uEmissive` while the motor runs. Blue
+    // rather than pink, which is the second way of telling the two apart.
+    const led = solidMaterial(new THREE.Color(0.550, 0.800, 1.000),
+      { spec: 0.60, specPower: 60, vcol: false, emissive: 0 });
+    const dot = new THREE.Mesh(new THREE.CylinderGeometry(0.0021, 0.0021, 0.0010, 14), led);
+    dot.position.set(0.0115, -0.0003, 0);
+    m.add(dot);
+    const pin = solidMaterial(new THREE.Color(0.780, 0.640, 0.330),
+      { spec: 0.90, specPower: 120, vcol: false });
+    for (const z of [-0.0032, 0.0032]) {
+      const c = new THREE.Mesh(new THREE.CylinderGeometry(0.0011, 0.0011, 0.0008, 10), pin);
+      c.position.set(-0.0105, -0.0002, z);
+      m.add(c);
+    }
+    m.userData.led = led;
+    m.userData.ledAt = dot.position.clone();
+    // It STANDS: base down, which is how its own frame is drawn.
+    m.userData.lay = 0;
+    return m;
+  }
+
+  /**
+   * ── ON HER SKIN, AND NOT ON A BONE ─────────────────────────────────────
+   *
+   * The Lovense rides the pelvis bone, rigidly, and the plug was put there
+   * first. `plugFit({ pose: true })` said why that cannot work for this one:
+   * standing at the stool in her idle, the skin it sits against had moved
+   * 12 to 22 mm off where the pelvis alone would put it, and the neck was
+   * out of her all the way round. The skin between her cheeks is weighted to
+   * her thighs as much as to her pelvis — that is what lets a cheek move when
+   * a leg does — and a thing pinned to the pelvis stays where the skin was.
+   *
+   * So it rides the SKIN: the bone weights of her own surface where its axis
+   * meets her, read off v2.0's triangle there (`apprenticeSkinHit`, the
+   * thigh stroke's road), and each frame the mount goes through those bones
+   * blended exactly as her vertex there does. The turn is the same weights
+   * on the bones' turns, normalised — a blend of rotations a few tens of
+   * degrees apart, which is what linear skinning does to her normals too.
+   * `skin.w` is [bone, weight] pairs, `skin.at` the bind point carried.
+   *
+   * Without v2.0 (BAYE.primary 'v1') it is the pelvis alone, as the Lovense.
+   */
+  let plugSkinAt = null;
+  function plugSkin() {
+    const key = PLUG.at.join() + '|' + PLUG.tilt;
+    if (plugSkinAt && plugSkinAt.key === key) return plugSkinAt;
+    const pb = skinFig ? skinFig.boneIndex('pelvis') : -1;
+    let w = [[pb, 1]];
+    if (appr && typeof apprenticeSkinHit === 'function') {
+      const th = PLUG.tilt, D = [Math.cos(th), Math.sin(th), 0];
+      const O = [PLUG.at[0] - D[0] * 0.08, PLUG.at[1] - D[1] * 0.08, PLUG.at[2]];
+      const hit = apprenticeSkinHit(O, D);
+      if (hit && hit.w && hit.w.length) {
+        const sum = hit.w.reduce((a, b) => a + b[1], 0) || 1;
+        w = hit.w.map(([j, x]) => [j, x / sum]);
+      }
+    }
+    plugSkinAt = { key, at: PLUG.at.slice(), w };
+    return plugSkinAt;
+  }
+
+  /**
+   * Where the skin mount is THIS frame, in her figure frame: the point and
+   * the turn, through her own weights. `wearTick` puts the group here, the
+   * hand that puts it in aims here, and `plugFit` measures the plug here.
+   */
+  const _psA = new THREE.Vector3(), _psB = new THREE.Vector3();
+  const _psQ = new THREE.Quaternion();
+  function plugCarry(sk, outP, outQ) {
+    const BT = skinFig.bindRest().bindT;
+    outP.set(0, 0, 0);
+    let x = 0, y = 0, z = 0, ww = 0, fx = 0, fy = 0, fz = 0, fw = 0, first = true;
+    for (const [j, w] of sk.w) {
+      skinFig.boneAt(j, _psA);
+      skinFig.boneTurn(j, _psQ);
+      _psB.set(sk.at[0] - BT[j * 3], sk.at[1] - BT[j * 3 + 1], sk.at[2] - BT[j * 3 + 2])
+        .applyQuaternion(_psQ).add(_psA);
+      outP.addScaledVector(_psB, w);
+      // The same hemisphere as the first, or the blend goes through nothing.
+      if (first) { fx = _psQ.x; fy = _psQ.y; fz = _psQ.z; fw = _psQ.w; first = false; }
+      const sgn = (_psQ.x * fx + _psQ.y * fy + _psQ.z * fz + _psQ.w * fw) < 0 ? -w : w;
+      x += _psQ.x * sgn; y += _psQ.y * sgn; z += _psQ.z * sgn; ww += _psQ.w * sgn;
+    }
+    if (outQ) outQ.set(x, y, z, ww).normalize();
+    return outP;
+  }
+
+  /**
+   * The plug's own turn, and where it sits inside its mount — PLUG's `tilt`
+   * as a basis written out rather than composed from angles, so there is
+   * nothing to get the order of wrong: local +y (base to tip) goes INTO her,
+   * local +x up the line between her cheeks, local +z across it. On the skin
+   * mount it sits AT the mount; on the bone (no v2.0) it is the offset from
+   * the pelvis's head, as the Lovense's is.
+   */
+  function plugPlace(shake, onSkin = !!appr) {
+    const th = PLUG.tilt;
+    const B = new THREE.Matrix4().makeBasis(
+      new THREE.Vector3(-Math.sin(th), Math.cos(th), 0),
+      new THREE.Vector3(Math.cos(th), Math.sin(th), 0),
+      new THREE.Vector3(0, 0, -1));
+    shake.quaternion.setFromRotationMatrix(B);
+    if (onSkin) { shake.position.set(0, 0, 0); return shake; }
+    const bone = skinFig && skinFig.bones.find((b) => b.name === 'pelvis');
+    const root = bone ? bone.t : [0.0152, 0.9344, 0];
+    shake.position.set(PLUG.at[0] - root[0], PLUG.at[1] - root[1],
+      PLUG.at[2] - root[2]);
+    return shake;
+  }
+
+  /** The plug, on her: `toyWorn`'s rig with the base-only geometry. */
+  function plugWorn(m) {
+    const mesh = m || giftMesh('plug');
+    if (mesh.userData.wornGeo && mesh.geometry !== mesh.userData.wornGeo) {
+      mesh.userData.geoWas = mesh.geometry;
+      mesh.geometry = mesh.userData.wornGeo;
+    }
+    if (mesh.parent) mesh.parent.remove(mesh);
+    mesh.position.set(0, 0, 0);
+    mesh.rotation.set(0, 0, 0);
+    mesh.quaternion.identity();
+    const shake = new THREE.Group();
+    const onSkin = !!appr;
+    plugPlace(shake, onSkin);
+    shake.add(mesh);
+    const g = new THREE.Group();
+    g.add(shake);
+    return { group: g, bone: 'pelvis', skin: onSkin ? plugSkin() : null, shake,
+      rest: shake.position.clone(), led: mesh.userData && mesh.userData.led };
+  }
+
+  /**
+   * ── AND WHETHER IT SITS RIGHT, MEASURED ────────────────────────────────
+   *
+   * `toyFit`'s question asked of the plug, and against the body that is
+   * DRAWN: v2.0's mesh (`appr`), not v1.0's, which has not been on screen
+   * since she was parked. A radial profile about her axis, which is what
+   * `toyFit` walks, cannot see the line between her cheeks — a 5-degree bin
+   * at the back of her is a centimetre wide and the cleft is narrower — so
+   * this casts rays at her triangles instead, the way `apprenticeSkinHit`
+   * does.
+   *
+   * In the bind pose by default, and in THIS frame's pose with `{ pose:
+   * true }`: her skin is put through her own bone weights on the CPU (the
+   * palette is v1.0's, which v2.0 wears — `apprSameRig`) and the plug
+   * through the pelvis alone, which is all it is carried by. That is the
+   * whole of "flush in every cot pose": the cheeks are weighted to her
+   * thighs as well as her pelvis, and a hip folded to 90 degrees moves them
+   * about a plug that does not move with them.
+   *
+   * Millimetres, along the plug's own axis:
+   *
+   *   face   her skin straight in front of the outer face's centre — how far
+   *          the base stands proud (the base itself is 8.6 mm through)
+   *   rim    the base's inner edge, all the way round: [nearest, median,
+   *          furthest] gap to her skin — + a gap (floating), − pressed in
+   *   neck   how many of 24 points round the neck 4 mm above the base are
+   *          OUTSIDE her (0 is right: nothing of it shows)
+   *   bulb   and the same of the bulb's widest ring (0)
+   *   hid    how many of 24 points round the base's widest edge have her own
+   *          skin between them and a camera level behind her — her cheeks
+   *          closing over it, which is what makes it hers to hide
+   */
+  function plugFit(o = {}) {
+    if (!appr || !skinFig) return null;
+    const g = appr.mesh.geometry, pos = g.getAttribute('position');
+    const BI = g.getAttribute('aBoneIdx'), BW = g.getAttribute('aBoneWt');
+    const ix = g.getIndex();
+    const { start, count } = g.drawRange;
+    const pb = skinFig.boneIndex('pelvis');
+    if (pb < 0) return null;
+    const bones = skinFig.bones;
+    // The plug's own frame into her bind frame: its turn, at PLUG.at.
+    const sh = plugPlace(new THREE.Group(), true);
+    const M = new THREE.Matrix4().compose(new THREE.Vector3(...PLUG.at), sh.quaternion,
+      new THREE.Vector3(1, 1, 1));
+    // And this frame's mount, for a posed measurement — see `plugCarry`.
+    const sk = plugSkin();
+    const mP = new THREE.Vector3(), mQ = new THREE.Quaternion();
+    if (o.pose) plugCarry(sk, mP, mQ);
+    const C = new THREE.Vector3(...PLUG.at);
+    // THIS frame's pose, bone by bone, cached for the call.
+    const posed = !!o.pose;
+    const bAt = [], bQ = [];
+    const _t = new THREE.Vector3();
+    // The bind HEAD of each bone, in her frame — `bindT`, and not a bone's
+    // `t`, which is its offset from its parent and is only the same thing for
+    // the pelvis, the root.
+    const BT = skinFig.bindRest().bindT;
+    const carry = (j, p, out) => {
+      if (!bAt[j]) {
+        bAt[j] = skinFig.boneAt(j, new THREE.Vector3());
+        bQ[j] = skinFig.boneTurn(j, new THREE.Quaternion());
+      }
+      return out.copy(p).sub(_t.set(BT[j * 3], BT[j * 3 + 1], BT[j * 3 + 2]))
+        .applyQuaternion(bQ[j]).add(bAt[j]);
+    };
+    // Her triangles within 13 cm of the base, corner by corner.
+    const R2 = 0.13 * 0.13, P = new Map(), tri = [];
+    const vb = new THREE.Vector3(), vs = new THREE.Vector3(), vp = new THREE.Vector3();
+    const vert = (v) => {
+      let q = P.get(v);
+      if (q) return q;
+      vb.fromBufferAttribute(pos, v);
+      if (!posed) q = vb.clone();
+      else {
+        q = new THREE.Vector3();
+        for (let j = 0; j < 4; j++) {
+          const w = BW.getComponent(v, j);
+          if (w <= 0) continue;
+          carry(Math.round(BI.getComponent(v, j) * 255), vb, vp);
+          q.addScaledVector(vp, w);
+        }
+      }
+      P.set(v, q);
+      return q;
+    };
+    for (let i = start; i + 2 < start + count; i += 3) {
+      const a = ix.getX(i), b = ix.getX(i + 1), c = ix.getX(i + 2);
+      let near = false;
+      for (const v of [a, b, c]) {
+        vs.fromBufferAttribute(pos, v);
+        if (vs.distanceToSquared(C) < R2) { near = true; break; }
+      }
+      if (near) tri.push(vert(a), vert(b), vert(c));
+    }
+    // Every crossing of a ray with that patch, as distances along it.
+    const e1 = new THREE.Vector3(), e2 = new THREE.Vector3(), pv = new THREE.Vector3();
+    const tv = new THREE.Vector3(), qv = new THREE.Vector3();
+    const hits = (O, D) => {
+      const out = [];
+      for (let k = 0; k < tri.length; k += 3) {
+        const A = tri[k], B = tri[k + 1], Cc = tri[k + 2];
+        e1.subVectors(B, A); e2.subVectors(Cc, A);
+        pv.crossVectors(D, e2);
+        const det = e1.dot(pv);
+        if (Math.abs(det) < 1e-12) continue;
+        tv.subVectors(O, A);
+        const u = tv.dot(pv) / det;
+        if (u < 0 || u > 1) continue;
+        qv.crossVectors(tv, e1);
+        const v = D.dot(qv) / det;
+        if (v < 0 || u + v > 1) continue;
+        out.push(e2.dot(qv) / det);
+      }
+      return out.sort((x, y) => x - y);
+    };
+    // A point of the plug's, bind or posed, in her frame. Posed, it is the
+    // same skin mount the worn one rides: offset from PLUG.at, turned by the
+    // blended turn, from where the mount is now.
+    const at = (x, y, z) => {
+      const L = new THREE.Vector3(x, y, z).applyMatrix4(M);
+      if (!posed) return L;
+      return L.sub(_t.set(...PLUG.at)).applyQuaternion(mQ).add(mP);
+    };
+    // Its axis, the same way — into her.
+    const a0 = at(0, 0, 0), a1 = at(0, 0.01, 0);
+    const D = a1.clone().sub(a0).normalize(), back = D.clone().negate();
+    // Inside her is an odd number of crossings out along the axis BACKWARDS:
+    // behind her there is nothing but the room.
+    const inside = (p) => hits(p, back).filter((t) => t > 1e-5).length % 2 === 1;
+    // How far along the axis from `p` her skin is, signed: the first crossing
+    // of a ray started well behind it, which is her skin coming in.
+    const gapAt = (p) => {
+      const h = hits(p.clone().addScaledVector(D, -0.08), D);
+      return h.length ? h[0] - 0.08 : null;
+    };
+    const mm = (x) => (x == null ? null : Math.round(x * 10000) / 10);
+    const ring = (y, rx, rz, n = 24) => {
+      const out = [];
+      for (let i = 0; i < n; i++) {
+        const a = (i / n) * Math.PI * 2;
+        out.push(at(Math.cos(a) * rx, y, Math.sin(a) * rz));
+      }
+      return out;
+    };
+    const face = gapAt(a0);
+    const rimG = ring(0.0076, 0.019, 0.019 * 0.60).map(gapAt).filter((x) => x != null)
+      .sort((x, y) => x - y);
+    const neck = ring(0.0118, 0.0088, 0.0088).filter((p) => !inside(p)).length;
+    const bulb = ring(0.056, 0.0171, 0.0171).filter((p) => !inside(p)).length;
+    // Level behind her, in her own frame (the pelvis carries "behind").
+    const bk = new THREE.Vector3(-1, 0, 0);
+    if (posed) bk.applyQuaternion(mQ);
+    const hid = ring(0.0046, 0.0231, 0.0231 * 0.60)
+      .filter((p) => hits(p, bk).some((t) => t > 2e-3)).length;
+    const out = { face: mm(face),
+      rim: rimG.length ? [mm(rimG[0]), mm(rimG[rimG.length >> 1]), mm(rimG[rimG.length - 1])] : null,
+      neck, bulb, hid, tris: tri.length / 3, pose: posed,
+      skin: sk.w.map(([j, w]) => [bones[j] ? bones[j].name : j, +w.toFixed(2)]) };
+    if (o.profile) {
+      // Her back, down the line between her cheeks: rearmost x per centimetre
+      // of height in five bands out from the midline, bind frame.
+      const rows = {}, mid = [];
+      for (let v = 0; v < pos.count; v++) {
+        vs.fromBufferAttribute(pos, v);
+        // And every vertex ON the midline, front and back, under her pelvis:
+        // the one section through her that says where each entrance is.
+        if (Math.abs(vs.z) < 0.003 && vs.y > 0.74 && vs.y < 0.90
+          && Math.abs(vs.x) < 0.14) mid.push([+vs.x.toFixed(3), +vs.y.toFixed(3)]);
+        if (vs.y < 0.74 || vs.y > 0.94 || vs.x > 0.03) continue;
+        const az = Math.abs(vs.z);
+        const band = az < 0.004 ? 'm' : az < 0.012 ? 'a' : az < 0.025 ? 'b'
+          : az < 0.045 ? 'c' : az < 0.08 ? 'd' : null;
+        if (!band) continue;
+        const r = vs.y.toFixed(2);
+        rows[r] = rows[r] || {};
+        if (rows[r][band] == null || vs.x < rows[r][band]) rows[r][band] = +vs.x.toFixed(3);
+      }
+      out.rows = rows;
+      out.mid = mid.sort((p, q) => p[1] - q[1]);
+    }
+    return out;
+  }
+
+  /**
    * Stand a set-down thing ON a surface, by measuring it rather than by
    * declaring how tall it is.
    *
@@ -68649,9 +69224,10 @@ async function buildJadrija(scene) {
   }
 
   function giftMesh(key) {
-    // One thing in the bag has a shape worth having — see `lovenseMesh`.
-    if (key === 'lovense') {
-      const m = lovenseMesh();
+    // Two things in the bag have a shape worth having — see `lovenseMesh`
+    // and `plugMesh`.
+    if (key === 'lovense' || key === 'plug') {
+      const m = key === 'plug' ? plugMesh() : lovenseMesh();
       m.castShadow = false;
       m.receiveShadow = false;
       scene.add(m);
@@ -76972,7 +77548,7 @@ async function buildJadrija(scene) {
      * `buzz` the toy going this second.
      */
     sceneHer: () => (show ? { her: show.phase, on_cot: !!show.onBed, worn: Object.keys(worn),
-      buzz: !!signals.lovense } : null),
+      buzz: !!signals.lovense, buzz_plug: !!signals.plug } : null),
     /**
      * The collar and the leash (1.553.0) — see `── THE COLLAR AND THE LEASH ──`.
      * `leashState` a frame's worth for 90-app.js; `leashOff(safe)` takes it
@@ -77457,6 +78033,72 @@ async function buildJadrija(scene) {
         lit: part && part.led
           ? +part.led.uniforms.uEmissive.value.toFixed(2) : null,
         phase: show ? show.phase : null,
+        donAt: show ? +(show.donAt || 0).toFixed(2) : null,
+        grip: giftHeld ? +(giftHeld.grip || 0).toFixed(2) : null };
+    },
+    /**
+     * The plug (1.560.1), measured — `toy`'s twin. `fit` is `plugFit` in the
+     * bind pose and `posed` the same in this frame's pose, which is the one
+     * that answers for a cot pose. `__fr.jad.raw().plug({ at: [x, y, z],
+     * tilt: 0.6 })` re-places a worn one first, so PLUG's two numbers can be
+     * swept in one run; `{ profile: true }` adds her back's own profile.
+     */
+    plug: (o) => {
+      if (!skinFig) return null;
+      const part = worn.plug && worn.plug[0];
+      // And the hand that puts it in — `{ back: { up, fwd, pole: [x, y, z] } }`.
+      if (o && o.back) {
+        if (o.back.up != null) DON_BACK.up = o.back.up;
+        if (o.back.fwd != null) DON_BACK.fwd = o.back.fwd;
+        if (o.back.pole) DON_BACK.pole.set(...o.back.pole).normalize();
+      }
+      if (o && (o.at || o.tilt != null)) {
+        if (o.at) PLUG.at = o.at.slice();
+        if (o.tilt != null) PLUG.tilt = o.tilt;
+        if (part) {
+          plugPlace(part.shake, !!part.skin);
+          if (part.skin) part.skin = plugSkin();
+          part.rest.copy(part.shake.position);
+          const sg = signals.plug;
+          if (sg && sg.node === part.shake) sg.at.copy(part.rest);
+        }
+      }
+      const w = new THREE.Vector3(), a = new THREE.Vector3();
+      skinFig.mesh.updateMatrixWorld();
+      const mount = toyMount(skinFig, w, 'plug');
+      // And which way its base faces, in the world — the way to look at it.
+      const dir = new THREE.Vector3();
+      if (part && part.shake) {
+        part.shake.updateWorldMatrix(true, false);
+        a.setFromMatrixPosition(part.shake.matrixWorld);
+        dir.set(0, -1, 0).transformDirection(part.shake.matrixWorld);
+      }
+      const prop = giftProps.find((m) => m.userData && m.userData.key === 'plug');
+      // Her grip point, world, and how far it is from the mount and from the
+      // plug's waist on the shelf — the two goals `donReach` aims at.
+      let palm = null;
+      const r3p = (v) => [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+      const hb = skinFig.boneIndex('handR');
+      if (hb >= 0) {
+        const hv = skinFig.boneAt(hb, new THREE.Vector3()).applyMatrix4(skinFig.mesh.matrixWorld);
+        const hq = skinFig.mesh.quaternion.clone().multiply(skinFig.boneTurn(hb, new THREE.Quaternion()));
+        const pv = PALM.clone().applyQuaternion(hq).add(hv);
+        palm = { at: r3p(pv), mount: mount ? Math.round(pv.distanceTo(w) * 1000) : null,
+          shelf: prop ? Math.round(pv.distanceTo(prop.position.clone().setY(prop.position.y + PLUG.grab)) * 1000) : null };
+      }
+      const r3 = (v) => [+v.x.toFixed(3), +v.y.toFixed(3), +v.z.toFixed(3)];
+      return { on: !!part, held: !!(giftHeld && giftHeld.key === 'plug'), out: !!prop,
+        shelf: prop ? r3(prop.position) : null, spot: kit ? kit.plugSpot : null,
+        mark: donMark('plug'), mount: mount ? r3(w) : null, at: part ? r3(a) : null,
+        dir: part ? r3(dir) : null, palm,
+        place: { at: PLUG.at.slice(), tilt: PLUG.tilt },
+        fit: plugFit(o || {}), posed: part ? plugFit({ pose: true }) : null,
+        buzzing: !!signals.plug, lovense: !!signals.lovense,
+        lit: part && part.led ? +part.led.uniforms.uEmissive.value.toFixed(2)
+          : prop && prop.userData.led ? +prop.userData.led.uniforms.uEmissive.value.toFixed(2) : null,
+        nod: show ? +(show.buzzNod || 0).toFixed(2) : null,
+        face: show ? +(show.buzzFace || 0).toFixed(2) : null,
+        phase: show ? show.phase : null, st: show ? [+show.t.toFixed(2), +show.s.toFixed(2)] : null,
         donAt: show ? +(show.donAt || 0).toFixed(2) : null,
         grip: giftHeld ? +(giftHeld.grip || 0).toFixed(2) : null };
     },

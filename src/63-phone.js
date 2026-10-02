@@ -85,6 +85,15 @@ let phoneBuzz = 0;
 let phoneBat = PHONE.bat0;
 /** The last thing the Lovense app was told, for the line under the button. */
 let phoneSaid = 'tap to buzz';
+/**
+ * AND THE SECOND CHANNEL (1.560.1): the plug from the shelf, its own button
+ * under the first, its own five seconds and its own line. The real app runs
+ * every toy paired to it from one screen, so this is one app with two
+ * buttons rather than a second app — and the two run independently, either
+ * or both, exactly as two receivers on the one signal path do.
+ */
+let phonePlug = 0;
+let phonePlugSaid = 'tap to buzz';
 /** The render target the live view is drawn into, and the quad that shows it. */
 let phoneRT = null, phoneQuad = null, phoneQuadCam = null, phoneCamObj = null;
 let phoneCamT = 0;
@@ -269,7 +278,19 @@ function phoneDraw() {
     const note = document.createElement('div');
     note.className = 'cell-note';
     note.textContent = phoneSaid;
-    wrap.append(dot, btn, note);
+    // The plug's, the same three things a size down.
+    const cap = document.createElement('div');
+    cap.className = 'cell-toy';
+    cap.textContent = 'plug';
+    const btn2 = document.createElement('button');
+    btn2.className = 'cell-buzz cell-plug';
+    btn2.textContent = phonePlug > 0 ? Math.ceil(phonePlug) + 's' : 'BUZZ';
+    if (phonePlug > 0) btn2.classList.add('on');
+    btn2.addEventListener('click', (e) => { e.stopPropagation(); phonePress('plug'); });
+    const note2 = document.createElement('div');
+    note2.className = 'cell-note';
+    note2.textContent = phonePlugSaid;
+    wrap.append(dot, btn, note, cap, btn2, note2);
     screen.appendChild(wrap);
     return;
   }
@@ -294,7 +315,28 @@ function phoneDraw() {
  * and the laptop — `signal` in 43-jadrija.js — so there is no second way for
  * this to be wrong.
  */
-function phonePress() {
+function phonePress(key = 'lovense') {
+  // The plug's button is the same function on its own clock (1.560.1).
+  if (key === 'plug') {
+    if (typeof jadrija === 'undefined' || !jadrija || !jadrija.signal) {
+      phonePlugSaid = 'no device';
+    } else if (phonePlug > 0) {
+      jadrija.signal('plug', false);
+      phonePlug = 0;
+      phonePlugSaid = 'stopped';
+    } else {
+      const r = jadrija.signal('plug', true);
+      if (r === 'on') {
+        phonePlug = PHONE.buzz;
+        phonePlugSaid = 'sending…';
+      } else {
+        phonePlugSaid = r === 'not out' ? 'device not found'
+          : r === 'no sender' ? 'no phone on you' : String(r);
+      }
+    }
+    phoneDraw();
+    return;
+  }
   if (typeof jadrija === 'undefined' || !jadrija || !jadrija.signal) {
     phoneSaid = 'no device';
   } else if (phoneBuzz > 0) {
@@ -403,6 +445,19 @@ function phoneAppNow() { return phoneOn ? phoneApp : null; }
  * down because the lens is zoomed.
  */
 function phoneTick(dt) {
+  if (phonePlug > 0) {
+    const was = Math.ceil(phonePlug);
+    phonePlug = Math.max(0, phonePlug - dt);
+    if (phonePlug <= 0) {
+      if (typeof jadrija !== 'undefined' && jadrija && jadrija.signal) {
+        jadrija.signal('plug', false);
+      }
+      phonePlugSaid = 'tap to buzz';
+      if (phoneOn && phoneApp === 'love') phoneDraw();
+    } else if (phoneOn && phoneApp === 'love' && Math.ceil(phonePlug) !== was) {
+      phoneDraw();
+    }
+  }
   if (phoneBuzz > 0) {
     const was = Math.ceil(phoneBuzz);
     phoneBuzz = Math.max(0, phoneBuzz - dt);
@@ -591,6 +646,7 @@ function phonePeek() {
 function phoneStats() {
   return { out: phoneOn, app: phoneOn ? phoneApp : null, buzz: +phoneBuzz.toFixed(2),
     bat: Math.round(phoneBat), said: phoneSaid,
+    plug: +phonePlug.toFixed(2), plugSaid: phonePlugSaid,
     cam: !!(phoneRT && phoneOn && phoneApp === 'cam'),
     steps: phoneSteps, blits: phoneBlits, rect: phoneRect,
     place: phoneCamPlace() };

@@ -8,6 +8,139 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.560.1] — 2026-10-01 (baye 1.52.0)
+
+### The other toy: a plug on the shelf
+
+Misha: *"can we add more toys like, in addition to the lovense which we have
+can we add a butt plug that can stand on that shelf by the tv, and can be
+used, to stimulate, similar to lovense"*, and *"our lovense does go into baye
+for stimulation and works very nicely so the butt toy would be the same as
+that just for the other entrance"*.
+
+It is the Lovense's every path with a second key on it (`plug` in CARRY):
+pre-placed like the Lovense, fetched with `wear:`, taken out with `doff:`,
+run from the same remote, and it gets the same reactions from her.
+
+**The object.** A remote-controlled silicone plug in deep aubergine, so it
+reads apart from the Lovense's pink across the room. It has a tapered bulb
+34 mm across, a 16 mm neck and a flat flared base. `plugMesh` lathes it
+from a radius-against-height table: 110 rings, 48 sides, about 10k
+triangles. The base is an oval, 46 × 28 mm, with the long way running up
+the line between her cheeks, as the real ones are made. A round base the
+same length would stand 9 mm into each cheek. The outer face of the base
+carries a blue LED and two brass charging contacts. It stands upright on
+the shelf by the television, between the candle and the photograph, in the
+candle's light. Its base clears the candle's dish by 27 mm and the photo
+frame by 70 mm.
+
+**Fetching it.** "Wear the plug", "put the plug in", "put in the butt plug",
+"insert the plug", "plug in", "stavi joj čep", "ubaci čep". She walks to
+her own mark under the shelf (`kit.work.plug`), which puts her square to the
+wall a stride out with the plug off her right shoulder, the same 0.35 rad
+`LEAD` every other fetch uses. She reaches up and closes her fist round the
+bulb's waist (`PLUG.grab`, 52 mm up from the base). It comes off the shelf
+over the Lovense's ramp. Then her right hand goes round to her bottom and
+puts it in. The panel says *up to the shelf for it*.
+
+The press-home reach was swept six ways, measuring the closest her grip got
+to the base. The obvious goal, wrist straight behind the base, is an arm at
+full stretch down her back and never came within 106 mm. A wrist 0.09 above
+the base reached 50 mm, but that wrist sits inside her buttock, and on
+camera the arm went into her hip. The goal that shipped (`DON_BACK`: 0.06 up,
+0.11 behind, elbow out and back) comes to 100 mm. That is her hand on the
+inside of her right cheek at the cleft, holding it by the waist, which is
+what it looks like from behind.
+
+**Worn, it rides her skin and not a bone.** The Lovense is pinned to the
+pelvis bone, and the plug was too, first. `plugFit({ pose: true })` showed
+why that fails here. Standing in her idle, the skin it sits against had
+moved 12 to 22 mm off where the pelvis alone put it, and the neck showed all
+the way round. The skin between her cheeks is weighted to both thighs as
+well as the pelvis (40 / 40 / 20, read off v2.0's triangle where the plug's
+axis meets her, through `apprenticeSkinHit`). So the mount is carried by
+those same weights each frame (`plugCarry`): the point blended as her
+vertex there is, and the turn as the same blend of the bones' turns.
+`wearTick` takes a `skin` part as well as a `bone` part now. Without v2.0
+it falls back to the pelvis.
+
+Only the base and 4 mm of neck are drawn while it is in her (`wornGeo`).
+This is the trick the Lovense uses with its egg, for the same reason.
+
+**Measured, not eyeballed.** `plugFit` casts rays at v2.0's own triangles,
+the body that is actually drawn, not v1.0's. It works in the bind pose and
+in the current frame's pose, with her skin pushed through her weights on the
+CPU. All numbers are mm along the plug's axis. `rim` is [nearest, median,
+furthest] gap from the base's inner edge to her skin: + is a gap, − is
+pressed in. `neck`/`bulb` count points out of 24 outside her, and 0 is
+right.
+
+    pose                face    rim                  neck  bulb
+    bind                8.6     −7.9 / −3.2 / 3.1     0     0
+    standing (dwell)    8.5     −11.2 / −5.9 / 3.3    0     0
+    on all fours        6.9     −9.3 / −3.5 / 2.9     0     0
+    on her front        8.6     −9.4 / −4.1 / 3.2     0     0
+    kneeling up (cot)   8.6     −9.1 / −3.9 / 3.2     0     0
+    on her back (cot)   7.5     −9.7 / −4.0 / 2.6     0     0
+    legs spread         6.4     −4.7 / −1.4 / 3.4     0     0
+    fetal               4.7     −13.3 / −2.7 / 2.3    0     0
+
+The base itself is 8.6 mm through, so `face` near that means it sits on
+her. Across eight poses no edge floats more than 3.4 mm, and nothing behind
+the base ever comes out. `PLUG.at` and `PLUG.tilt` (bind (−0.0225, 0.8175,
+0), 1.05 rad) were swept against these numbers through
+`__fr.jad.raw().plug({ at, tilt })`, about 2,400 placements over two runs.
+`{ profile: true }` adds the midline section through her, and it shows the
+mount is behind the perineum (x −0.021 at y 0.826), well clear of the front
+of her. Standing, her cheeks close over it: 16 of the 24 points on its rim
+have skin between them and a camera behind her.
+
+**Taken out.** "Take out the plug", "pull the plug out", "remove the plug",
+"plug out", "izvadi čep", "skini plug". It goes straight back to the shelf,
+to the same position it was built at. Out of doors it goes to your satchel,
+like the Lovense since 1.559.1.
+
+**The remote: two channels.** The phone's Lovense app has a second button,
+PLUG, in purple under the first. It runs its own five seconds and has its
+own line of status, and a second press stops it (`phone.press('plug')`).
+Each runs independently or both together, down the same `signalSet` path,
+and the laptop's typed line reaches either. Spoken: "buzz the plug",
+"vibrate the plug for 2 minutes", "turn the plug on/off", "plug off", "stop
+the plug", "uključi čep", "isključi čep", and "buzz both" / "stop both" for
+the two at once. Like the Lovense, it runs fifteen seconds the moment it
+goes in.
+
+**Its own LED and its own motor.** The LED pulses blue on the plug's own
+rhythm. `buzz()` in 80-audio.js now keeps one loop per receiver
+(`BUZZ_VOICE`). The Lovense's numbers are untouched. The plug is a fifth up
+at 72 Hz, with a quicker wobble and a slightly higher low-pass, and it is
+quieter because it is inside her. Before, there was one voice carrying the
+louder of the two, and two motors in one voice can't be told apart. Turning
+one off now silences only its own voice. The worn shake is 0.7 mm
+(`PLUG.buzz`), against the Lovense's 1.1.
+
+**Her reactions follow one envelope, not one per toy.** The nod, the parted
+lips and the closed eyes are the same machinery as the Lovense's. With both
+running, `signalTick` takes the louder beat of whatever is in her. The blink
+is struck when that combined beat starts a pulse, not on each toy's pulse,
+so two toys give no extra nod and no second blink.
+
+**Her voice knows** (baye 1.52.0): the scene carries `buzz_plug` beside
+`buzz`. `worn` can now carry six entries, and `plug` is in `WEAR_KEYS`.
+`WORN_NOUN` and `HER_WORLD` describe the plug. Asked to put it in, she hears
+PUT IN and TAKE OUT rather than PUT ON / TAKE OFF.
+
+**Unchanged.** The Lovense is measured the same against the previous build:
+fit tip 37/36 mm (the shake is 1 mm), LED 8/7, the same 15-second
+announce, 3 pulse onsets in 5 s, and nod and LED to 1.0. Off and doff work
+as before. In the service, 678 sentences quoted in this changelog give the
+same answer as before. The safeword and her autonomous mode do not touch
+either toy, and neither did before; that is left as it was.
+
+People 100, blockers 820, no console errors. No `rng()` draw changed.
+
+Server: `server/baye/baye.py` 1.52.0 — needs deploying and restarting.
+
 ## [1.560.0] — 2026-10-01 (baye 1.51.0)
 
 ### On her own: the autonomous mode

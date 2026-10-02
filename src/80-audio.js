@@ -1593,7 +1593,28 @@ function buildAudio() {
    * `d` is metres away, and it dies fast: this is a quiet noise in a small
    * room and there is nothing to hear from the next hut.
    */
-  let buzzOsc = null, buzzGain = null, buzzHarm = null, buzzLfo = null;
+  /**
+   * ── AND A SECOND MOTOR, IN A DIFFERENT KEY ────────────────────────────
+   *
+   * Misha, 1 Oct 2026: a plug on the shelf by the television, worn and run
+   * off the same remote as the Lovense, *"similar to lovense"*. Two motors
+   * in one small room are two voices and not one voice twice as loud: run
+   * together on one oscillator they are indistinguishable, and the whole
+   * point of a second channel on the phone is hearing which one you sent.
+   *
+   * So each receiver has its own loop, keyed by its satchel key. The
+   * Lovense's numbers are exactly the ones below this note — 48 Hz, its
+   * octave, a 240 Hz low-pass — and are untouched. The plug is a smaller,
+   * faster motor in a softer body: a fifth up (72 Hz), a quicker wobble, the
+   * low-pass a little higher so the fifth is not filtered back into the
+   * Lovense's register, and quieter, because it is inside somebody and the
+   * body is the damper.
+   */
+  const BUZZ_VOICE = {
+    lovense: { f: 48, lp: 240, lfo: 3.6, wob: 2.6, gain: 0.14 },
+    plug: { f: 72, lp: 300, lfo: 5.2, wob: 3.4, gain: 0.10 },
+  };
+  const buzzV = {};
   /**
    * `amp` is the pattern — see `signalAmp` in 43-jadrija.js. It is a third
    * argument and not a second call because the oscillators run as a loop: the
@@ -1602,14 +1623,20 @@ function buildAudio() {
    * pulse. The 0.08 s ramp below is what makes it a motor spinning up rather
    * than a switch.
    */
-  function buzz(on, d = 0, amp = 1) {
+  function buzz(on, d = 0, amp = 1, voice = 'lovense') {
     if (!ctx) return false;
+    const V = BUZZ_VOICE[voice] || BUZZ_VOICE.lovense;
     if (!on) {
-      if (buzzGain) buzzGain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+      // One voice, or every voice when none is named by a caller that
+      // predates the second one — `buzz(false)` used to mean "the motor".
+      for (const k of arguments.length >= 4 ? [voice] : Object.keys(buzzV)) {
+        if (buzzV[k]) buzzV[k].gain.gain.setTargetAtTime(0, ctx.currentTime, 0.05);
+      }
       return false;
     }
     const far = Math.max(0, 1 - d / 7);
-    if (!buzzOsc) {
+    let bv = buzzV[voice];
+    if (!bv) {
       // ── LOWER, AND THEN LOWER AGAIN ────────────────────────────────────
       //
       // Misha, 19 Sep 2026: *"the frequency of the vibration should be
@@ -1630,40 +1657,41 @@ function buildAudio() {
       // a twentieth at the fifth; and a low-pass at 240 Hz takes off what is
       // left. Q is DECIBELS on these filters, so 0 is flat — 0.7 would be a
       // resonance sitting exactly where the brightness was.
-      buzzOsc = ctx.createOscillator();
-      buzzOsc.type = 'triangle';
-      buzzOsc.frequency.value = 48;
-      buzzHarm = ctx.createOscillator();
-      buzzHarm.type = 'triangle';
-      buzzHarm.frequency.value = 96;
+      const osc = ctx.createOscillator();
+      osc.type = 'triangle';
+      osc.frequency.value = V.f;
+      const harm = ctx.createOscillator();
+      harm.type = 'triangle';
+      harm.frequency.value = V.f * 2;
       const hg = ctx.createGain();
       hg.gain.value = 0.46;
       const lp = ctx.createBiquadFilter();
       lp.type = 'lowpass';
-      lp.frequency.value = 240;
+      lp.frequency.value = V.lp;
       lp.Q.value = 0;
-      buzzGain = ctx.createGain();
-      buzzGain.gain.value = 0;
+      const gain = ctx.createGain();
+      gain.gain.value = 0;
       // The wobble: a motor in a loose object is never one pitch for long.
       // Shallower again with the pitch — 4 Hz on 48 is eight per cent, and a
       // warble is what this stops being.
-      buzzLfo = ctx.createOscillator();
-      buzzLfo.frequency.value = 3.6;
+      const lfo = ctx.createOscillator();
+      lfo.frequency.value = V.lfo;
       const lg = ctx.createGain();
-      lg.gain.value = 2.6;
-      buzzLfo.connect(lg).connect(buzzOsc.frequency);
-      buzzOsc.connect(lp);
-      buzzHarm.connect(hg).connect(lp);
-      lp.connect(buzzGain);
-      buzzGain.connect(master);
-      buzzOsc.start();
-      buzzHarm.start();
-      buzzLfo.start();
+      lg.gain.value = V.wob;
+      lfo.connect(lg).connect(osc.frequency);
+      osc.connect(lp);
+      harm.connect(hg).connect(lp);
+      lp.connect(gain);
+      gain.connect(master);
+      osc.start();
+      harm.start();
+      lfo.start();
+      bv = buzzV[voice] = { osc, harm, lfo, gain };
     }
     // 0.14 and it was 0.055. A small motor against a wooden top is one of the
     // louder things in a quiet room, and at the old gain you had to be told it
     // was on — the same fault the kiss had, and the same fix.
-    buzzGain.gain.setTargetAtTime(0.14 * far * Math.max(0, amp),
+    bv.gain.gain.setTargetAtTime(V.gain * far * Math.max(0, amp),
       ctx.currentTime, 0.08);
     return true;
   }
