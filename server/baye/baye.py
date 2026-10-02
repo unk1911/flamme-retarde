@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.52.0"
+VERSION = "1.53.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -481,6 +481,17 @@ INTENTS = [
     ("auto.on", [r"^\W*((uklju[cč]i|pokreni|upali)\s+)?(autonomni|samostalni)\s+(na[cč]in|re[zž]im)(\s+rada)?\W*$"]),
     ("auto.on", [r"^\W*(samostalno|budi samostalna)\W*$"]),
     ("auto.on", [r"^\W*((active[rz]?|lance[rz]?)\s+)?(le\s+)?mode\s+autonome\W*$"]),
+    # THE ROLE SWAP (1.52.0, src/49-reverse.js): "reverse roles" — the player
+    # into her body, Chloe giving the orders. The page decides whether it is
+    # on or back (it matches the transcript itself too); "swap back" is off,
+    # and wins. Reserved, the whole sentence. Its safeword is `belt.stop`.
+    ("rev.off", [r"^\W*((swap|switch|change)\s+(us\s+)?back|(back\s+to\s+)?normal\s+roles|roles?\s+back"
+                 r"|vrati(mo)?\s+(nas|uloge)|vratimo\s+se)\W*$"]),
+    ("rev.swap", [r"^\W*((let'?s\s+|lets\s+)?(reverse|switch|swap|change|flip)\s+(the\s+)?(roles|places)"
+                  r"|role\s*(swap|reversal)|roles?\s+reversed?)\W*$"]),
+    ("rev.swap", [r"^\W*((ajmo|hajde|ajde)\s+)?zamijeni(mo)?\s+(se\s+)?(uloge|mjesta)\W*$"]),
+    ("rev.swap", [r"^\W*(zamjena\s+uloga|obrnute\s+uloge|obrni\s+uloge)\W*$"]),
+    ("rev.swap", [r"^\W*((on\s+)?(inverse|[eé]change)[rz]?\s+(les\s+)?r[oô]les|inversion\s+des\s+r[oô]les)\W*$"]),
 ]
 
 
@@ -1923,6 +1934,9 @@ def intents_of(text: str) -> list:
     # And her own mode: "disengage autonomous mode" names it too.
     if "auto.off" in out and "auto.on" in out:
         out.remove("auto.on")
+    # And the role swap's "swap back" is the off.
+    if "rev.off" in out and "rev.swap" in out:
+        out.remove("rev.swap")
     # And "lick the ball" is about the ball: one thing for him at a time, and
     # the one with the noun in it.
     if "doodle.ball" in out and "doodle.lick" in out:
@@ -4495,7 +4509,7 @@ SCENE_HAND = {"breast": "their hand is on your breast",
               "mouth": "their thumb is in your mouth"}
 SCENE_SAFE_BY = {"you", "her"}      # the player, or her own red
 SCENE_SAFE_OF = {"belt": "the belt", "collar": "the collar and leash",
-                 "auto": "the play"}
+                 "auto": "the play", "rev": "the role swap"}
 # HER AUTONOMOUS MODE (1.51.0, src/49-auto.js): the move she chose herself a
 # moment ago, by its key off the page's table, and what it was in her words.
 AUTO_DOING = {
@@ -4581,6 +4595,8 @@ def clean_scene(raw) -> dict:
         "auto_still": bool(g("auto_still")) or None,
         "auto_doing": (lambda d: d if d in AUTO_DOING else None)(clamp_str(g("auto_doing"), 10)),
         "auto_heat": clamp_num(g("auto_heat"), 0, 1),
+        # The role swap (1.52.0, src/49-reverse.js): one value or nothing.
+        "roles": "reversed" if clamp_str(g("roles"), 10) == "reversed" else None,
     }
     # A count with no count is nothing, and a lead with no leash is no lead.
     for k in ("spanks", "lashes", "tugs", "marks"):
@@ -4624,12 +4640,24 @@ def scene_lines(s: dict):
     facts, tone = [], []
     if not s:
         return facts, tone
+    # ROLES REVERSED (1.52.0): the counts below are hits on YOUR body, and
+    # the player is in it — so they are ones you gave, with Chloe's hands.
+    rv = s.get("roles") == "reversed"
+    if rv:
+        facts.append("you two have REVERSED ROLES, a game you both agreed to: "
+                     "they are in your body now and you are in Chloe's, and "
+                     "YOU are in charge: you give the orders and do the "
+                     "spanking, and they lie where you tell them and take it. "
+                     "Speak as the one in charge, playful and confident. The "
+                     "safeword still ends it at once")
     for key, n_key, tool in (("spank", "spanks", "with their hand"),
                              ("lash", "lashes", "with their belt")):
         n = s.get(n_key)
         if not n:
             continue
-        line = f"they have spanked you {_times(n)} {tool} in the last minute"
+        line = (f"you have spanked them {_times(n)} with your hand in the last minute"
+                if rv and key == "spank" else
+                f"they have spanked you {_times(n)} {tool} in the last minute")
         if s.get(key + "_at"):
             line += " on " + _and([SCENE_REG[r] for r in s[key + "_at"]])
         if s.get(key + "_ago_s") is not None:
@@ -4688,7 +4716,9 @@ def scene_lines(s: dict):
         where = ("in one place" if s["marks"] == 1
                  else "in a couple of places" if s["marks"] <= 3
                  else "all over")
-        facts.append(f"your skin is {look} {where} where they have been "
+        facts.append(f"their skin is {look} {where} where you have been "
+                     "spanking them" if rv else
+                     f"your skin is {look} {where} where they have been "
                      "spanking you")
     a = s.get("safeword_ago_s")
     if a is not None:

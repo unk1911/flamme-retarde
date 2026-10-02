@@ -8,6 +8,237 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.561.0] — 2026-10-01 (baye 1.53.0)
+
+### Roles reversed: you in Baye's body, Chloe giving the orders
+
+Misha: *"if inside the kabine, using some command like 'reverse roles', and
+we would switch up and i (played by chloe), would sorta "turn into" baye, and
+baye into chloe, and she would ask me to do all things and spank me, in
+"autonomous" mode"*.
+
+Phase one, a first playable. The same two adults and the same game, with the
+other one in charge, and the safeword ending it at once. All of it is the
+kabina's: new file `src/49-reverse.js`, with small hooks in 43-jadrija.js,
+49-ears.js and 90-app.js.
+
+**The swap.** Typed or said, the whole line: "reverse roles", "switch roles",
+"swap places", "zamijenimo uloge", "obrnute uloge", "inverser les rôles".
+The same words again swap back, and so do "swap back" and "vratimo uloge".
+Typed lines are matched in the page (`revWords`, ahead of everything else in
+`send`), so they work signed out. Spoken lines are `rev.swap` / `rev.off` in
+the service, and the page also matches the transcript itself. It only works
+in the kabina with Baye in the room. It is refused while the collar is on her
+("take it off first") or your belt is out. A tag, **ROLES REVERSED**, sits top
+right with the order Chloe is waiting on under it, and the key that does it
+("SHE WANTS: SPREAD YOUR LEGS. MORE. [5]").
+
+**You are in her body.**
+- **Walking.** The walker is put where she stands, looking where she looks.
+  While she is standing (`dwell`) she is put where the walker is, facing
+  where it faces, on her own stroll off its speed (`jadrija.ride`, which is
+  her `dwell` and nothing else: `bayeRide` in 43-jadrija.js). Your pace is
+  hers in there: 1.45 m/s, or 2.3 with Q. Her stroll is solved for 1.37 and
+  the walker's 3.4 was feet sliding. Her body turns to your heading at 9/s,
+  so a flick of the mouse is your head first.
+- **Poses.** Anything asked of her is hers as ever, through `askShow` and
+  1.559.3's direct roads, so the cot is her own walk to it and her own way
+  on. While she is in a pose the walker is pinned to her and the mouse only
+  looks. W or S is "get up". On arriving in a pose your eyes go to Chloe
+  once, eased, and after that the mouse is yours.
+- **Keys** (only while the roles are reversed, on the help sheet):
+  1 stand up · 2 lie on the cot · 3 on your front · 4 kneel (on the cot, up
+  on your knees) · 5 legs apart / together · 6 arms out / in · 7 on your
+  back (from your front, the roll over). A first cut had 3 toggle front and
+  back, and a second press rolled you straight off what she had asked for.
+- **Typed, the whole line:** "lie on the cot", "on my front", "on my back",
+  "kneel", "lotus", "on my side", "on all fours", "sit up", "curl up",
+  "spread my legs", "legs together", "arms out", "arms in", "look at her",
+  "look down", "turn around", "stand up", and the Croatian and French for
+  most of them ("lezi na krevet", "na trbuh", "raširi noge", "skupi noge",
+  "klekni", "ustani"...).
+- **The camera** is first person off her head bone: her eye, and 10 cm ahead
+  of it along your line of sight, so her face is behind the near plane
+  whichever way you look. Lying on the cot it rises 10 cm over the pillow,
+  because level with her eye her own arms filled the picture. **B** is a
+  third person that stands off her where the room has space (`revThird`).
+  The ground's own pull-back wants 1.7 m of clear air behind the walker and
+  in this room it rarely has it (1.554.1 says so). In the first test it
+  collapsed into her skull, eyeballs and all. This one tries behind your
+  line of sight at 2.6, 2.1 and 1.7 m, then round either way, inside the
+  room's walls (`kabina.room`) and clear of the furniture, aimed at her chest
+  (her seat, lying down), and eased.
+- Her autonomous mode goes off when you get in. While the roles are
+  reversed her own clock of moves, your belt (`\`), the collar (`=`) and
+  "autonomous" are refused. Baye is out of the walker's body list, because a
+  walker pushed out of its own body walks off up the room (the kiss's
+  0.77 m/s, from the other side). Your old hands are off too: no reach, no
+  hose, no first-person arms.
+
+**Chloe is the NPC.** Her figure (49-you.js) is driven through `you.drive`
+from where you stood, and `poseSwimBody` stands back for it.
+- She walks with a steer-and-slide against the room's own collider
+  (`ground.confine`), turns before she walks, and keeps half a metre off you.
+- Baye's "you" is now Chloe: `jadrija.update` is handed her and not the
+  walker, so everything Baye does at "you" (her gaze, "look at me", facing
+  her) is done at Chloe.
+- **Her hand.** She goes to your side of the cot level with your seat, square
+  to the cot and not to the spot, and gets down into your own crouch
+  (`crouchSolve` / `crouchAims`). Her hand is laid on the spot first (the
+  cot's own `cotAim`, from her eye, with a hand's width of play), and held
+  there while it is fitted by feedback (`revArmFit`):
+  - the swing is the difference between shoulder-to-wrist and
+    shoulder-to-spot in her fore-and-aft plane;
+  - what the swing cannot reach is a lean over the cot (`bow`, up to 0.5
+    rad down her spine);
+  - she steps along the cot to line up her right hand.
+
+  Then she winds up (0.30 s), comes down accelerating (0.11 s), and on the
+  frame it lands it is `buttSlap`'s path with her hand as its side: the
+  sound, the mark, your hands to your cheeks, the cot's ragdoll and its
+  reflex, and the scene's record. Your camera drops 3 cm and pitches with
+  it. She spanks you on the cot, face down. Standing spanks are built (she
+  comes round behind you, `revBehindFree`, `revSpot`) and switched off
+  (`REV.standSpank`): her wrist got to 8-19 cm of the cheek, and with your
+  back to a wall she came at you from the side and her hand found your hip
+  (photographed).
+- **What was wrong first:**
+  - Turned on to the spot at a slant, leaning in slid her along the frame
+    0.46 m towards your head.
+  - The first fit was a height-only nudge on the swing and left the hand
+    32-45 cm short.
+  - A bow with no ceiling folded her over your back.
+
+  Now her wrist is on the spot to 2.3-4.9 cm at the swing (12 strikes in
+  the trace below; 3.3 cm on average).
+
+**She gives orders** (`revDecide`, the autonomous mode's selector turned
+round). Every 3.5-7 s, while no order is out and no round of spanks is on,
+she scores what she could do where you are (`autoCtx`: on the cot face down,
+on your back, on your side, sitting, kneeling, standing) and picks one,
+weighted:
+- an order that fits and that you are not already keeping;
+- a round of spanks (face down on the cot);
+- the remote, if you are wearing the Lovense or a plug and have obeyed once
+  (`jadrija.signal`, 5-11 s);
+- a walk round you to watch from somewhere else.
+
+**The orders** (`REV_ORDERS`), each a line in her Croatian with a gloss,
+checked against your body:
+- "Na krevet. Odmah." (cot)
+- "Na trbuh, curo." (front)
+- "Okreni se na leđa." (back)
+- "Raširi noge. Više." (spread) and "Noge skupa." (together)
+- "Ruke u stranu." (arms out) and "Ruke uz tijelo." (arms in)
+- "Ne miči se. Ni mrdnut." (still: 6 s with no ask and no step)
+- "Pogledaj me." (look: your line of sight from her eye on Chloe's face,
+  within about 25°, or "look at her" typed)
+- "Na koljena." (kneel)
+- "Dođi ovamo." (come: within 1.3 m, on your feet)
+- "Okreni se. Leđima prema meni." (turn: your back to her)
+- "Ustani." (stand)
+
+Kept for 0.7 s, it is praised ("Dobra cura.", "Tako je. Vidiš da možeš.",
+"Mm, poslušna si danas.") and she warms up: heat +0.08. Heat makes the
+rounds longer (1 to 4) and firmer (9 + 7×heat N·s, with a hard one now
+and then) and the spanking more likely. Not done in 10 s, she teases ("Hm?
+Nisi me čula?", "Prespora si, ljubavi.", "E, sad ćeš dobiti po guzi.") and
+the next thing is a punishment round of 2-3. If you are not where she can
+give it, the order that puts you there is three times as likely.
+Starting to do it buys you 9 s, once, because the cot is a walk and a lie-down.
+MEASURED: "kneel" was pressed 2.9 s into the order and was ignored at 10 s,
+while she was still going down. Heat falls back to 0.2 over 90 s.
+
+**A decision trace** (`__fr.reverse.trace()`), two and a half minutes of
+world at ×2 with a test player that obeys about two orders in three, a few
+seconds late (abridged; the lines are hers):
+
+```
+ 10.9  SWAPPED                      "Moja si sad. Slušaj me."
+ 19.1  order:cot        h0.20       "Na krevet. Odmah."
+ 22.2  you:recline.bed              (key 2)
+ 30.4  kept:cot         h0.28       "Dobra cura."
+ 33.3  order:spread     h0.28
+ 43.3  ignored:spread   not done in 10 s     "Prespora si, ljubavi."
+ 44.8  order:armsOut    (alt: front 3.52 — the punishment wants you on your front)
+ 48.5  kept:armsOut     h0.35
+ 51.9  order:still   -> 57.9 kept:still (6 s)  h0.41
+ 61.3  order:armsIn  -> 64.6 kept:armsIn       h0.48
+ 68.2  order:front   -> 73.6 kept:front        h0.53
+ 77.0  spank x3         mood | alt: spank 2.62, order:spread 1.03
+ 81.0  slap back (cot), 82.1 slap butt, 83.3 slap butt     (k 12.6 N·s, u 0.33)
+ 84.6  spank x1      -> 86.3 slap butt
+ 89.8  order:still   -> 95.8 kept:still        h0.64
+ 98.5  spank x2      -> 100.1, 101.2 slaps     (k 13.4, u 0.43)
+104.9  order:spread  -> 108.3 kept:spread      h0.72
+112.4  spank x1, 117.6 spank x3 -> 4 slaps     (k 13.9, u 0.49)
+125.2  order:armsOut -> 135.2 ignored
+136.6  order:back    -> 146.7 ignored
+148.1  spank x3         punishment | alt: spank 4.00
+149.8  slap butt
+151.0  SAFEWORD         you   "Hej, hej... gotovo je. Tu sam."
+158.6  SWAPPED BACK     safe
+```
+
+**The safeword.** "red", "crvena", "stop" (or the service's `belt.stop`)
+while the roles are reversed ends it at once (`revSafe`):
+- any order and any swing stop where they are;
+- Baye's own breathing is hushed (`herHush('safe')`), and the scene records
+  `safeword_of: 'rev'`;
+- Chloe comes to your head, on the open side, her hand on your hair, slowly
+  round (Baye's own `petTouch`), and says "Hej, hej... gotovo je. Tu sam."
+  or "Bila si super. Dođi.";
+- four and a half seconds of her hand, and the roles go back.
+
+You come back into Chloe where she is kneeling, facing you. Leaving the room,
+leaving the ground, and the keys that put you somewhere else (8, 9, 0, V, R,
+O) swap back first.
+
+**Her voice knows** (`server/baye/baye.py` 1.52.0, **needs deploying on
+mpcn0**). `clean_scene` takes `roles: 'reversed'` (that value or nothing).
+`scene_lines` tells her the roles are reversed: she is in Chloe's body and in
+charge, giving the orders and doing the spanking, and the safeword still ends
+it. The counts are read the other way round ("you have spanked them 3 times
+with your hand", "their skin is red and stinging"). `SCENE_SAFE_OF` gains
+`rev` ("the role swap"), and `INTENTS` gains `rev.swap` / `rev.off` (whole
+sentences; off wins). Without the deploy the swap works by voice through the
+page's own transcript match, and she is just not told. Chloe's own voice and
+persona are phase two: her lines are captions for now.
+
+**Regression** (normal roles): the belt out, "red" (stopped, back on);
+the collar on, clipped, "red" (off); flat on the cot and three hand spanks
+(3 of 3 landed); the autonomous mode on, three decisions, off; 9 and 8.
+People 100, blockers 820. No console errors. RULE 4: no `rng()` draw added,
+removed or moved (her choices use `Math.random`, as Baye's always have).
+
+**Found on the way:**
+- 43-jadrija.js already has a `rideStep` (the bikes'), and a second function
+  of that name was silently replaced by it: her walk did nothing until it
+  was renamed `bayeRideStep`.
+- "Look at me" was first checked on the camera before the camera is put in
+  her head, so lying down it was a standing eye a metre over her, and a
+  test player looking straight at Chloe failed it twice.
+
+**Rough, for phase two:**
+- She crouches like you do (a squat), not kneeling by the cot. Standing
+  spanks are off (above).
+- Her arm is a swing about one axis plus a lean; there is no hand pose (the
+  first person's `HAND_POSE.slap` is the view-model's).
+- Her walk is a steer and a slide: she can be slow round the cot's end.
+- Her head does not track you.
+- The first person lying face down sees the room past your own arm.
+- B's lens can only see what the room leaves room for.
+- Next: her own voice and persona on the service, the belt and the collar
+  in her hand, more of her moves (the hair, the remote by name, praise with
+  a touch), and a camera jolt with a flash.
+
+Debug: `__fr.reverse`: `on()`, `off()`, `safe()`, `hear(text)`,
+`words(text)`, `key(n)`, `ask(name)`, `order(id)`, `spank(n)`, `decide()`,
+`dom(on)` (her choices off, for a probe of the controls), `set({heat,
+next})`, `trace(n)`, `said()`, `state()`, `lookAt()`, `view([x,y,z,tx,ty,tz])`,
+`side(d)`, `armStop('aim')`, `room(x, z)`. Plus `__fr.jad.raw()`'s `ride`,
+`rideNow`, `rideFrom` and `kabina.room(x, z, inset)`.
+
 ## [1.560.3] — 2026-10-01
 
 ### The plug, in the cleft and not under it

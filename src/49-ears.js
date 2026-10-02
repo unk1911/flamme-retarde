@@ -517,6 +517,16 @@ const ears = (() => {
     // is the belt's only while the belt is out — otherwise it is a thing you
     // said, and goes on as it always did.
     if (typed) {
+      // THE ROLE SWAP (1.561.0, src/49-reverse.js): "reverse roles", and
+      // while it is on, its safeword and your own body's poses — matched
+      // here, so they work signed out.
+      const rv = typeof revWords === 'function' ? revWords(blob) : null;
+      if (rv) {
+        note('“' + blob + '”  typed · here  → ' + rv, 'heard');
+        act(rv);
+        draw();
+        return;
+      }
       // HER AUTONOMOUS MODE (1.560.0, src/49-auto.js): "engage autonomous
       // mode", "autonomous off" — reserved, the whole line, matched here so it
       // works signed out like the belt.
@@ -650,6 +660,11 @@ const ears = (() => {
         if (aw && !d.intents.includes(aw)) d.intents.push(aw);
         if (!aw && autoActive() && autoSafeword(said) && !d.intents.includes('belt.stop')) d.intents.push('belt.stop');
       }
+      // And the role swap's, heard (1.561.0): its own words win the line.
+      if (!typed && said && typeof revWords === 'function') {
+        const rv = revWords(said);
+        if (rv) d.intents = [rv];
+      }
       note('“' + (said || '…') + '”  ' + (typed ? 'typed' : secs.toFixed(1) + ' s')
         + ' · ' + d.ms + ' ms'
         + (lang ? ' · ' + lang : '')
@@ -667,7 +682,8 @@ const ears = (() => {
       // `beltWords`); otherwise it is a sentence, and goes on to her.
       if (d.intents && d.intents.length && !(typeof beltActive === 'function' && beltActive())
         && !(typeof collarActive === 'function' && collarActive())
-        && !(typeof autoActive === 'function' && autoActive())) {
+        && !(typeof autoActive === 'function' && autoActive())
+        && !(typeof revActive === 'function' && revActive())) {
         d.intents = d.intents.filter((n) => n !== 'belt.stop');
       }
       // A command, and that is the whole of it — commands outrank conversation.
@@ -1035,6 +1051,20 @@ const ears = (() => {
 
   /** Do a command. Every one reports back to the panel, including "nobody". */
   async function act(name, lang = null) {
+    // THE ROLE SWAP (1.561.0) — see src/49-reverse.js. While it is on, the
+    // safeword is its own: it ends the swap and Chloe comes to you.
+    if (name === 'belt.stop' && typeof revActive === 'function' && revActive()) name = 'rev.safe';
+    if (/^rev\./.test(name) && typeof revAct === 'function') {
+      const r = revAct(name);
+      note(r.label, r.ok ? 'did' : 'meta');
+      return;
+    }
+    // Your belt and the collar are Chloe's while she is in charge, and phase
+    // one does not hand them to her: not while the roles are reversed.
+    if (/^(belt|collar)\.|^auto\.on$/.test(name) && typeof revActive === 'function' && revActive()) {
+      note('roles: not while the roles are reversed', 'meta');
+      return;
+    }
     // HER OWN MODE (1.560.0) — see src/49-auto.js.
     if (name === 'auto.on' || name === 'auto.off') {
       const got = name === 'auto.on' ? autoOn('typed') : autoOff('asked');
