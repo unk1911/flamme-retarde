@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.72.0"
+VERSION = "1.73.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4705,6 +4705,31 @@ CHLOE_BEAT = {
                   "staying put",
     "pin_off": "you are letting go of their wrists and letting them up after "
                "holding them down. One short line",
+    # 1.73.0 (page 1.587.0, src/49-revhold.js): hauled by other holds than
+    # the hair. Holds, never sex: your hand on an ear, a wrist, an ankle, a
+    # chin, the back of the neck (the nape, never the throat). Consensual
+    # play between the two of them; the safeword ends it at once.
+    "hold_ear": "you have just taken them by the ear, pinched between your "
+                "finger and thumb, and are leading them across the room by it, "
+                "bent over toward you. A short, in-charge line",
+    "hold_arm": "you have just twisted one of their arms up behind their back "
+                "and are walking them in front of you, bent forward, where you "
+                "want them. A short, firm line",
+    "hold_ankle": "they are lying on the cot and you have just grabbed one of "
+                  "their ankles with both hands and are dragging them down the "
+                  "mattress toward you. A short, teasing line",
+    "hold_chin": "you have their chin in your hand and are tipping their face "
+                 "up to look at you. A short line that makes them look at you",
+    "hold_neck": "your hand is on the back of their neck and you are pushing "
+                 "them down to bend them over. A short line telling them down",
+    "hold_yank": "you are hauling them by your hold and they lagged or fought "
+                 "it, so you just gave it a sharp pull. A short line",
+    "hold_walk": "you are leading them across the room by your hold on them. A "
+                 "short line on the way",
+    "hold_talk": "you are holding them still by your hold on them and talking "
+                 "to them while you have them there. One line, in your mood",
+    "hold_done": "you have just let go of them after hauling them about. One "
+                 "short line as you let go",
 }
 # What they begged for (1.70.0, page 1.583.0): the page's `rev_beg`.
 REV_BEG = {
@@ -4717,6 +4742,13 @@ REV_BEG = {
     "drag": "drag them round the room by their hair",
     # 1.72.0 (page 1.586.0).
     "pin": "pin them down on the cot and hold them there",
+    # 1.73.0 (page 1.587.0).
+    "ear": "lead them about by the ear",
+    "arm": "twist their arm up behind their back and march them about",
+    "ankle": "drag them down the cot by the ankle",
+    "chin": "take them by the chin and make them look at you",
+    "neck": "bend them over by the back of the neck",
+    "haul": "haul them about, however you like",
 }
 # Her mood (1.70.0, page 1.583.0): the page's `rev_mood`, and the tone it is.
 REV_MOOD = {
@@ -4753,6 +4785,21 @@ REV_PIN = {
     "wrists": "they are lying on their back on the cot and you are kneeling "
               "beside the cot at their head, holding their wrists down on the "
               "mattress above their head",
+}
+# Your other holds on them (1.73.0, page 1.587.0): the page's `rev_hold`.
+# Holds, never sex — the tone line in `scene_facts` says so.
+REV_HOLD = {
+    "ear": "you have them by the ear, pinched between your finger and thumb, "
+           "leading them about bent over toward you",
+    "arm": "you have one of their arms twisted up behind their back, one hand "
+           "on the wrist and one on the elbow, walking them bent forward in "
+           "front of you",
+    "ankle": "they are lying on the cot and you have one of their ankles in "
+             "both hands, having dragged them down the mattress by it",
+    "chin": "you are holding their chin in your hand, their face tipped up to "
+            "yours, making them look at you",
+    "neck": "your hand is on the back of their neck, holding them bent over "
+            "in front of you",
 }
 # A toy Chloe has drawn partway out (1.59.0): the page sends its key.
 TOY_DRAWN = {"plug": "the plug", "lovense": "the Lovense", "wand": "the wand"}
@@ -5357,6 +5404,8 @@ def clean_scene(raw) -> dict:
         "rev_hair": _enum(g("rev_hair"), REV_HAIR, 8),
         # And holding them down on the cot (1.72.0, page 1.586.0).
         "rev_pin": _enum(g("rev_pin"), REV_PIN, 8),
+        # And her other holds on them (1.73.0, page 1.587.0).
+        "rev_hold": _enum(g("rev_hold"), REV_HOLD, 6),
         "remote_level": clamp_num(g("remote_level"), 0, 4),
         # And her mood (1.70.0, page 1.583.0): its name off a table, how
         # stern, how gentle and how excited, 0..1, and what they last begged
@@ -5372,7 +5421,7 @@ def clean_scene(raw) -> dict:
     if not out["roles"]:
         for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "remote_level",
                   "rev_spoon", "rev_hair", "rev_mood", "rev_stern", "rev_warm", "rev_excite",
-                  "rev_beg", "rev_pin"):
+                  "rev_beg", "rev_pin", "rev_hold"):
             out[k] = None
     if out["remote_level"] is not None:
         out["remote_level"] = int(round(out["remote_level"])) or None
@@ -5687,6 +5736,11 @@ def chloe_scene_lines(s: dict):
         facts.append(REV_PIN[rp])
         tone.append("This is a pin, a hold: firm, teasing, in charge. Nothing "
                     "sexual — you are holding them down, nothing more.")
+    rho = s.get("rev_hold")
+    if rho in REV_HOLD:
+        facts.append(REV_HOLD[rho])
+        tone.append("This is a hold: rough, firm or teasing, in charge. Nothing "
+                    "sexual — your hand on them where it is, nothing more.")
     td = s.get("toy_drawn")
     if td in TOY_DRAWN:
         facts.append(f"your hand is on {TOY_DRAWN[td]} they are wearing and you "

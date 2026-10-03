@@ -284,6 +284,12 @@ function rmoodBeg(what) {
     const r = typeof rvhAsk === 'function' ? rvhAsk('pull') : { ok: false, label: 'no hair' };
     return { ok: r.ok, label: 'Chloe, excited: ' + String(r.label).replace(/^chloe: /i, '') };
   }
+  // Hauled by another hold — ear, arm, ankle, chin, neck, or 'haul' for the
+  // one that fits (1.587.0, src/49-revhold.js).
+  if (/^(ear|arm|ankle|chin|neck|haul)$/.test(what)) {
+    const r = typeof rvoAsk === 'function' ? rvoAsk(what) : { ok: false, label: 'no hold' };
+    return { ok: r.ok, label: 'Chloe, excited: ' + String(r.label).replace(/^chloe: /i, '') };
+  }
   // Pinned on the cot (1.586.0, src/49-revpin.js).
   if (what === 'pin') {
     const r = typeof rvpAsk === 'function' ? rvpAsk() : { ok: false, label: 'no pin' };
@@ -483,6 +489,8 @@ function rmoodWeight(id) {
   else if (id === 'hair:draw' || id === 'hair:kneel') k = (1 + g) * (1 + 0.6 * e);
   // Walking you by your hair (1.584.0): discipline, and a game when she is wound up.
   else if (/^drag/.test(id)) k = (1 + 1.4 * s) * (1 - 0.6 * g) * (1 + 1.4 * e);
+  // Her other holds (1.587.0): discipline, and a game when she is wound up.
+  else if (/^haul/.test(id)) k = (1 + 1.4 * s) * (1 - 0.6 * g) * (1 + 1.2 * e);
   // Holding you down on the cot (1.586.0): discipline above all.
   else if (/^pin/.test(id)) k = (1 + 1.6 * s) * (1 - 0.5 * g) * (1 + 0.4 * e);
   else if (m === 'hold') k = (1 + s) * (1 + 0.5 * e);
@@ -604,6 +612,11 @@ function rmoodWords(t) {
   const buzzing = typeof rvt !== 'undefined' && rvt.phoneOn;
   if (/^((please |oh )?(harder|do it harder|spank (me )?harder|again|do it again|more|one more|another( one)?|again please|more please|harder please|please more|please again|please harder))( chloe| mistress| babe)?( please)?$/.test(t)) return 'rev.beg:harder';
   if (!buzzing && /^(jace|jos( jednom| jednu| malo)?( molim( te)?)?|encore( une)?( fois)?|plus fort|encore plus fort)( s'?il te plait)?$/.test(t)) return 'rev.beg:harder';
+  // Hauled by another hold (1.587.0, src/49-revhold.js): "pull my ear",
+  // "twist my arm", "drag me by my ankle", "grab my chin", "push me down" —
+  // before the pin's "hold me down" and the drag's "drag me".
+  const hw = typeof rvoWords === 'function' ? rvoWords(t) : null;
+  if (hw) return hw;
   // Pinned on the cot (1.586.0, src/49-revpin.js): "pin me down", "sit on
   // me", "hold me down", "hold my wrists", "pin my arms" — and in Croatian
   // and French. Not "hold me" alone: that is her hug, or the spoon.
