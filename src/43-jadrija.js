@@ -48249,7 +48249,58 @@ async function buildJadrija(scene) {
     // unvoiced startle, because she did not see it coming (see `startle` in
     // 80-audio.js).
     face: { pet: 1, gape: 0.36, in: 9, out: 2.5 },
+    // HAULED IN — see `PULL_HAUL`.
+    haul: null,
   };
+  // ── HAULED IN, ON HER KNEES OR ON ALL FOURS ─────────────────────────────
+  //
+  // 1.587.0. Misha, 3 Oct 2026: *"can u make sure that when she is in all
+  // fours or in kneeling pose if I grab her by the hair it causes her head to
+  // come real close to me real tight"*. MEASURED before this, at 70 N held:
+  // on her knees (`kept`) her head went 15 degrees back and her chest 11,
+  // and on all fours her head came up 9.6 cm. The pull above is a draw of
+  // 26 cm past the hair's length toward your shoulder; from a kneeling woman
+  // that tips her head and leaves it where it was.
+  //
+  // So in these poses, in the player's own hands (not when roles are
+  // reversed — `haul` is asked for by 90-app.js and nobody else), the pull
+  // is a different thing. The fist goes to YOUR CHEST (`down` under your
+  // eye, `fwd` out in front of it) and the hair is wound short in it, down to
+  // `wind` m between her scalp and your knuckles, over `drawT` s; a hard jerk
+  // (`F.yank` N) and then held (`F.hold`); her back's muscles at `tone` of
+  // their own, so she arches into it rather than holding it off; and her
+  // spine's stops opened to `hi` (degrees of extension, the joint's own +x)
+  // so the arch is a whole back and not a neck. You step in to `stand` m
+  // behind her hips and bend (`bend`, 0..1 of the crouch — 47-ground.js) so
+  // your chest is down where her head comes to, not your lap.
+  //
+  // ON ALL FOURS her head is three-quarters of a metre in front of her hips
+  // and half a metre off the floor, and no arch of a back brings that to a
+  // chest. So her hips come up (`hip` degrees, the pelvis turned about the
+  // line through her two hip joints, her thighs turned back by the same so
+  // her knees stay on the floor) and back toward you (`shift` m — dragged by
+  // her hair), and her arms keep (`armKeep`) the way they pointed: her hands
+  // come off the floor and hang. Up over `inT` s, down over `outT` s after
+  // the hand lets go. On her knees the same, a little — leaning back from
+  // her knees.
+  const PULL_HAUL = {
+    // Which of her phases are which.
+    ph: { kept: 'kneel', submit: 'kneel', creep: 'kneel', leashKneel: 'kneel', leashPut: 'kneel',
+      leashKnelt: 'kneel', fours: 'fours', crawl: 'fours', leashFours: 'fours', leashCrawl: 'fours' },
+    kneel: { F: { yank: 240, hold: 150 }, wind: 0.05, down: 0.44, fwd: 0.10, over: 0.08, drawT: 0.22, chest: 0.12, touch: 0.05,
+      tone: 0.45, hi: { spine02: 32, chest: 28, neck: 50 }, most: { spine02: 35, chest: 30, neck: 55 },
+      hip: 12, shift: 0.0, armKeep: 0, stand: 0.45, bend: 0.30, neckBack: 30 },
+    fours: { F: { yank: 240, hold: 180 }, wind: 0.05, down: 0.40, fwd: 0.10, over: 0.08, drawT: 0.30, chest: 0.12, touch: 0.05,
+      tone: 0.45, hi: { spine02: 32, chest: 28, neck: 50 }, most: { spine02: 35, chest: 30, neck: 55 },
+      hip: 60, shift: 0.15, armKeep: 0.85, stand: 0.42, bend: 0.40, neckBack: 25 },
+    inT: 0.30, outT: 0.80, relDamp: 2.5,
+    // YOUR TRUNK, which she is hauled against: a capsule `youR` m round,
+    // from `youTop` to `youLow` m under your eye, its front at the haul's
+    // `chest` m out in front of it; firm (`youK` N/m), not a wall. MEASURED
+    // without it, the yank carried the back of her skull 5 cm into you.
+    youR: 0.12, youTop: 0.18, youLow: 0.80, youK: 20000,
+  };
+  PULL_RAG.haul = PULL_HAUL;
   // The bones whose give is drawn. The pelvis is in the net and not here.
   const PULL_BODY = ['spine02', 'chest', 'neck'];
   let pullR = null;
@@ -48266,7 +48317,12 @@ async function buildJadrija(scene) {
     // a yank's `yankF` N and `yankDraw` m), null for PULL_RAG's own; `yk` a
     // yank on top of the hold, { t, u }. Both off when the hand lets go, so a
     // pull that never set them is the pull it always was.
-    tune: null, yk: null };
+    tune: null, yk: null,
+    // 1.587.0, hauled in (`PULL_HAUL`): the pose's table while it lasts, or
+    // null; `mode` 'kneel' or 'fours'; `hu` how far her hips have come, 0..1;
+    // `away` the level way from her hips to you, taken on the grab; `stand`
+    // where you step to, world (x, z); `Fg` where the fist is going.
+    ln: 0, ease: 0, haul: null, mode: null, hu: 0, away: new THREE.Vector3(), stand: [0, 0], Fg: new THREE.Vector3() };
   const pullStats = { ms: 0, msMax: 0, msSum: 0, frames: 0, steps: 0, grabs: 0, rescues: 0, why: null,
     pitch: 0, pitchMax: 0, chest: 0, chestMax: 0, hip: 0, hipMax: 0, F: 0, Fmax: 0, back: null, relAt: null,
     hair: null };
@@ -48283,6 +48339,9 @@ async function buildJadrija(scene) {
       iterations: PULL_RAG.iterations, alpha: 0.9, alphaContact: 0.9, beta: 1e5, betaAng: 100, gamma: 0.999,
       gravity: [0, 0, 0], drag: RAGDOLL.drag, vMax: 4, wMax: 25, margin: 0.01, deep: 0.03,
       mu: 0.3, floorMu: 0.8, capK: 30000,
+      // You, hauling her in (PULL_HAUL): your trunk, one kinematic capsule
+      // her head and back meet — see `pullYou`. Empty otherwise.
+      maxWorldCaps: 1, worldCapK: PULL_HAUL.youK,
     });
     const rag = ragdollBuild(net, f, caps, { idBase: 1 });
     const hipJ = net.addJoint(-1, [0, 0, 0], rag.pelvis, [0, 0, 0], Infinity, Infinity, 1);
@@ -48431,6 +48490,7 @@ async function buildJadrija(scene) {
     // pose is beyond it: at rest nothing is pushed, and a pull still meets a
     // stop a little way past where she already was.
     const tab = ragdollTable(), mg = PULL_RAG.lim * Math.PI / 180;
+    R.stops = new Map();
     for (const [nm, m] of rag.angles) {
       const D = tab.find((d) => d.bone === nm);
       if (!D || !D.lo) continue;
@@ -48440,6 +48500,13 @@ async function buildJadrija(scene) {
         hi[k] = Math.max(D.hi[k] * Math.PI / 180, ph[k] + mg);
       }
       net.setAngleLimits(m, lo, hi);
+      // Kept, so a haul can open them and give them back (`pullHaulSet`).
+      R.stops.set(nm, { m, lo, hi });
+    }
+    R.hauled = false;
+    for (const n of PULL_BODY) {
+      const i = f.boneIndex(n);
+      if (i >= 0) R.most[i] = PULL_RAG.most[n] * Math.PI / 180;
     }
     // Her pelvis's body off its bone, as the ragdoll has just put it there:
     // offset = turn⁻¹·(mesh⁻¹·P − head), attitude = turn⁻¹·mesh⁻¹·Q.
@@ -48472,6 +48539,8 @@ async function buildJadrija(scene) {
 
   function pullLeave() {
     const R = pullR;
+    pull.haul = null; pull.mode = null; pull.hu = 0; pull.ease = 0;
+    if (R) R.net.setWorldCaps(null, 0);
     if (!R || !R.on) return;
     R.rag.leave();
     R.net.setJointK(R.hipJ, 0, 0);
@@ -48479,16 +48548,53 @@ async function buildJadrija(scene) {
     R.on = false;
   }
 
+  /** The drawn joints' muscles at `u` of their own tone (`tone`, `damp`), dampers times `dm`. */
+  function pullTone(R, u, dm = 1) {
+    const { net, rag } = R;
+    for (const [nm, m] of rag.angles) {
+      const k = PULL_RAG.tone[nm];
+      if (k == null) continue;
+      const D = RAGDOLL.bodies.find((d) => d.bone === nm), t = PULL_RAG.tension * k * u;
+      if (D) net.setAngleK(m, D.k * t, D.kd * Math.max(0.35, Math.sqrt(t)) * PULL_RAG.damp * dm);
+    }
+  }
+
+  /**
+   * Hauled in or not (`H`, a PULL_HAUL pose table, or null): her back's
+   * muscles at the haul's `tone` and its stops opened to `hi`, or both given
+   * back to the pull's own — which is what she springs back on.
+   */
+  function pullHaulSet(R, H) {
+    const { net, rag } = R, dg = Math.PI / 180;
+    pullTone(R, H ? H.tone : 1);
+    for (const [nm, m] of rag.angles) {
+      if (PULL_RAG.tone[nm] == null) continue;
+      const S = R.stops && R.stops.get(nm);
+      if (S) {
+        const hi = S.hi.slice();
+        if (H && H.hi[nm] != null) hi[0] = Math.max(hi[0], H.hi[nm] * dg);
+        net.setAngleLimits(m, S.lo, hi);
+      }
+    }
+    for (const n of PULL_BODY) {
+      const i = R.body[PULL_BODY.indexOf(n)];
+      if (i != null && i >= 0) R.most[i] = ((H && H.most[n]) || PULL_RAG.most[n]) * dg;
+    }
+    R.hauled = !!H;
+  }
+
   /**
    * The hand closes (`on`) or lets go. `eye` is where you are — the pull
    * goes back toward your shoulder under it. Whether it took hold.
    */
-  function hairPull(on, eye) {
+  function hairPull(on, eye, haul = false) {
     if (!on) {
       if (!pull.on) return false;
       pull.on = false; pull.rel = 0; pull.still = 0;
       pull.tune = null; pull.yk = null;
-      if (pullR && pullR.on) pullR.net.setString(pullR.hair, null, null, false);
+      // Hauled, the hand eases off (`ease`, `pullTick`); otherwise it opens.
+      if (pullR && pullR.on && pull.haul) pull.ease = 1;
+      else if (pullR && pullR.on) pullR.net.setString(pullR.hair, null, null, false);
       pullStats.relAt = 0; pullStats.back = null;
       return true;
     }
@@ -48502,11 +48608,30 @@ async function buildJadrija(scene) {
     pullToBind(f, hb, g.s, pull.sB);
     pullToBind(f, hb, g.g, pull.gB);
     pull.len = g.g.distanceTo(g.s);
+    pull.ln = pull.len;
+    // Hauled in? On her knees or on all fours, in your hands — see PULL_HAUL.
+    const mode = haul && !pull.tune && show ? PULL_HAUL.ph[show.phase] || null : null;
+    // A haul still easing her hips down is taken over where it is.
+    if (!mode && pull.haul) { pull.haul = null; pull.mode = null; pull.hu = 0; }
     // Into the net at rest on the pose — unless it is still on her from the
     // last pull, springing back, when the hand takes hold of her where she
     // is: going in afresh would put her back on the pose in one frame.
     if (!pullR || !pullR.on) pullEnter(f);
     const R = pullR, { net } = R, P = net.P, Q = net.Q, b = R.head;
+    if (mode) {
+      pull.haul = PULL_HAUL[mode]; pull.mode = mode;
+      // The level way from her hips to you, once: where you step to and
+      // where the fist goes are both off it, and neither should chase the
+      // other round her.
+      f.mesh.updateMatrixWorld();
+      f.boneAt(R.pb, _plA).applyMatrix4(f.mesh.matrixWorld);
+      pull.away.set(eye.x - _plA.x, 0, eye.z - _plA.z);
+      if (pull.away.lengthSq() < 1e-6) pull.away.set(1, 0, 0);
+      pull.away.normalize();
+      pull.stand[0] = _plA.x + pull.away.x * pull.haul.stand;
+      pull.stand[1] = _plA.z + pull.away.z * pull.haul.stand;
+      pullHaulSet(R, pull.haul);
+    } else if (R.hauled) pullHaulSet(R, null);
     // The back of her skull on the head's body: where it is drawn, which is
     // where the net has it (to `gap`, under a centimetre).
     pull.S.copy(g.s);
@@ -48516,7 +48641,7 @@ async function buildJadrija(scene) {
     pull.T.copy(g.g);
     pull.P.copy(pull.T);
     net.setString(R.hair, [pull.T.x, pull.T.y, pull.T.z], pull.len, true, R.rb);
-    pull.on = true; pull.t = 0; pull.rel = 0; pull.F = 0;
+    pull.on = true; pull.t = 0; pull.rel = 0; pull.F = 0; pull.ease = 0;
     pullStats.grabs++; pullStats.pitchMax = 0; pullStats.chestMax = 0; pullStats.hipMax = 0; pullStats.Fmax = 0;
     pullStats.back = null; pullStats.relAt = null; pullStats.riseMax = 0; pullStats.riseNMax = 0;
     // The gasp, on the grab.
@@ -48538,13 +48663,77 @@ async function buildJadrija(scene) {
   }
 
   /** The arm's force this moment, N — see PULL_RAG.F. */
-  function pullForce(t) {
-    const F = PULL_RAG.F;
+  function pullForce(t, H = null) {
+    // A haul's own yank and hold (PULL_HAUL), on the same curve.
+    const F = PULL_RAG.F, yank = H ? H.yank : F.yank, hold = H ? H.hold : F.hold;
     let u = 0;
     if (t < F.rise) { u = t / F.rise; u = u * u * (3 - 2 * u); } else if (t < F.rise + F.peak) u = 1;
     else if (t < F.rise + F.peak + F.fall) { u = 1 - (t - F.rise - F.peak) / F.fall; u = u * u * (3 - 2 * u); }
     const up = Math.min(1, t / F.rise);
-    return (F.hold * up) + (F.yank - F.hold) * u;
+    return (hold * up) + (yank - hold) * u;
+  }
+
+  /**
+   * Her hips hauled, `u` of the way (PULL_HAUL's `hip` and `shift`): the
+   * turn of her pelvis about the line through her two hip joints, in her
+   * figure's frame (R.hipQ4), and the shift of her root (R.hipT3), from the
+   * pose held still (R.fkW, R.fkT — `pullAnchors` has just made them); and
+   * the net's anchor for her pelvis moved the same way.
+   */
+  const _phA = new Float64Array(3), _phH = new Float64Array(3), _phV = new Float64Array(3),
+    _phQ = new Float64Array(4), _phM = new Float64Array(4);
+  function pullHip(R, f, u, HA) {
+    const T = R.fkT, lL = f.boneIndex('legUL'), lR = f.boneIndex('legUR'), nk = R.nk, pb = R.pb;
+    R.hipOn = u > 0 && lL >= 0 && lR >= 0;
+    if (!R.hipOn) return;
+    if (!R.hipQ4) { R.hipQ4 = new Float64Array(4); R.hipT3 = new Float64Array(3); }
+    // The pivot: midway between her hip joints. The axis: the line through
+    // them, level, turned so it brings the far end of her (her neck) UP.
+    for (let k = 0; k < 3; k++) _phH[k] = (T[3 * lL + k] + T[3 * lR + k]) / 2;
+    let ax = T[3 * lL] - T[3 * lR], az = T[3 * lL + 2] - T[3 * lR + 2];
+    const al = Math.hypot(ax, az) || 1;
+    ax /= al; az /= al;
+    const fx = T[3 * nk] - T[3 * pb], fz = T[3 * nk + 2] - T[3 * pb + 2];
+    // (a × f).y = az·fx − ax·fz.
+    if (az * fx - ax * fz < 0) { ax = -ax; az = -az; }
+    const th = u * HA.hip * Math.PI / 180, s = Math.sin(th / 2);
+    const Rq = R.hipQ4;
+    Rq[0] = ax * s; Rq[1] = 0; Rq[2] = az * s; Rq[3] = Math.cos(th / 2);
+    // The shift: toward you, level, in her frame.
+    const mQ = f.mesh.quaternion;
+    _plV.copy(pull.away).applyQuaternion(_plQ.copy(mQ).invert());
+    const sh = u * HA.shift;
+    // Her root: pivot + R·(root − pivot) + shift, less where it was.
+    for (let k = 0; k < 3; k++) _phV[k] = T[3 * pb + k] - _phH[k];
+    qrotv(_phA, 0, Rq, 0, _phV, 0);
+    R.hipT3[0] = _phH[0] + _phA[0] - T[3 * pb] + _plV.x * sh;
+    R.hipT3[1] = _phH[1] + _phA[1] - T[3 * pb + 1];
+    R.hipT3[2] = _phH[2] + _phA[2] - T[3 * pb + 2] + _plV.z * sh;
+    // The anchor, world: the same turn about the same pivot. Into her frame
+    // (mesh⁻¹), turned, and back.
+    _plA.set(R.anchorP[0], R.anchorP[1], R.anchorP[2]).sub(f.mesh.position).applyQuaternion(_plQ);
+    _phV[0] = _plA.x - _phH[0]; _phV[1] = _plA.y - _phH[1]; _phV[2] = _plA.z - _phH[2];
+    qrotv(_phA, 0, Rq, 0, _phV, 0);
+    _plA.set(_phH[0] + _phA[0] + _plV.x * sh, _phH[1] + _phA[1], _phH[2] + _phA[2] + _plV.z * sh)
+      .applyQuaternion(mQ).add(f.mesh.position);
+    R.anchorP[0] = _plA.x; R.anchorP[1] = _plA.y; R.anchorP[2] = _plA.z;
+    // anchorQ' = (mesh · R · mesh⁻¹) · anchorQ.
+    _phM[0] = mQ.x; _phM[1] = mQ.y; _phM[2] = mQ.z; _phM[3] = mQ.w;
+    avbdQMul(_phM, 0, Rq, 0, _phQ, 0);
+    avbdQMul(_phQ, 0, _phM, 0, _phQ, 0, false, true);
+    avbdQMul(_phQ, 0, R.anchorQ, 0, R.anchorQ, 0);
+  }
+
+  /** Your trunk in her net while you haul her (PULL_HAUL's `you…`), or none. */
+  const _pyC = new Float64Array(8);
+  function pullYou(R, HA) {
+    if (!HA) { R.net.setWorldCaps(null, 0); return; }
+    const H = PULL_HAUL, off = HA.chest - H.youR;
+    const x = pull.eye.x - pull.away.x * off, z = pull.eye.z - pull.away.z * off;
+    _pyC[0] = x; _pyC[1] = pull.eye.y - H.youTop; _pyC[2] = z;
+    _pyC[3] = x; _pyC[4] = pull.eye.y - H.youLow; _pyC[5] = z;
+    _pyC[6] = H.youR; _pyC[7] = H.youR;
+    R.net.setWorldCaps(_pyC, 1);
   }
 
   /** The guard — see `cotSane`. */
@@ -48614,13 +48803,48 @@ async function buildJadrija(scene) {
     for (let k = 0; k < 3; k++) R.tgt.t[k] += (pullL.clip.t[k] - R.tgt.t[k]) * ks;
     rag.drive(R.tgt.q);
     pullAnchors(R, f);
+    // Hauled: you, as a capsule she meets (`pullYou`) while your hand is in
+    // her hair; and her hips up and back toward you, the anchor with them.
+    pullYou(R, pull.haul && (pull.on || pull.ease > 0) ? pull.haul : null);
+    if (pull.haul) {
+      const HA = pull.haul;
+      pull.hu = pull.on ? Math.min(1, pull.hu + dt / PULL_HAUL.inT) : Math.max(0, pull.hu - dt / PULL_HAUL.outT);
+      pullHip(R, f, smoothstep(0, 1, pull.hu), HA);
+      // And her head thrown back on her neck (`neckBack` degrees on the
+      // neck's muscle, its own +x): MEASURED without, the arch was all back
+      // and the neck stayed within 3-9 degrees of the pose, her face turned
+      // up at the ceiling and never at you.
+      if (HA.neckBack) {
+        if (!R.drvQ) R.drvQ = new Float32Array(R.tgt.q.length);
+        R.drvQ.set(R.tgt.q);
+        const th = smoothstep(0, 1, pull.hu) * HA.neckBack * Math.PI / 360;
+        _phQ[0] = Math.sin(th); _phQ[1] = 0; _phQ[2] = 0; _phQ[3] = Math.cos(th);
+        avbdQMul(R.drvQ, 4 * R.nk, _phQ, 0, R.drvQ, 4 * R.nk);
+        rag.drive(R.drvQ);
+      }
+      // Let go: her own tone comes back as her hips come down, not at once —
+      // MEASURED all at once, the arch sprang back past the pose, her head
+      // 11 degrees forward of it on her knees and 26 on all fours.
+      // And her dampers at `relDamp` until she is out of the net: MEASURED
+      // at the pull's own, the last of the arch went past the pose by 8
+      // degrees after the hand had eased off.
+      if (!pull.on && R.hauled) pullTone(R, HA.tone + (1 - HA.tone) * (1 - pull.hu), PULL_HAUL.relDamp);
+    } else R.hipOn = false;
     net.setTarget(R.hipJ, R.anchorP[0], R.anchorP[1], R.anchorP[2], R.anchorQ);
     // THE HAND. Where it closed, riding the pose; drawn back toward your
     // shoulder; and the string's end at it — or, if that is more than the arm
     // pulls with, as far along the way to it as the force allows.
     const P = net.P, Q = net.Q, b = R.head;
-    if (pull.on) {
-      pull.t += dt;
+    // Hauled and let go, the hand eases off rather than opening (`ease`, 1
+    // to 0 over PULL_HAUL's `outT`): the most it pulls with goes down to
+    // nothing and she follows it back. MEASURED opening at once, her arch
+    // sprang back past the pose — 7 degrees on her knees, 20 on all fours.
+    if (!pull.on && pull.ease > 0) {
+      pull.ease = Math.max(0, pull.ease - dt / PULL_HAUL.outT);
+      if (!(pull.ease > 0)) net.setString(R.hair, null, null, false);
+    }
+    if (pull.on || pull.ease > 0) {
+      if (pull.on) pull.t += dt;
       pull.grip = 1;
       pullAt(f, R.fkW, R.fkT, R.hb, pull.gB, pull.G);
       // Toward your shoulder, and out of her back by `outOf` of that: lying
@@ -48645,9 +48869,24 @@ async function buildJadrija(scene) {
       // hand's whole draw brought it level with her scalp: 22 N, and her head
       // 4 cm off the pillow (MEASURED).
       pullAt(f, R.fkW, R.fkT, R.hb, pull.sB, _plA);
-      _plA.addScaledVector(_plV, pull.len + (TU && TU.draw != null ? TU.draw : PULL_RAG.draw)
-        + (TU && TU.yankDraw != null ? TU.yankDraw : 0.12) * yU);
-      _plA.lerp(pull.G, 1 - smoothstep(0, 1, pull.t / PULL_RAG.drawT));
+      const HA = pull.haul;
+      if (HA) {
+        // HAULED: the fist to your chest — `down` under your eye and `fwd`
+        // out in front of it, toward her — and `over` on past it, so it is
+        // held tight there rather than arriving; the hair wound in to `wind`
+        // as it goes. See PULL_HAUL.
+        const u = smoothstep(0, 1, pull.t / HA.drawT);
+        pull.ln = pull.len + (HA.wind - pull.len) * u;
+        pull.Fg.set(pull.eye.x - pull.away.x * HA.fwd, pull.eye.y - HA.down, pull.eye.z - pull.away.z * HA.fwd);
+        _plV.copy(pull.Fg).sub(_plA).normalize();
+        _plA.copy(pull.Fg).addScaledVector(_plV, HA.over);
+        _plA.lerp(pull.G, 1 - u);
+      } else {
+        pull.ln = pull.len;
+        _plA.addScaledVector(_plV, pull.len + (TU && TU.draw != null ? TU.draw : PULL_RAG.draw)
+          + (TU && TU.yankDraw != null ? TU.yankDraw : 0.12) * yU);
+        _plA.lerp(pull.G, 1 - smoothstep(0, 1, pull.t / PULL_RAG.drawT));
+      }
       // Her scalp, on the net's head.
       _plE[0] = R.rb[0]; _plE[1] = R.rb[1]; _plE[2] = R.rb[2];
       qrotv(_plD, 0, Q, 4 * b, _plE, 0);
@@ -48657,13 +48896,28 @@ async function buildJadrija(scene) {
       const k = PULL_RAG.arm;
       _plB.copy(_plA).sub(pull.S);
       const L = _plB.length();
-      if (L <= pull.len) pull.T.copy(_plA);
-      else {
-        const F = Math.min(k * (L - pull.len), pullForce(pull.t) * (TU && TU.k != null ? TU.k : 1)
-          + (TU && TU.yankF != null ? TU.yankF : 80) * yU);
-        pull.T.copy(pull.S).addScaledVector(_plB, (pull.len + F / k) / L);
+      // Hauled, the back of her head comes to your chest (`chest` m out in
+      // front of your eye) and stops there: the arm cannot draw it into
+      // you, so what it pulls with goes to nothing over the last `touch` m.
+      // MEASURED without, the yank carried her skull 5 cm into the chest.
+      let touch = 1;
+      if (HA) {
+        // The back of her skull: 9 cm in from her scalp along the way her
+        // face points (as drawn last frame) is the middle of it, and 9 cm
+        // back toward you from there its back.
+        pullFwd(f, R.fkW2, R.hb, _plV).applyQuaternion(f.mesh.quaternion);
+        const sx = pull.S.x + _plV.x * 0.09, sz = pull.S.z + _plV.z * 0.09;
+        const gap = (sx - pull.eye.x) * -pull.away.x + (sz - pull.eye.z) * -pull.away.z - 0.09 - HA.chest;
+        touch = smoothstep(0, HA.touch, gap);
+        pullStats.touch = gap;
       }
-      net.setString(R.hair, [pull.T.x, pull.T.y, pull.T.z]);
+      if (L <= pull.ln) pull.T.copy(_plA);
+      else {
+        const F = Math.min(k * (L - pull.ln), pullForce(pull.t, HA && HA.F) * (TU && TU.k != null ? TU.k : 1)
+          * (pull.on ? 1 : smoothstep(0, 1, pull.ease)) * touch + (TU && TU.yankF != null ? TU.yankF : 80) * yU);
+        pull.T.copy(pull.S).addScaledVector(_plB, (pull.ln + F / k) / L);
+      }
+      net.setString(R.hair, [pull.T.x, pull.T.y, pull.T.z], HA ? pull.ln : null);
     }
     R.acc = Math.min(R.acc + dt, PULL_RAG.maxSub * PULL_RAG.h);
     let n = 0;
@@ -48693,15 +48947,66 @@ async function buildJadrija(scene) {
       worst = Math.max(worst, Math.min(ang, R.most[i]));
       pullL.q[o] = _plE[0]; pullL.q[o + 1] = _plE[1]; pullL.q[o + 2] = _plE[2]; pullL.q[o + 3] = _plE[3];
     }
-    // Her hips planted: no shift of the root.
+    // Her hips planted: no shift of the root — unless she is hauled
+    // (`pullHip`), when her pelvis turns up about her hip joints and comes
+    // back toward you, and her thighs turn back by the same, so from the
+    // knees down she is where she was.
     pullL.t.fill(0);
+    if (!R.hipB) {
+      R.hipB = ['legUL', 'legUR'].map((nm) => f.boneIndex(nm)).filter((i) => i >= 0);
+      R.armB = [['armUL', 'clavicleL'], ['armUR', 'clavicleR']].map(([a, c]) => [f.boneIndex(a), f.boneIndex(c)])
+        .filter(([a, c]) => a >= 0 && c >= 0);
+      R.tT = new Float32Array(3);
+      R.hipAll = [R.pb, ...R.hipB];
+      R.zeroB = [...R.hipAll, ...R.armB.map((x) => x[0])];
+    }
+    for (const i of R.zeroB) {
+      pullL.q[4 * i] = pullL.q[4 * i + 1] = pullL.q[4 * i + 2] = 0; pullL.q[4 * i + 3] = 1;
+    }
+    if (R.hipOn) {
+      // d = q⁻¹·R·q on her root; L⁻¹·d⁻¹·L on each thigh.
+      const o = 4 * R.pb;
+      avbdQMul(C, o, R.hipQ4, 0, _plE, 0, true);
+      avbdQMul(_plE, 0, C, o, _plE, 0);
+      for (let c = 0; c < 4; c++) pullL.q[o + c] = _plE[c];
+      for (const i of R.hipB) {
+        avbdQMul(C, 4 * i, _plE, 0, _plD, 0, true, true);
+        avbdQMul(_plD, 0, C, 4 * i, pullL.q, 4 * i);
+      }
+      pullL.t[0] = R.hipT3[0]; pullL.t[1] = R.hipT3[1]; pullL.t[2] = R.hipT3[2];
+    }
     // What it did, for a probe: her head and her chest off the pose as DRAWN
     // — the pose held still with the give laid on it, against the pose held
     // still — degrees, + up; how far her pelvis is off where it is held (it
     // is not drawn); and the force in the hair.
     R.dq.set(R.tgt.q);
     for (const i of R.body) avbdQMul(R.dq, 4 * i, pullL.q, 4 * i, R.dq, 4 * i);
-    ragdollFK(f, R.dq, R.tgt.t, R.fkW2, R.fkT2);
+    if (R.hipOn) for (const i of R.hipAll) avbdQMul(R.dq, 4 * i, pullL.q, 4 * i, R.dq, 4 * i);
+    for (let k = 0; k < 3; k++) R.tT[k] = R.tgt.t[k] + pullL.t[k];
+    ragdollFK(f, R.dq, R.tT, R.fkW2, R.fkT2);
+    // Her arms, hauled up off all fours, keep `armKeep` of the way they
+    // pointed (off the drawn collarbone): her hands come up off the floor and
+    // hang, rather than swinging up with her chest to reach out in front.
+    const keep = R.hipOn && pull.haul ? pull.haul.armKeep * smoothstep(0, 1, pull.hu) : 0;
+    if (keep > 0) {
+      for (const [a, c] of R.armB) {
+        avbdQMul(R.fkW2, 4 * c, R.fkW, 4 * c, _plE, 0, true);
+        avbdQMul(C, 4 * a, _plE, 0, _plE, 0, true);
+        avbdQMul(_plE, 0, C, 4 * a, _plE, 0);
+        if (_plE[3] < 0) for (let k = 0; k < 4; k++) _plE[k] = -_plE[k];
+        let l = 0;
+        for (let k = 0; k < 4; k++) { _plE[k] = (k === 3 ? 1 - keep : 0) + keep * _plE[k]; l += _plE[k] * _plE[k]; }
+        l = 1 / Math.sqrt(l);
+        for (let k = 0; k < 4; k++) pullL.q[4 * a + k] = _plE[k] * l;
+      }
+    }
+    // The neck's own give, degrees — the stop it is kept inside (PULL_HAUL's
+    // `hi`) is the anatomy, and this is how near it she is.
+    {
+      const o = 4 * R.nk;
+      pullStats.neck = 2 * Math.acos(Math.min(1, Math.abs(pullL.q[o + 3]))) * 180 / Math.PI;
+    }
+    pullStats.hipDeg = R.hipOn && pull.haul ? smoothstep(0, 1, pull.hu) * pull.haul.hip : 0;
     pullStats.pitch = pullPitch(f, R, R.hb);
     pullStats.chest = pullPitch(f, R, R.cb);
     // And how far up her head and the top of her back (the neck's root)
@@ -48718,22 +49023,23 @@ async function buildJadrija(scene) {
     pullStats.hip = Math.hypot(P[pb] - a0[0], P[pb + 1] - a0[1], P[pb + 2] - a0[2]);
     pullStats.pitchMax = Math.max(pullStats.pitchMax, pullStats.pitch);
     pullStats.chestMax = Math.max(pullStats.chestMax, pullStats.chest);
-    if (pull.on) {
+    if (pull.on || pull.ease > 0) {
       _plE[0] = R.rb[0]; _plE[1] = R.rb[1]; _plE[2] = R.rb[2];
       qrotv(_plD, 0, Q, 4 * b, _plE, 0);
       pull.S.set(P[3 * b] + _plD[0], P[3 * b + 1] + _plD[1], P[3 * b + 2] + _plD[2]);
       const L = pull.T.distanceTo(pull.S);
-      pull.F = Math.max(0, L - pull.len) * PULL_RAG.arm;
+      pull.F = Math.max(0, L - pull.ln) * PULL_RAG.arm;
       // The net's scalp against the drawn one, m: the give is the net's, so
       // anything here is a clamp (`most`) or a bone the give leaves out.
       pullStats.gap = pullAt(f, R.fkW2, R.fkT2, R.hb, pull.sB, _plA).distanceTo(pull.S);
       // The fist: the hair's own length off her scalp, toward the spring's end.
-      if (L > pull.len) pull.P.copy(pull.S).lerp(pull.T, pull.len / L);
+      if (L > pull.ln) pull.P.copy(pull.S).lerp(pull.T, pull.ln / L);
       else pull.P.copy(pull.T);
       pullStats.F = pull.F; pullStats.Fmax = Math.max(pullStats.Fmax, pull.F);
       pullStats.hipMax = Math.max(pullStats.hipMax, pullStats.hip);
-    } else {
-      pull.F = 0; pullStats.F = 0;
+    }
+    if (!pull.on) {
+      if (!(pull.ease > 0)) { pull.F = 0; pullStats.F = 0; }
       // Let go: back in the pose? Spring-back is the first time her head is
       // within a degree and 5 mm of it; the net is left once she is still
       // there.
@@ -48744,8 +49050,8 @@ async function buildJadrija(scene) {
       }
       const A = PULL_RAG.after;
       pull.still = worst * 180 / Math.PI < A.ang && rag.speed() < A.v ? pull.still + dt : 0;
-      if (pull.still >= A.still || pull.rel > A.most) pullLeave();
-      pull.grip = Math.max(0, pull.grip - dt / 0.15);
+      if ((pull.still >= A.still && !(pull.hu > 0) && !(pull.ease > 0)) || pull.rel > A.most) pullLeave();
+      if (!(pull.ease > 0)) pull.grip = Math.max(0, pull.grip - dt / 0.15);
     }
     // The hair to the fist — see `drape.grip` in 41-skin.js.
     pullStats.hair = apprenticeHairGrip(pull.grip > 0 ? pull.P : null, pull.grip);
@@ -80246,7 +80552,9 @@ async function buildJadrija(scene) {
       return { x: p.x, y: p.y, z: p.z, fx: d.x, fy: d.y, fz: d.z, ax: (n.x - a.x) / l, az: (n.z - a.z) / l,
         nx: n.x, ny: n.y, nz: n.z };
     },
-    hairPull: (on, eye) => hairPull(!!on, eye || null),
+    // `haul` (1.587.0): the player's own hand — on her knees or on all fours
+    // she is hauled in to you (PULL_HAUL). Roles reversed never asks for it.
+    hairPull: (on, eye, haul = false) => hairPull(!!on, eye || null, !!haul),
     /**
      * The hair drag's two (1.584.0, src/49-revwalk.js): `hairPullTune(o)` the
      * way and weight of this hold — { outOf, draw, k, yankF, yankDraw }, null
@@ -80259,12 +80567,29 @@ async function buildJadrija(scene) {
       if (!(pull.grip > 0)) return null;
       const d = _plV.copy(pull.S).sub(pull.P);
       const l = d.length() || 1;
+      // Hauled (1.587.0): where you step to, how far you bend (0..1 of the
+      // crouch), and her head, to look down at — see PULL_HAUL.
+      // You look down past the back of her head, along the arch of her to
+      // her chest — her head at the bottom of the view and not filling it.
+      const H = pull.haul && pull.on ? { stand: pull.stand, bend: pull.haul.bend,
+        look: [pull.S.x - pull.away.x * 0.35, pull.S.y - 0.22, pull.S.z - pull.away.z * 0.35],
+        yaw: Math.atan2(pull.away.x, pull.away.z), mode: pull.mode } : null;
       return { x: pull.P.x, y: pull.P.y, z: pull.P.z, grip: pull.grip, on: pull.on,
-        hx: d.x / l, hy: d.y / l, hz: d.z / l };
+        hx: d.x / l, hy: d.y / l, hz: d.z / l, haul: H };
     },
     /** Debug: what the pull is doing — see `pullTick` — and what it has done. */
     pullRag: () => ({ on: !!(pullR && pullR.on), layer: pullL.on, w: +pullL.w.toFixed(3), holding: pull.on,
-      t: +pull.t.toFixed(2), style: pull.style, len: +pull.len.toFixed(3),
+      t: +pull.t.toFixed(2), style: pull.style, len: +pull.len.toFixed(3), ln: +(pull.ln || 0).toFixed(3),
+      mode: pull.mode, hu: +pull.hu.toFixed(3), hipDeg: +(pullStats.hipDeg || 0).toFixed(1),
+      neck: +(pullStats.neck || 0).toFixed(1), touch: pull.haul ? +((pullStats.touch || 0) * 100).toFixed(1) : null,
+      // Each drawn joint's extension now and its stop, degrees (the joint's +x).
+      stops: pullR && pullR.on && pullR.stops ? Object.fromEntries(PULL_BODY.map((nm) => {
+        const S = pullR.stops.get(nm);
+        if (!S) return [nm, null];
+        return [nm, [+(pullR.net.angleNow(S.m)[0] * 180 / Math.PI).toFixed(1), +(S.hi[0] * 180 / Math.PI).toFixed(1),
+          pullR.hauled && pull.haul ? +Math.max(S.hi[0] * 180 / Math.PI, pull.haul.hi[nm]).toFixed(1) : null]];
+      })) : null,
+      Fg: pull.haul ? [+pull.Fg.x.toFixed(3), +pull.Fg.y.toFixed(3), +pull.Fg.z.toFixed(3)] : null,
       F: +pullStats.F.toFixed(1), Fmax: +pullStats.Fmax.toFixed(1),
       pitch: +pullStats.pitch.toFixed(2), pitchMax: +pullStats.pitchMax.toFixed(2),
       chest: +pullStats.chest.toFixed(2), chestMax: +pullStats.chestMax.toFixed(2),

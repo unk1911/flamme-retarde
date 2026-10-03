@@ -8,6 +8,87 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.587.0] — 2026-10-03
+
+### Her hair, on her knees and on all fours: hauled in tight
+
+Misha: *"can u make sure that when she is in all fours or in kneeling pose if
+I grab her by the hair it causes her head to come real close to me real
+tight"*. 1.545.0's pull draws 26 cm past the hair's length toward your
+shoulder, at 70 N. From a woman on her knees that only tips her head: 15°
+back. On all fours it lifted her head 12 cm, and it stayed three-quarters of
+a metre in front of her hips.
+
+On her knees (`kept`, `submit`, `creep` and the leash's kneels) and on all
+fours (`fours`, `crawl`, `leashFours`, `leashCrawl`), the pull is now a haul
+(`PULL_HAUL` in 43-jadrija.js). This is only in your own hands, normal roles.
+Roles reversed never asks for it, and standing or lying the pull is
+unchanged.
+
+- **The fist goes to your chest.** It ends 44 cm under your eye and 10 cm in
+  front of it, and the hair is wound in to 5 cm between her scalp and your
+  knuckles. The yank is 240 N, then 150 N held (180 N on all fours).
+- **She arches into it.** Her back's muscles go to 45% of their tone, and
+  her spine's stops open to 32° / 28° / 50° (lower back, chest, neck). Her
+  head is thrown back on her neck by up to 30°. Even at the yank, the neck
+  stays 14° inside its stop. On her knees she also leans back 12° from the
+  knees.
+- **On all fours she comes up onto her knees.** Her pelvis turns up 60°
+  about her two hip joints. Her thighs turn back by the same amount, so her
+  knees stay where they were. She is dragged 15 cm back toward you. Her
+  arms keep 85% of the way they pointed, so her hands come off the floor
+  and hang.
+- **You step in behind her hips** (45 cm on her knees, 42 cm on all fours)
+  and bend (`bend` in 47-ground.js, 0.30 / 0.40 of the crouch). Her head
+  comes to your chest, not your lap. You look down along her.
+- **You are in her net.** Your trunk is a capsule her head and back meet.
+  The arm stops pulling over the last 5 cm before your chest. Measured
+  without either, the yank carried the back of her skull 5 cm into you.
+- **Letting go eases her back.** Your hand eases off over 0.8 s, her hips come
+  down over the same time, and her dampers stay at 2.5× until she is out of
+  the net. Measured when the hand simply opened, her arch sprang back past
+  the pose: her head went 7° forward of it on her knees and 26° on all
+  fours.
+- **The eye the pull goes toward is your walker's, not the camera.** In the
+  third person, or under a probe's camera, the camera can be metres away.
+
+Measured on the same probe, before (1.586.0) and after, her back to you,
+first person:
+
+| | Knees before | Knees after | All fours before | All fours after |
+|---|---|---|---|---|
+| Head back, held (yank peak) | 15° (26°) | 59° (59°) | 24° (36°) | 126° (134°), up onto her knees |
+| Chest / back | 11° | 42° (12° of it the lean from the knees) | 14° | 109° (60° of it her hips) |
+| Neck, its own extension | — | +18° (stop 50°) | — | +18° (+26° at the yank) |
+| Head height | 116 cm | 109 cm | 66 cm (72 cm at the yank) | 111 cm |
+| Head under your eye | 50 cm (eye 166 cm) | 37 cm (eye 146 cm, bent) | 100 cm | 28 cm (eye 140 cm) |
+| Back of her skull to your chest | 38 cm | 5 cm (closest 3 cm at the yank, never inside) | 106 cm | 7 cm (5 cm at the yank) |
+| Force, held (yank) | 70 N (94 N) | 138 N (203 N) | 70 N (99 N) | 179 N (218 N) |
+| Hair tautness | 1.00 | 1.00 | 1.00 | 1.00 |
+| Back in the pose after letting go (within 1°) | 1.25 s | 2.35 s, no overshoot (within 5° at 1.6 s) | 1.25 s | 2.25 s, no overshoot (within 5° at 1.4 s) |
+
+The yank brings her head from the pose to 53° in 0.40 s on her knees. Her
+head meets your chest, comes back off it to 48°, and is held at 58–59° from
+0.85 s on. On all fours she is up on her knees and against you in 0.70 s.
+The run was repeated without the probe's pin: you asked her to turn, walked
+behind her, and pressed on her hair. The result was the same, within 1° and
+1 cm. Standing is unchanged: 25.4° held and 37.0° at the yank, chest 14.5°,
+against 25.6°, 37.0° and 14.5° before.
+
+Your eye is 31–37 cm from her skull and the near clip is 4–6 cm, so nothing
+is clipped. **Cost**: 0.5–0.7 ms a frame while hauling, measured headless
+with three runs sharing the machine; the plain pull was 0.36–0.55 ms. The
+capsule and the hip turn add nothing when nobody is hauling. Probes:
+`__fr.jad.raw().hairPull(on, eye, haul)`, and `pullRag()` now also gives
+`mode`, `hu`, `hipDeg`, `neck`, `touch`, `stops` and `Fg`.
+
+**Rough.** The third person does not show it here. Pressing on her hair
+measures the reach from the camera (that was true before too), and with
+the kabina's walls the B camera sits at your eye with no body drawn. So
+your body's real skin was not measured against her head. The trunk capsule
+(12 cm round, its front 12 cm out from your eye) stands in for it. Kneeling
+on the cot (`bedKneel`) is left as the plain pull.
+
 ## [1.586.0] — 2026-10-02 (baye 1.72.0)
 
 ### Roles reversed: Chloe pins you down on the cot
