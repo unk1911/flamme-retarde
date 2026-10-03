@@ -263,6 +263,8 @@ function revScene() {
   if (typeof rvdScene === 'function') rvdScene(o);
   // On top of you on the cot, or holding your wrists (1.586.0): `rev_pin`.
   if (typeof rvpScene === 'function') rvpScene(o);
+  // Tied, and blindfolded (1.587.0, src/49-revbind.js): `rev_bound`, `rev_blind`.
+  if (typeof rvbScene === 'function') rvbScene(o);
   // Her mood, and what you last begged for (1.583.0).
   if (typeof rmoodScene === 'function') rmoodScene(o);
   return o;
@@ -453,6 +455,8 @@ function revOff(why = 'asked') {
   if (typeof rvhClear === 'function') rvhClear();
   // Off you on the cot (1.586.0).
   if (typeof rvpClear === 'function') rvpClear();
+  // Untied, the blindfold off, her belt back on her (1.587.0).
+  if (typeof rvbClear === 'function') rvbClear();
   rev.on = false;
   if (jadrija && jadrija.ride) jadrija.ride(null);
   revArmClear();
@@ -489,6 +493,9 @@ function revSafe(who = 'you') {
   rev.dom.order = null;
   rev.care = { t: 0, said: false };
   revArmStop();
+  // Tied or blindfolded (1.587.0, src/49-revbind.js): the ties off you and the
+  // blindfold off on this frame — before her belt's own, which may be the tie.
+  if (typeof rvbSafe === 'function') rvbSafe();
   // And her belt and the collar (1.564.0): a swing stops where it is and she
   // lets go of the strap; the collar comes off at once.
   if (typeof rvkSafe === 'function') rvkSafe();
@@ -651,6 +658,8 @@ function revAsk(name) {
     revTrace({ pick: 'you:' + name, why: 'after she is off you' });
     return true;
   }
+  // Tied (1.587.0): what your arms cannot do is a struggle against the rope.
+  if (typeof rvbYourAsk === 'function' && rvbYourAsk(name)) return true;
   // A pose asked while the order is "be still" is a move.
   rev.dom.moved += 1;
   // On her leash (1.564.0): the leash's own poses, and nothing that would
@@ -679,6 +688,14 @@ function revKey(e) {
   if (/^(Digit[089]|Numpad[089]|KeyV|KeyR|KeyO)$/.test(e.code)) { revOff('left'); return false; }
   // Your belt and the collar are Chloe's (1.564.0): the backslash asks for
   // her belt (or for it back on her), = for the collar (or off you).
+  // ── 1.587.0 (src/49-revbind.js): Shift+\ "tie me up", Shift+= "blindfold me" — begs.
+  if ((e.code === 'Backslash' || e.code === 'Equal') && e.shiftKey && typeof rmoodBeg === 'function') {
+    e.preventDefault();
+    const r = rmoodBeg(e.code === 'Backslash' ? 'bind' : 'blind');
+    if (typeof toast === 'function') toast(r.label);
+    return true;
+  }
+  // ── end 1.587.0
   if (e.code === 'Backslash' || e.code === 'Equal') {
     e.preventDefault();
     if (typeof rvkAsk === 'function') {
@@ -1024,6 +1041,8 @@ function revToys() {
 function revDecide() {
   const D = rev.dom, v = revView();
   D.decisions++;
+  // Tied or blindfolded (1.587.0): her choices are the tie's own (`rvbActs`).
+  if (typeof rvbHolds === 'function' && rvbHolds()) { D.next = rev.clock + 1; return null; }
   // A beg of yours she owes you first (1.583.0, `rmoodBegDecide`).
   const bg = typeof rmoodBegDecide === 'function' ? rmoodBegDecide(v) : null;
   if (bg) { revTrace({ pick: bg, ctx: v ? v.ctx : null, heat: +D.heat.toFixed(2) }); return bg; }
@@ -1067,6 +1086,8 @@ function revDecide() {
   if (typeof rvdCands === 'function') for (const c of rvdCands(ctx, D)) cands.push(c);
   // And holding you down on the cot, stern (1.586.0, src/49-revpin.js).
   if (typeof rvpCands === 'function') for (const c of rvpCands(ctx, D)) cands.push(c);
+  // And tying you up, stern or excited (1.587.0, src/49-revbind.js).
+  if (typeof rvbCands === 'function') for (const c of rvbCands(ctx, D)) cands.push(c);
   // The remote: since 1.567.0 a move of hers with the phone in her hand
   // (`move:remote`, src/49-revtoys.js, among `rvmCands`); the bare buzz is
   // what is left without that file.
@@ -1111,6 +1132,11 @@ function revDecide() {
   } else if (/^pin/.test(pick.id) && typeof rvpChoose === 'function') {
     const r = rvpChoose(pick.id, 'mood | alt: ' + alt);
     if (r !== true) revTrace({ pick: 'pin:' + r });
+    D.next = rev.clock + 3;
+  } else if (/^bind/.test(pick.id) && typeof rvbChoose === 'function') {
+    // Tied up (1.587.0).
+    const r = rvbChoose(pick.id, 'mood | alt: ' + alt);
+    if (r !== true) revTrace({ pick: 'bind:' + r });
     D.next = rev.clock + 3;
   } else if (/^drag/.test(pick.id) && typeof rvdChoose === 'function') {
     const r = rvdChoose(pick.id, 'mood | alt: ' + alt);
@@ -1172,7 +1198,9 @@ function revTick(dt) {
     const top = typeof keys !== 'undefined' && keys.has('KeyQ') ? 2.3 : 1.45;
     // Her fist in your hair, walking you round the room (1.584.0,
     // src/49-revwalk.js): her pace is yours, and your keys only lean on it.
-    const tow = typeof rvdTow === 'function' && rev.last && dt > 0 ? rvdTow(dt, Y) : null;
+    const tow = (typeof rvdTow === 'function' && rev.last && dt > 0 ? rvdTow(dt, Y) : null)
+      // Tied standing (1.587.0): walked to the hook, and held there; walking is a struggle.
+      || (typeof rvbTow === 'function' && rev.last && dt > 0 ? rvbTow(dt, Y) : null);
     if (rev.last && dt > 0 && !tow) {
       const mx = Y.x - rev.last[0], mz = Y.z - rev.last[1], md = Math.hypot(mx, mz);
       if (md > top * dt && md < 1) {
@@ -1197,7 +1225,9 @@ function revTick(dt) {
     Y.x = r.x; Y.z = r.z; Y.vx = 0; Y.vz = 0;
     // Held down on the cot (1.586.0): W or S is a struggle, and she holds on.
     const pinned = typeof keys !== 'undefined' && (keys.has('KeyW') || keys.has('KeyS'))
-      && typeof rvpStruggle === 'function' && rvpStruggle('you');
+      && ((typeof rvpStruggle === 'function' && rvpStruggle('you'))
+        // Tied (1.587.0): the same keys pull at the rope.
+        || (typeof rvbStruggle === 'function' && rvbStruggle('you')));
     if (!pinned && typeof keys !== 'undefined' && (keys.has('KeyW') || keys.has('KeyS')) && rev.clock - rev.riseAt > 2.5
       && !rev.care && v.ctx && !(typeof rvkCollarOn === 'function' && rvkCollarOn())) {
       rev.riseAt = rev.clock;
@@ -1257,6 +1287,8 @@ function revTick(dt) {
   if (typeof rvhTick === 'function') rvhTick(dt);
   // Walking you round the room by it (1.584.0): before her arms are solved.
   if (typeof rvdTick === 'function') rvdTick(dt);
+  // Tied, blindfolded (1.587.0): her hands' asks, your arms, the rope, the band, the dark.
+  if (typeof rvbTick === 'function') rvbTick(dt);
   // Her moves, her hands, her look (1.565.0).
   if (typeof rvmTick === 'function') rvmTick(dt);
   revCamera(dt);

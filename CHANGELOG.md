@@ -8,6 +8,199 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.588.0] — 2026-10-03 (baye 1.73.0)
+
+### Roles reversed: bound and blind
+
+Misha: *"run more interesting scenarios, in the kabine, all sorts of
+intrigues ... this is all part of the whole bdsm dynamic ... go all out and
+wild"*. Item B of plan/night-loop-2026-10-03.md. The same two adults and the
+same consensual kabina play as 1.561.0–1.586.0, and the safeword over all of
+it.
+
+**The line, and how it was kept.** No sex. Her hands go to your wrists, your
+head and your hair; the spanks are the existing spanks; her whisper is at
+your ear. Nothing presses the two bodies together, and that is measured
+skin to skin (below).
+
+The new file is `src/49-revbind.js` (names `rvb…`, `__fr.reverse.bind`). It
+sorts before 49-reverse.js ("revb" < "reve"), so its lines go into her tables
+and its API on to `__fr.reverse` once the script has run (`rvbInstall`) —
+those tables are `const`s, which even `typeof` may not touch earlier. Hooks,
+each in its own marked block:
+- 49-reverse.js: the scene, the swap back, the safeword (before her belt's
+  own), your asks, Shift+\ and Shift+=, her selector, the walker's tow, W/S,
+  the frame;
+- 49-revmood.js: the words, the beg's dispatch, her mood's weight;
+- 49-revkit.js: a belt phase `bound` (round your wrists, not in her hand);
+- 49-voice.js: `bind` and `blind_on` carry the scene;
+- 80-audio.js: `voiceSpace(pan, gain)` and `stepAt(hard, gain, pan)`;
+- 90-app.js: the help line.
+
+**The ties** (`kind`):
+- **The cot** — lying face down or face up: your arms stretched up over your
+  head and your wrists tied together to the cot's end rail. Face down your
+  wrists reach past the mattress's end (held 0 mm median). Face up they do
+  not: your arms were 17 cm short, MEASURED, so the tie is drawn back within
+  96 % of your arms (`rvbReachClamp`), lifted over the pillow, and the
+  tether runs over the mattress's end to the rail.
+- **Behind your back** — standing or kneeling: wrists together at the small
+  of your back (a forearm's half-thickness behind your skin, measured off
+  your back once), a knot and the tail hanging.
+- **The hook** — standing: a brass coat hook on the east wall (new, 1.90 m;
+  the room's two hooks are over the cot). She walks over and you are walked
+  after her (`rvbTow`), facing the wall, your arms go up, and your wrists are
+  tied under it.
+
+**With**: a soft rope (a coil lies at the shelf's east end; she fetches it,
+and after a tie she drops it where she stands and fetches it from there next
+time), or **her belt** — off her jeans (her hand to her buckle, the waist band
+painted away, `you.belt`), carried folded in her fist, two turns round your
+wrists and its buckle; back on her after.
+
+**The rope is drawn on you.** Its coils are the convex hull of your forearms'
+and hands' skin in each turn's slice, measured off your mesh every 1.5 s and
+carried on your forearms between (`rvbHull`), then the tether to the rail or
+the hook, round it, and back to a knot. It is drawn on as she ties and off as
+she unties (`tieU`), her hands working round your wrists.
+
+**Your arms are held**: solved to the tie every frame (the 1.574 arm solve,
+`rvhBayeArm`, along a way round so they do not pass through you); your keys
+cannot move them — an ask your arms cannot do is a struggle (`rvbYourAsk`);
+W or S, or walking, is a struggle (`rvbStruggle`): your wrists pull at the
+rope, your view jolts, and she notices — stern, a spank and longer; excited,
+her remote; warm, a soft word.
+
+**The blindfold**: a dark cloth band fitted to your head the way a stretched
+band sits — the hull of your head, hair, lashes and brows at eye height, row
+by row, smoothed so it does not dip into your eye sockets, a knot at the back
+(`rvbBandFit`), carried on your head bone. First person goes nearly black
+with a faint warm leak at the bottom edge (`#rvb-dark`, only in your own
+eyes); the third person and the debug lens show the band. Her voice and her
+steps are panned and weighed by where she is against your head while you
+cannot see (`audio.voiceSpace`, `audio.stepAt`).
+
+**Left tied** (`rvbActs`), her mood read afresh each time: she walks away and
+makes you wait; comes back ("Miss me?"); checks the knots with a tug; teases
+with her remote and the toy you wear (49-revtoys.js's `toy` move); spanks;
+comes to your ear, her hand on the side of your head, and whispers; praises
+you; strokes your hair; puts the blindfold on mid-way. After close work she
+steps back off you. Then she unties you, the blindfold comes off (your eyes
+adjust over a second), your arms come down, and a beat of aftercare: a soft
+line and her hand in your hair.
+
+**Her mood** (`rvbMood`): stern, longer (16 + 36·stern − 11·warm + 8·excited
+s), tighter (your arms stretched up to 3.5 cm further, tighter at each
+check), more checks, waits away of 7–13 s, and a spank for a struggle;
+excited, short trips away, her remote, the toys, in waves; warm, short (10 s
+at the warmest), soft, praise, her hand in your hair.
+
+**Asking.** In a sentence, a beg (`rev.beg:bind | blind | untie`), what you
+said of it riding on the name (`bind.cot.belt.blind`): "tie me up", "tie my
+hands", "tie me to the bed", "tie my wrists behind my back", "tie me to the
+hook with your belt", "blindfold me", "cover my eyes", "tie me up and
+blindfold me", "zaveži me", "veži mi ruke", "poveži mi oči", "attache-moi",
+"bande-moi les yeux"; Shift+\ ties, Shift+= blindfolds. MEASURED, all 13
+matched as listed; "don't tie me up" and "did you tie me up" are nothing;
+"pin me down", "hold me" and "spank me" are what they were. "untie me" (and
+"take the blindfold off") counts only while you are tied: warm, she does;
+stern, "No." and longer (MEASURED: 40.7 → 54.7 s); excited, a tease and half
+the time yes. The safeword is always "red". While you are tied, the pin, the
+drag, the collar and your hair are refused. Off the cot she has you lie down
+first; lying, on your feet first.
+
+**Her own pick**: stern over 0.42 or excited over 0.35, where a tie goes;
+not within 60 s, nor twice in six picks. MEASURED at stern 0.95 with the defy
+bot: `bind` 2.17 at the top of her list (order:cot 1.10) once, 1.17 second
+another time — a hook tie with her belt and a blindfold.
+
+**The safeword**, on that frame (`rvbSafe`, before her belt's own): the tie
+off — the rope dropped loose where your wrists were, her belt freed — the
+blindfold off, the dark off, your arms yours; her remote is the toys'
+(`rvtSafe`); then her aftercare. MEASURED in all 13 safewords of the runs (the hook and
+behind the back, rope and belt, blindfolded): rope, band and dark all gone and the remote off on the first frame
+after, every time, and her aftercare began.
+
+**Her voice** (`server/baye/baye.py` 1.73.0, **needs deploying on mpcn0**):
+CHLOE_BEATs `bind`, `bind_hold`, `bind_squirm`, `bind_check`, `bind_away`,
+`bind_back`, `bind_whisper`, `bind_good`, `bind_off`, `bind_no`, `blind_on`,
+`blind_off`, `bind_care`; REV_BEG `bind`, `blind`, `untie`; scene keys
+`rev_bound` (cot | back | hook) and `rev_blind`, with a tone line: *"This is
+bondage play they wanted: teasing, in charge, making them wait, your voice
+close. Nothing sexual — rope on their wrists, a cloth over their eyes,
+nothing more."* `clean_scene` checked: 'hook' kept, 'evil' dropped, both
+dropped unless the roles are reversed. Undeployed, the page's captions show.
+About a hundred and forty new lines in her three moods.
+
+**MEASURED** (worktree build, headless, key 8, her selector off, the mood
+set; the final runs, seven scenarios: the hook with rope and blindfold,
+stern; the cot face down with her belt, excited; face up with rope and
+blindfold, warm; behind the back kneeling, stern; standing with her belt and
+blindfold, excited; standing with the Lovense worn, excited; and her own
+pick):
+
+| tie | your wrists to the tie, median (p90) | rope on your skin, median per angle | band to your head | Chloe's skin to yours (her hands left out) |
+|---|---|---|---|---|
+| hook, rope | 0.4–0.5 mm (0.5–0.6) | −0.7 mm (snug) | 3.5 mm, 0 inside | ≥ 8.1 mm |
+| cot face down, belt | 0 mm (4–7) | −6.2 mm | — | ≥ 30.8 mm |
+| cot face up, rope | 0 mm (7.5) | −11.4 mm | 3.2 mm, 0 inside | ≥ 39.3 mm |
+| back, kneeling, rope | 0.2–0.3 mm (5) | −2.1 mm | 3.9 mm, 0 inside | −75 mm (see rough 1) |
+| back, standing, belt | 0.3–0.4 mm (0.4) | −5.5 mm | 3.5 mm, 0 inside | ≥ 7.0 mm |
+| back, standing, rope + Lovense | 0.4 mm (0.4) | −2.3 mm | 3.5 mm, 0 inside | ≥ 54.2 mm |
+
+- **First person, blindfolded**: the frame's mean luminance 0.017–0.021
+  (top 80 % of it 0.008, the bottom 5 % 0.107–0.143, the leak), against
+  0.125–0.138 not blindfolded.
+- **The hook**: your skin no nearer its shank than 7 mm; no skin of yours
+  past a wall (the first cut put a hand 30 mm into it; your wrists now hang
+  14 cm off the wall, you 36 cm off it).
+- **Her ear distance** whispering: 183–344 mm standing or kneeling by you;
+  480 mm face up on the cot.
+- **Lines**: never one of her last fourteen, as ever; per tie 8–12 lines.
+- **The toys**: the Lovense worn, she drew it (`move:toy`) and ran her remote
+  (on, level 0.64) while you were tied.
+- No console errors or exceptions in any run.
+
+What it took, MEASURED along the way:
+- the hook at 1.96 m left your wrists 6 cm short of it; it is at 1.90;
+- the body's front taken off the shoulders' names looked at your back — it
+  is your pelvis's own frame now;
+- her plans failed at the cot's end and behind you (`noplace`) until she
+  was given the pin's kneel at the cot's end and easier fallbacks;
+- standing where her hands had been, her head was 29–69 mm into your raised
+  arm — she steps back after close work, and her bow is eased off while her
+  head is within a hand of you (`rvbHeadGuard`);
+- your whole skin skinned twice a quarter-second ran the sim at a fifth of
+  its speed under load — it skins only your arms (or head) now, hashed;
+- kneeling, she walked away and you shuffled after her on your knees
+  (43-jadrija.js's `creep`, past 1.35 m) out of the tie — no walking away
+  while you kneel.
+
+Debug: `__fr.reverse.bind`: `ask(what, opts)`, `beg(what)`,
+`start(kind, { how, blind })`, `untie()`, `struggle()`, `act(what)`,
+`state()`, `last()` (every number above, per tie), `all()`, `band(k)`,
+`kab()`, `view('side' | 'front' | 'back' | 'face' | 'wrists' | 'top' | null)`,
+`mood()`, `words(t)`, `tune(o)`, `measure(on)`.
+
+**Rough, still:**
+1. **Kneeling, tied behind your back**: she comes from square beside you
+   now, but at the untie and in her own spanks (the 1.565.0 swing) her
+   thigh is still up to 75–79 mm into your arm; and your hands lie on your
+   bottom, sunk into it up to 70 mm (`armSelf`). Standing, both are fine.
+2. **The coils against your skin**: the rope sits on it (−0.7 to −2.3 mm,
+   a rope pressed in), the belt 5–6 mm in and, face up, 11 mm — the belt's
+   turns are wider than the slice they were fitted to; and a struggle or a
+   tug takes a coil 10–50 mm in for a moment, until the hull is refitted.
+3. **Face up on the cot** your arms do not reach the rail; the tie is
+   drawn back to where they do and the tether is long. Your hands lie in the
+   mattress's top there by up to 27 mm, and face down 10 mm on the rail.
+4. **The rail loop** passes between the rail and the mattress's end, where
+   the two meshes already overlap: hidden, but inside the foam.
+5. **Her whisper** face up on the cot is from 48 cm, kneeling beside it.
+6. **The band** is fitted to your hair as bound, not as draped: lying, loose
+   hair can show through it at the back.
+7. The struggle's sound is the jolt and her answer; there is no rope creak.
+
 ## [1.586.0] — 2026-10-02 (baye 1.72.0)
 
 ### Roles reversed: Chloe pins you down on the cot

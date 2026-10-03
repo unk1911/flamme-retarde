@@ -4042,6 +4042,8 @@ const HELP = [
     ['SHIFT + . · “drag me”', 'help.k.revdrag'],
     // Pinned on the cot (1.586.0).
     ['SHIFT + , · “pin me down”', 'help.k.revpin'],
+    // Tied up, and blindfolded (1.587.0).
+    ['SHIFT + \\ · SHIFT + = · “tie me up”', 'help.k.revbind'],
     // Begging her, and her mood (1.583.0).
     ['“spank me” · “harder”', 'help.k.revbeg'],
     ['O', 'help.k.pc'],
