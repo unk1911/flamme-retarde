@@ -8,6 +8,277 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.586.0] — 2026-10-02 (baye 1.72.0)
+
+### Roles reversed: Chloe pins you down on the cot
+
+Misha: *"can chloe mount on top of baye while baye is lying on the cot"* —
+and, of this and the hair drag, *"yes queue up both of them"*. The queue's
+item 2 (plan/queue-2026-10-02.md). The same two adults and the same
+consensual kabina play as 1.561.0–1.585.0, and the safeword over all of it.
+
+**The line, and how it was kept.** This is a pin — a hold — and not sex.
+Nothing in it grinds, rocks, thrusts or moves her hips in a rhythm; her
+pelvis is never over yours and never moves against you; there is no
+pressing-together motion and no face anywhere near anybody's crotch. Kept,
+not promised:
+- **Face down she kneels astride your back, not your hips.** Her knees are
+  on the mattress either side of your ribs and her seat is above your
+  hips. A rule in the solve keeps all of her (her arms excepted) at least
+  1.5 cm off your hips and thighs. MEASURED, in all nine pins of the final
+  runs: her nearest skin to your bottom was 46–53 mm away, and her pelvis
+  bone was never nearer yours than 304 mm.
+- **Face up she is NOT across your hips.** Kneeling over somebody's hips
+  facing them reads as something else whatever the hands are doing. Across
+  your thighs her arms do not reach your wrists (1.2 m, measured off your
+  bones). Above your head is not possible either, because your crown is at
+  the mattress's end and there is no foam there. So she **kneels on the
+  floor at the end of the cot beyond your head** and holds your wrists down
+  on the mattress either side of it. Her head is held 6 cm or more clear of
+  yours (MEASURED, 38–67 mm; the first cut, from further off, bowed her head
+  79 mm into yours).
+- **Her seat does not move against you.** While she holds you, her pelvis
+  against your spine moved sd 0.1 mm along you and ≤ 0.1 mm across. Up and
+  down it moved sd 1–4 mm, and that is the struggle and her correction of
+  it (below), one push each time, never a rhythm.
+
+The new file is `src/49-revpin.js` (names `rvp…`, `__fr.reverse.pin`). It has
+hooks in:
+- 49-reverse.js: the drive, Shift+, her selector, W/S, your asks, the
+  safeword, the scene;
+- 49-revmoves.js: her body mode `pin`, the move, the spank from on top, the
+  aftercare after she is off;
+- 49-revmood.js: the words, the beg, her mood's weight;
+- 49-voice.js and 90-app.js;
+- one addition to 43-jadrija.js, off unless asked for.
+
+**Face down: what it is.**
+- **The climb** (`rvpClimb`, 2.9 s): she comes to the cot's room side level
+  with your ribs and turns to it. One knee goes up on to the mattress
+  beside you, with her foot out to the side behind her, off the cot, and
+  then swept in on to the foam. She turns along you. Her other leg comes up
+  off the floor on her own side, knee lifted and shin folded under it, then
+  goes over your back and down on the far side. Then she settles down on to
+  both knees and sits on your back. Your hands go up by your head as she
+  comes, so her knees go where your arms lay.
+- **The settle** (0.8 s): she sits on your back for a moment and her weight
+  shows (below).
+- **The pin**: she kneels up a hand over your back and leans forward on
+  straight arms (up to 1.4 rad, closed by feedback on her real shoulders).
+  Her palms go on to your wrists up by your head, on the wrist's top and
+  outer side, her fingers round it. (Flat on top, her hand was bent 117–125°
+  off her forearm; now it is 88–93°, a push-up wrist.)
+- **Her legs are solved, not a clip.** She is her own `submit` clip held at
+  its kneel key. Her knees are put on points on the mattress and her hips go
+  where her thighs (0.443 m) let them (`rvpHipPose`). Each knee moves back
+  on its own if it touches you (`kneeAdj`), and her knees sink into the foam
+  to a measured depth.
+- **The spank from on top**: she sits up on to your back, her knees a hand
+  further forward, turns her trunk right round (twist, back and side bend,
+  closed on her real shoulder), and reaches back over her own hip to the top
+  of your near cheek. Her other hand rests on her own thigh. It is 1.565.0's
+  swing (`rvmSpankStart` with `pin`), from where she is.
+- **Off** is the same climb run backwards (2.5 s), on to her feet beside the
+  cot, then her standing clip (0.75 s). Your arms come down after she is off
+  you.
+
+**Her weight shows.** `cotPress` is applied at her seat, and a new
+`jadrija.cotWake(s)` keeps the cot ragdoll's give drawn while it lasts.
+Sitting, her whole weight is on you; kneeling up, a third of it is. The
+weight is 170–330 N, set by her mood. When she holds your wrists, they are
+pressed 1–8 mm into the foam.
+
+**Your struggle is small, and she corrects it.** W or S while she holds you
+is not "get up". It is a struggle:
+- your wrists come up off the foam (22 mm) and go back;
+- your view jolts;
+- she leans in and presses down harder for half a second and says so
+  ("Uh-uh. Stay.", "Did I say move?", "Hehe, nope!");
+- when she is stern, each wriggle adds 3–6 s to the pin.
+
+You also wriggle on your own now and then, unless she is gentle. Any other
+ask of yours (a key, a word) has her let go and get off first, and then it
+is done.
+
+**Face up.** She plans a kneel at the cot's end (1.565.0's `rvmPlan`, both
+hands to your wrists). Your hands go up beside your head, in hers. Her bow
+is closed on her reach and capped by the measured gap between her head and
+yours. To stroke your hair, one of her hands stays on its wrist and the
+other goes to your hair. (The first cut put one hand over both wrists. Up
+either side of your head the wrists are 0.4 m apart, so her palm landed on
+your face. MEASURED, and dropped.) Face up she gives orders ("Look at me",
+"Don't move"), teases, strokes your hair and uses her remote, but does not
+spank: your bottom is out of her reach from your head.
+
+**What she does from the pin** (`rvpActs`), every 2–9 s, with her mood read
+afresh each time so a wave shows:
+- a round of spanks (face down);
+- a line;
+- a squeeze of her grip;
+- your hair stroked;
+- her remote, if you wear a toy (`jadrija.remote`);
+- an order: "still" or, face up, "look".
+
+A spanking you begged for comes first.
+
+**Her mood sets it** (`rvpMood`):
+- **hold**: 16 + 26·stern − 9·warmth + 6·excitement s (9–48 s);
+- **weight**: 260 + 80·stern − 90·warmth N;
+- **grip** and how far the struggle's correction goes;
+- **spank rounds**: 0.4 + 2.6·stern + 1.4·excitement − 1.6·warmth;
+- **slaps a round**: 1.583.0's `rmoodSpanks`;
+- **how often she acts**: 5.2 − 2·stern − 2.2·excitement + 2.6·warmth s.
+
+MEASURED, final build, three pins each, face down:
+
+| mood | held, s (planned) | rounds | spanks a pin | wriggles corrected | also |
+|---|---|---|---|---|---|
+| stern 0.9 | 44–51 (39.3 + wriggles) | 1–3 | 16, 16, 5 | 2–3 | "That's another minute." |
+| excited 0.85 | 24.1 | 1–2 | 2, 5, 6 | 1 | "Gotcha! Hehe." |
+| warm 1.0 | 9.0 | 0 | 0 | 0 | your hair stroked (1 of 3; 3 of 3 the run before) |
+
+Face up: stern 44 s, excited 27 s, warm 9 s, no spanks.
+
+**Asking.** These count as a beg (`rev.beg:pin`, `rmoodBeg('pin')`), in a
+sentence:
+- "pin me down", "pin me", "sit on me", "hold me down", "hold my wrists",
+  "pin my arms", "get on top of me";
+- "prikovi me", "sjedni na mene", "drži me";
+- "immobilise-moi", "assieds-toi sur moi", "tiens-moi (les poignets)";
+- or **Shift+,**.
+
+MEASURED, all 17 matched, and:
+- "don't pin me down" and "did you pin me down" are nothing;
+- "hold me" is still the spoon (or the hug), "hold me close" still the hair
+  draw, and "sit up" still sitting up.
+
+Where you are decides what happens:
+- **on your tummy or your back**: she comes at once;
+- **another pose on the cot**: "on your tummy" first;
+- **off the cot**: "on the cot" first;
+- **with her belt or the leash in her hand**: that goes away first;
+- **while she lies behind you (the spoon)**: she gets up, has you on your
+  tummy, and then climbs on. MEASURED. She waits until you have held the
+  pose for 0.8 s and her order is kept: rolling from your side to your
+  tummy passes your back, and she had begun the face-up pin there.
+
+Asked again while she holds you, the pin goes 8 s longer.
+
+**Her own pick.** When she is stern (over 0.45) and you are lying face down
+or up on the cot, `pin` joins her candidates (stern ×2.6 in `rmoodWeight`).
+It is not picked within 40 s of the last pin, nor twice in five picks.
+MEASURED at stern 0.95: `pin` was picked at her first decision, weight
+2.30 (spank 2.74).
+
+**The safeword** stops it on that frame:
+- her hands come off your wrists on that frame (their aims are dropped);
+- face down she gets off the quick way (1.5 s instead of 2.5);
+- face up she straightens up;
+- then her aftercare: her hand in your hair, and the roles go back.
+
+MEASURED: her palms were more than 5 cm off your wrists 2 frames
+(0.06–0.10 s) after "red". Face down she was on her feet 2.7 s after it;
+face up, 0.05 s after. The aftercare began in both.
+
+**Her lines**, in her tone and never one of the last fourteen:
+- new beats `pin` (on you), `pin_hold`, `pin_squirm` and `pin_off`;
+- about fifty lines in all ("Don't move. I mean it.", "Shh. Just stay with
+  me.", "Try to get up. I dare you.", "Every time you wriggle, it's
+  longer.", "Okay, babe. Letting you go.");
+- five lines for the beg ("Hold you down? Say less.").
+
+**Her voice** (`server/baye/baye.py` 1.72.0, **needs deploying on mpcn0**):
+- `CHLOE_BEAT`s `pin`, `pin_hold`, `pin_squirm` and `pin_off`;
+- `REV_BEG.pin`;
+- the scene key `rev_pin`: 'astride' (*"…kneeling astride their back, your
+  knees on the mattress either side of them, leaning over them and holding
+  their wrists down by their head"*) or 'wrists' (kneeling at their head
+  holding their wrists down). It comes with a tone line: *"This is a pin, a
+  hold: firm, teasing, in charge. Nothing sexual — you are holding them
+  down, nothing more."*
+- `clean_scene` was checked: 'astride' is kept, 'evil' is dropped, and the
+  key is dropped unless the roles are reversed. It is not sent during the
+  aftercare.
+
+Undeployed, the page's captions show.
+
+**43-jadrija.js**, off unless asked for: `cotWake(s)` holds the cot
+ragdoll's `calm` for `s` s, so a press shows the way a slap does.
+
+**MEASURED, skin to skin**: both bodies were CPU-skinned off their drawn
+palettes (`rvsGap`, inside counted at 3 mm), every 0.25 s, with her arms and
+hands measured apart from her body. Final build, nine face-down pins:
+
+| phase | nearest, mm | vertices inside |
+|---|---|---|
+| climbing on | +7.6 or more (6 pins); −7.8 to −9.1 (3 pins) | 0–1 |
+| settling | +13.7 to +15.5 | 0 |
+| holding your wrists | **+9.4 to +10.2, every pin** | **0** |
+| sitting up to spank (≈1 s) | −23 to −30 | 5–12 |
+| spanking | −10.3 to +7.5 | 0–1 |
+| back down on to your wrists after it | −15 to +11 | 0–1 |
+| letting go | +5 to +9 (stern, excited; once −13.5); −15 to −29 (warm) | 0–7 |
+| climbing off | +3.4 to +7.2 | 0 |
+
+- **Her palms on your wrists**, held: median 2–8 mm to your skin, p90
+  7–21 mm. Face up, median 1.6–8 mm.
+- **A slap from on top**: her palm 4–21 mm off the spot at contact (median
+  about 8), every slap landing on the cheek (`cotAim`: butt).
+- **Her knees** were 10–18 mm into the foam's top at the deepest, and at
+  most 14 mm off it (32–34 mm in three of the nine pins).
+- **The walls**: no skin point of either of you past a wall in any run.
+- **No console errors** in any run.
+
+What it took to get there, MEASURED along the way:
+- kneeling with her knees beside your armpits, they met your upper arms up
+  by your head;
+- sitting low on your lumbar, the backs of her thighs were 31 mm into the
+  top of your bottom, which is what the `botGap` rule ended;
+- swinging her far leg straight from the floor over you, it went through
+  you (159 vertices); it now lifts on her own side first;
+- the first spank posture was 3–7 cm short of your bottom, so three spots
+  in five were given up; she now reaches with a straight arm (`spankReach`
+  0.50) and moves her knees forward;
+- a seat raised while she spanked lifted her knees 6 cm off the foam and
+  her hands 12 cm short of your wrists; the kneel-up height is now capped
+  by her thighs (`upFa`);
+- her palm sat 16 mm above your skin because the wrist's top had been taken
+  off the bone's line; it is now taken off the vertex.
+
+Regression: all MEASURED on this build, all unchanged:
+- the hair drag (5.6 m, 87 mm apart);
+- a cot spank round (3 slaps, 3.1–4.1 mm);
+- her hand holding you down;
+- the spoon (11 mm);
+- the swap back.
+
+Debug: `__fr.reverse.pin`:
+- `ask()`, `beg()`, `start()`, `end()`;
+- `squirm()`, `spank(n)`, `act(what)`;
+- `state()`, `last()` (every number above, per pin), `all()`, `palms()`,
+  `geom()`;
+- `view('side'|'head'|'feet'|'top'|'wall'|'diag'|'diagf'|null)`;
+- `tune(o)`, `measure(on)`, `mood()`, `words(t)`.
+
+**Rough, still:**
+1. **Sitting up for a spank** (about a second), the inside of her left thigh
+   is up to 23–30 mm into your left side (5–12 vertices). That is two rigid
+   meshes where flesh would give. While she spanks it is −14 mm or better.
+   Your left side is the fuller one (your arm up by your head), and her
+   left knee moves back off it (`kneeAdj`) a measure later.
+2. **On the climb** (about u 0.37–0.45, a frame or two), her near boot is
+   1.5 cm inside the cot's side, 20 cm below the mattress top.
+3. **Letting go, gently** (warm), a knee touches your arm for a moment,
+   up to 29 mm.
+4. **A slap from on top** lands up to 21 mm off its spot, against 2–4 mm
+   standing; her trunk is still turning when she swings.
+5. **First person, face down**: the existing face-down camera is low at
+   the pillow, and her arms are mostly out of its frame. Face up, her
+   forearm by your head fills it.
+6. **Her wrists** are bent about 90° on yours (a push-up hand), because her
+   arms come down to you nearly straight.
+7. **Face up** there are no spanks, by design.
+
 ## [1.585.0] — 2026-10-02 (baye 1.71.0)
 
 ### Roles reversed: Chloe walks you round the kabina by your hair

@@ -284,6 +284,11 @@ function rmoodBeg(what) {
     const r = typeof rvhAsk === 'function' ? rvhAsk('pull') : { ok: false, label: 'no hair' };
     return { ok: r.ok, label: 'Chloe, excited: ' + String(r.label).replace(/^chloe: /i, '') };
   }
+  // Pinned on the cot (1.586.0, src/49-revpin.js).
+  if (what === 'pin') {
+    const r = typeof rvpAsk === 'function' ? rvpAsk() : { ok: false, label: 'no pin' };
+    return { ok: r.ok, label: 'Chloe, excited: ' + String(r.label).replace(/^chloe: /i, '') };
+  }
   // Walked round the room by it (1.584.0, src/49-revwalk.js).
   if (what === 'drag') {
     const r = typeof rvdAsk === 'function' ? rvdAsk() : { ok: false, label: 'no drag' };
@@ -478,6 +483,8 @@ function rmoodWeight(id) {
   else if (id === 'hair:draw' || id === 'hair:kneel') k = (1 + g) * (1 + 0.6 * e);
   // Walking you by your hair (1.584.0): discipline, and a game when she is wound up.
   else if (/^drag/.test(id)) k = (1 + 1.4 * s) * (1 - 0.6 * g) * (1 + 1.4 * e);
+  // Holding you down on the cot (1.586.0): discipline above all.
+  else if (/^pin/.test(id)) k = (1 + 1.6 * s) * (1 - 0.5 * g) * (1 + 0.4 * e);
   else if (m === 'hold') k = (1 + s) * (1 + 0.5 * e);
   else if (m === 'grip') k = (1 + 0.8 * s) * (1 + 0.4 * e);
   else if (m === 'stroke' || m === 'hug' || m === 'spoon' || m === 'sitby' || m === 'chin') k = (1 - 0.8 * s) * (1 + 2 * g) * (1 - 0.4 * e);
@@ -597,6 +604,10 @@ function rmoodWords(t) {
   const buzzing = typeof rvt !== 'undefined' && rvt.phoneOn;
   if (/^((please |oh )?(harder|do it harder|spank (me )?harder|again|do it again|more|one more|another( one)?|again please|more please|harder please|please more|please again|please harder))( chloe| mistress| babe)?( please)?$/.test(t)) return 'rev.beg:harder';
   if (!buzzing && /^(jace|jos( jednom| jednu| malo)?( molim( te)?)?|encore( une)?( fois)?|plus fort|encore plus fort)( s'?il te plait)?$/.test(t)) return 'rev.beg:harder';
+  // Pinned on the cot (1.586.0, src/49-revpin.js): "pin me down", "sit on
+  // me", "hold me down", "hold my wrists", "pin my arms" — and in Croatian
+  // and French. Not "hold me" alone: that is her hug, or the spoon.
+  if (/\bpin me( down)?\b|\bpin (my|both my) (arms|wrists|hands)\b|\bsit on (me|my back|top of me)\b|\bhold me down\b|\bhold (my|both my) (wrists|arms|hands)( down)?\b|\b(get|climb) on top of me\b|\bprikovi me\b|\bsjedni na mene\b|\bdrzi me( dolje| prikovanu)?$|\bdrzi mi (ruke|zapesca)\b|\bimmobilise[- ]moi\b|\bassieds[- ]toi sur moi\b|\btiens[- ]moi( les poignets)?$|\btiens[- ]moi les poignets\b/.test(t)) return 'rev.beg:pin';
   // Walked round the room by your hair (1.584.0, src/49-revwalk.js): "drag
   // me", "pull me by the hair", "vuci me za kosu", "traîne-moi par les
   // cheveux" — before the plain pull, which "pull ... hair" also is. Not the

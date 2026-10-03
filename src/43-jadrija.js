@@ -81398,6 +81398,18 @@ async function buildJadrija(scene) {
       }
       return true;
     },
+    /**
+     * Her give kept drawn for `s` s (1.586.0, src/49-revpin.js): somebody's
+     * weight on her (`cotPress`) shows the way a slap does, its rest not
+     * averaged away while it lasts. Off unless asked for. False when she is
+     * not on her ragdoll.
+     */
+    cotWake: (s) => {
+      const R = cotR;
+      if (!R || !R.on) return false;
+      R.calm = Math.max(R.calm, s);
+      return true;
+    },
     /** The belt's world — her capsules, the cot — and a lash on her: see `beltWorld`, `beltHit`. */
     beltWorld: () => beltWorld(),
     /**

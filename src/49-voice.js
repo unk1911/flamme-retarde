@@ -307,7 +307,7 @@ const CHLOE_SAY = {
   // (1.564.0: her belt coming off and the collar going on carry the scene too.)
   // (1.583.0: and her yes when you beg her for it.)
   // (1.584.0: and her fist closing in your hair to walk you.)
-  prio: { on: 1, off: 1, order: 1, care: 1, belt: 1, collar: 1, beg: 1, hair_drag: 1 },
+  prio: { on: 1, off: 1, order: 1, care: 1, belt: 1, collar: 1, beg: 1, hair_drag: 1, pin: 1 },
   cut: { on: 1, off: 1, care: 1 },
 };
 
