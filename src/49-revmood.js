@@ -267,11 +267,28 @@ function rmoodBeg(what) {
   if (!rev.on) return { ok: false, label: 'roles are not reversed' };
   // After the safeword nothing is asked of her but to look after you.
   if (rev.care) return { ok: false, label: 'Chloe: aftercare first — the safeword stopped all of it' };
+  // ── 1.587.0 (src/49-revbind.js): what you said of it rides on the name
+  // ('bind.cot.belt.blind'); and while you are tied, nothing that would move
+  // you out of the tie (her pin, the drag, the collar, your hair).
+  const opt = String(what).split('.');
+  what = opt.shift();
+  if (typeof rvbHolds === 'function' && rvbHolds() && /^(pin|drag|collar|hair)$/.test(what)) {
+    return { ok: false, label: 'Chloe: you are tied up — not that, not now' };
+  }
+  // ── end 1.587.0
   const X = rmood.ex, D = rev.dom;
   const again = rmood.begLast && rev.clock - rmood.begLast.t < 12;
   X.begs++;
   rmoodExcite(RMOOD.ex.beg + (again ? RMOOD.ex.again : 0) + (what === 'harder' ? RMOOD.ex.harder : 0), 'begged: ' + what);
   rmood.begLast = { what, t: rev.clock };
+  // ── 1.587.0: tie me up, blindfold me, untie me (src/49-revbind.js).
+  if (/^(bind|blind|untie)$/.test(what) && typeof rvbAsk === 'function') {
+    if (what !== 'untie') revSay('beg', true, rmoodBegLine(what), { still: revStill.dom });
+    if (D.order) D.order = null;
+    const r = rvbAsk(what, opt);
+    return { ok: r.ok, label: 'Chloe, excited: ' + String(r.label).replace(/^chloe: /i, '') };
+  }
+  // ── end 1.587.0
   revSay('beg', true, rmoodBegLine(what), { still: revStill.dom });
   // Whatever order she had out, she lets it go: you asked for something better.
   if (D.order) {
@@ -485,6 +502,8 @@ function rmoodWeight(id) {
   else if (/^drag/.test(id)) k = (1 + 1.4 * s) * (1 - 0.6 * g) * (1 + 1.4 * e);
   // Holding you down on the cot (1.586.0): discipline above all.
   else if (/^pin/.test(id)) k = (1 + 1.6 * s) * (1 - 0.5 * g) * (1 + 0.4 * e);
+  // Tying you up (1.587.0): discipline, and a game when she is wound up.
+  else if (/^bind/.test(id)) k = (1 + 1.3 * s) * (1 - 0.5 * g) * (1 + 1.1 * e);
   else if (m === 'hold') k = (1 + s) * (1 + 0.5 * e);
   else if (m === 'grip') k = (1 + 0.8 * s) * (1 + 0.4 * e);
   else if (m === 'stroke' || m === 'hug' || m === 'spoon' || m === 'sitby' || m === 'chin') k = (1 - 0.8 * s) * (1 + 2 * g) * (1 - 0.4 * e);
@@ -604,6 +623,29 @@ function rmoodWords(t) {
   const buzzing = typeof rvt !== 'undefined' && rvt.phoneOn;
   if (/^((please |oh )?(harder|do it harder|spank (me )?harder|again|do it again|more|one more|another( one)?|again please|more please|harder please|please more|please again|please harder))( chloe| mistress| babe)?( please)?$/.test(t)) return 'rev.beg:harder';
   if (!buzzing && /^(jace|jos( jednom| jednu| malo)?( molim( te)?)?|encore( une)?( fois)?|plus fort|encore plus fort)( s'?il te plait)?$/.test(t)) return 'rev.beg:harder';
+  // ── 1.587.0 (src/49-revbind.js): tied up and blindfolded — "tie me up",
+  // "tie my hands", "tie me to the bed", "blindfold me", "cover my eyes",
+  // "untie me"; "zaveži me", "veži mi ruke", "poveži mi oči"; "attache-moi",
+  // "bande-moi les yeux". What you said of it rides on the name: to the
+  // cot, behind your back, to the hook, with her belt, a rope, and blind.
+  {
+    const bind = /\btie me( up| down)?\b|\btie (up )?(my|both my) (hands|wrists|arms)\b|\btie me to\b|\bbind me\b|\bbind (my|both my) (hands|wrists)\b|\btie (them|my wrists|my hands) (together|behind)\b|\b(za)?vezi me\b|\b(za)?vezi mi (ruke|zapesca)\b|\bsvezi me\b|\bpovezi me\b|\bpovezi mi ruke\b|\battache[- ]moi\b|\bligote[- ]moi\b/.test(t);
+    const blind = /\bblindfold( me)?\b|\bcover (up )?my eyes\b|\bpovezi mi oci\b|\bzavezi mi oci\b|\bstavi mi povez\b|\bbande[- ]moi les yeux\b|\bbandeau\b|\bcache[- ]moi les yeux\b/.test(t);
+    const untie = /\buntie (me|my (hands|wrists|arms))\b|^untie\b|\b(take|get) (the |this |my )?(blindfold|rope|ropes) off( me)?\b|\b(take|get) off (the |my )?(blindfold|rope)\b|\bodvezi me\b|\bodvezi mi (ruke|zapesca)\b|\b(skini|makni) mi (povez|uze)\b|\bdetache[- ]moi\b|\b(enleve|retire)[- ]moi (le |ce )?bandeau\b/.test(t);
+    if (untie && typeof rvbHolds === 'function' && rvbHolds()) return 'rev.beg:untie';
+    if (bind && !untie) {
+      const o = [];
+      if (/\b(bed|cot|krevet\w*|lit)\b/.test(t)) o.push('cot');
+      else if (/\bbehind (my|your|the) back\b|\biza (ledja|leda)\b|\bdans le dos\b/.test(t)) o.push('back');
+      else if (/\b(hook|wall|kuk\w*|vjesalic\w*|zid\w*|crochet|mur)\b|\barms up\b/.test(t)) o.push('hook');
+      if (/\b(belt|remen\w*|ceinture)\b/.test(t)) o.push('belt');
+      else if (/\b(rope|uze\w*|konop\w*|corde)\b/.test(t)) o.push('rope');
+      if (blind) o.push('blind');
+      return 'rev.beg:' + ['bind'].concat(o).join('.');
+    }
+    if (blind && !untie) return 'rev.beg:blind';
+  }
+  // ── end 1.587.0
   // Pinned on the cot (1.586.0, src/49-revpin.js): "pin me down", "sit on
   // me", "hold me down", "hold my wrists", "pin my arms" — and in Croatian
   // and French. Not "hold me" alone: that is her hug, or the spoon.

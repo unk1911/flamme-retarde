@@ -6005,7 +6005,13 @@ function buildAudio() {
       // gets the limiter and `slowmo`; what she loses is the underwater
       // lowpass, which is on the master, and a muffled voice is not the thing
       // anybody was asking for when they put their head under.
-      ctx.createMediaElementSource(voiceEl).connect(voiceGain).connect(subG);
+      // (1.587.0) Through a panner and a gain of their own on the way out:
+      // centred and at 1 they are nothing, and nothing changes. Blindfolded in
+      // the kabina her voice is put where she is — see `voiceSpace`.
+      voicePan = ctx.createStereoPanner();
+      voiceRoom = ctx.createGain();
+      ctx.createMediaElementSource(voiceEl).connect(voiceGain).connect(voicePan).connect(voiceRoom).connect(subG);
+      voicePan.pan.value = voiceSpaceWant[0]; voiceRoom.gain.value = voiceSpaceWant[1];
       // A BRANCH off her, not a link in the chain: an analyser passes its
       // input through untouched, but hanging it off to one side and leaving
       // its output unconnected means nothing about the sound can change if
@@ -6069,6 +6075,34 @@ function buildAudio() {
    * return to stable state"*. The pause fires `end(false)`, which resolves
    * whatever was waiting on her, so the caller is free the same tick.
    */
+  // ── 1.587.0 (src/49-revbind.js): a voice put somewhere ──
+  let voicePan = null, voiceRoom = null;
+  const voiceSpaceWant = [0, 1];
+  /**
+   * Where the voice is: `pan` −1 (your left) .. 1, and `gain` on top of the
+   * line's own level. (0, 1) is the voice as it always was. Eased, so a step
+   * of hers is a move and not a click.
+   */
+  function voiceSpace(pan = 0, gain = 1) {
+    voiceSpaceWant[0] = clamp(pan, -1, 1); voiceSpaceWant[1] = clamp(gain, 0, 2);
+    if (!ctx || !voicePan) return false;
+    voicePan.pan.setTargetAtTime(voiceSpaceWant[0], ctx.currentTime, 0.08);
+    voiceRoom.gain.setTargetAtTime(voiceSpaceWant[1], ctx.currentTime, 0.08);
+    return true;
+  }
+  /** A footfall put somewhere: `footstep`'s, through a panner — her steps, heard blindfolded. */
+  function stepAt(hard = 0.5, gain = 1, pan = 0) {
+    if (!ctx || gain <= 0.001) return;
+    const p = ctx.createStereoPanner();
+    p.pan.value = clamp(pan, -1, 1);
+    p.connect(master);
+    const v = 0.86 + Math.random() * 0.30, t = ctx.currentTime;
+    burst({ freq: (108 + hard * 96) * v, q: 1.2, sweep: 0.55, dur: 0.14 - hard * 0.05, gain: 0.085 * gain, dest: p, at: t });
+    burst({ freq: (1400 + hard * 2700) * v, q: 0.55, sweep: 0.35, dur: 0.09 - hard * 0.045, gain: (0.022 + 0.034 * hard) * gain, dest: p, at: t });
+    setTimeout(() => { try { p.disconnect(); } catch (e) { /* gone */ } }, 400);
+  }
+  // ── end 1.587.0
+
   function voiceStop() {
     if (!voiceEl) return false;
     const was = !voiceEl.paused;
@@ -8078,6 +8112,8 @@ function buildAudio() {
   return { start, update, squelch, dropWhoosh, setGush, footstep, crabClack, splash, plunge, gasp, beep, nudge, rattle, creak,
     beadShove, beadWarm, bark, barkWarm, hmm, hmmWarm, slap, slapWarm, beltCrack, beltSwish,
     beltBuckle, beltQuiet, beltWarm, herMoan, herGasp, herHush,
+    // 1.587.0: a voice and a footfall put somewhere (src/49-revbind.js).
+    voiceSpace, stepAt,
     /** Debug: what the belt and her voice played, context seconds — see `sfxNote`. */
     beltSfxLog: () => sfxLog.map((e) => ({ ...e })),
     beltHave: () => ({ whp: whpBufs.map((b) => !!b), unbuckle: unbBufs.map((b) => !!b),

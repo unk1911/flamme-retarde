@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.72.0"
+VERSION = "1.73.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4705,6 +4705,36 @@ CHLOE_BEAT = {
                   "staying put",
     "pin_off": "you are letting go of their wrists and letting them up after "
                "holding them down. One short line",
+    # ── 1.73.0 (page 1.587.0, src/49-revbind.js): tied up and blindfolded.
+    # Consensual bondage play between the two of them, and the safeword ends
+    # it at once. Nothing sexual: rope or your belt on their wrists, a cloth
+    # over their eyes, your voice, your hands on the knots and their hair.
+    "bind": "you are tying their wrists right now. A short, in-charge line "
+            "while you tie them",
+    "bind_hold": "you have left them tied up and are making them wait. A short "
+                 "teasing or firm line, in your mood",
+    "bind_squirm": "they just pulled and struggled against the rope on their "
+                   "wrists. A short line about it",
+    "bind_check": "you are checking the knots on their wrists and giving them "
+                  "a tug. One short line",
+    "bind_away": "you are walking away across the room and leaving them tied "
+                 "up there. One short line over your shoulder",
+    "bind_back": "you have just come back over to them where they are tied. "
+                 "One short teasing line",
+    "bind_whisper": "you are close at their ear, whispering. One short, low, "
+                    "intimate line",
+    "bind_good": "they are being patient and good while tied up. Praise them, "
+                 "short and warm",
+    "bind_off": "you are untying their wrists now, letting them go. One short line",
+    "bind_no": "they just asked you to untie them and the answer is no, not "
+               "yet. One short line",
+    "blind_on": "you are putting a blindfold over their eyes right now. One "
+                "short line",
+    "blind_off": "you are taking the blindfold off their eyes. One short, "
+                 "gentle line",
+    "bind_care": "you have just untied them and are looking after them: their "
+                 "wrists, your hand in their hair. One short, soft line",
+    # ── end 1.73.0
 }
 # What they begged for (1.70.0, page 1.583.0): the page's `rev_beg`.
 REV_BEG = {
@@ -4717,6 +4747,10 @@ REV_BEG = {
     "drag": "drag them round the room by their hair",
     # 1.72.0 (page 1.586.0).
     "pin": "pin them down on the cot and hold them there",
+    # 1.73.0 (page 1.587.0).
+    "bind": "tie them up",
+    "blind": "blindfold them",
+    "untie": "untie them",
 }
 # Her mood (1.70.0, page 1.583.0): the page's `rev_mood`, and the tone it is.
 REV_MOOD = {
@@ -4753,6 +4787,15 @@ REV_PIN = {
     "wrists": "they are lying on their back on the cot and you are kneeling "
               "beside the cot at their head, holding their wrists down on the "
               "mattress above their head",
+}
+# Tied up (1.73.0, page 1.587.0): the page's `rev_bound`, and `rev_blind`.
+# Bondage play, never sex — the tone line in `chloe_scene_lines` says so.
+REV_BOUND = {
+    "cot": "they are lying on the cot with their arms stretched up over their "
+           "head and their wrists tied together to the cot's end rail",
+    "back": "their wrists are tied together behind their back",
+    "hook": "they are standing facing the wall with their arms up and their "
+            "wrists tied to the hook above them",
 }
 # A toy Chloe has drawn partway out (1.59.0): the page sends its key.
 TOY_DRAWN = {"plug": "the plug", "lovense": "the Lovense", "wand": "the wand"}
@@ -5357,6 +5400,9 @@ def clean_scene(raw) -> dict:
         "rev_hair": _enum(g("rev_hair"), REV_HAIR, 8),
         # And holding them down on the cot (1.72.0, page 1.586.0).
         "rev_pin": _enum(g("rev_pin"), REV_PIN, 8),
+        # And tied up, and blindfolded (1.73.0, page 1.587.0).
+        "rev_bound": _enum(g("rev_bound"), REV_BOUND, 6),
+        "rev_blind": bool(g("rev_blind")) or None,
         "remote_level": clamp_num(g("remote_level"), 0, 4),
         # And her mood (1.70.0, page 1.583.0): its name off a table, how
         # stern, how gentle and how excited, 0..1, and what they last begged
@@ -5372,7 +5418,7 @@ def clean_scene(raw) -> dict:
     if not out["roles"]:
         for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "remote_level",
                   "rev_spoon", "rev_hair", "rev_mood", "rev_stern", "rev_warm", "rev_excite",
-                  "rev_beg", "rev_pin"):
+                  "rev_beg", "rev_pin", "rev_bound", "rev_blind"):
             out[k] = None
     if out["remote_level"] is not None:
         out["remote_level"] = int(round(out["remote_level"])) or None
@@ -5687,6 +5733,16 @@ def chloe_scene_lines(s: dict):
         facts.append(REV_PIN[rp])
         tone.append("This is a pin, a hold: firm, teasing, in charge. Nothing "
                     "sexual — you are holding them down, nothing more.")
+    rb = s.get("rev_bound")
+    if rb in REV_BOUND:
+        facts.append(REV_BOUND[rb] + " (you tied them)")
+    if s.get("rev_blind"):
+        facts.append("they are blindfolded and cannot see you: they only hear "
+                     "your voice and your steps")
+    if rb in REV_BOUND or s.get("rev_blind"):
+        tone.append("This is bondage play they wanted: teasing, in charge, "
+                    "making them wait, your voice close. Nothing sexual — "
+                    "rope on their wrists, a cloth over their eyes, nothing more.")
     td = s.get("toy_drawn")
     if td in TOY_DRAWN:
         facts.append(f"your hand is on {TOY_DRAWN[td]} they are wearing and you "

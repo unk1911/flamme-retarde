@@ -134,7 +134,8 @@ function rvkTrace(e) { if (typeof revTrace === 'function') revTrace(e); }
 function rvkNote(s) { rvk.log.push([+rev.clock.toFixed(1), s]); if (rvk.log.length > 60) rvk.log.shift(); }
 
 /** Her belt is out of the loops (drawing, held, swinging, going back). */
-function rvkBeltOut() { return rvk.belt.ph !== 'off'; }
+function rvkBeltOut() { return rvk.belt.ph !== 'off' && rvk.belt.ph !== 'bound'; }
+// ('bound', 1.587.0: round your wrists — src/49-revbind.js has it, not her hand.)
 /** It is in her hand to use: held, or mid-round. */
 function rvkBeltInHand() {
   const p = rvk.belt.ph;
@@ -531,7 +532,7 @@ function rvkLanded(h) {
  */
 function rvkBeltTick(dt) {
   const B = rvk.belt;
-  if (B.ph === 'off') return;
+  if (B.ph === 'off' || B.ph === 'bound') return;
   B.t += dt;
   B.heat *= Math.exp(-dt / RVK.cool);
   const L = BELT.len, st = rvk.strap;
