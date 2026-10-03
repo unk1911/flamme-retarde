@@ -1735,6 +1735,7 @@ const PET_STAND = 0.50;      // m, eye to crown, horizontally, where you stop
 const PET_REACH = 0.95;      // and how close the hand comes up from
 const HAIR_STAND = 0.42;     // m, level, her hair to your eye, where you stop behind her
 const HAIR_REACH = 0.90;     // and how close the hand goes out from
+const _hairEye = new THREE.Vector3();
 const _thumbF = new THREE.Vector3(), _thumbV = new THREE.Vector3();
 const THUMB_D = 1.8;         // how far off her lip the button means the thumb
 const THUMB_STAND = 0.45;    // and where you stop, eye to lip
@@ -10240,12 +10241,46 @@ function tick(wall, draw) {
       || hairD < HAIR_REACH + clamp(camera.position.y - hairNow.y - 0.3, 0, 0.8));
     hairK = damp(hairK, hairReach ? 1 : 0, hairReach ? 5.0 : 7, dt);
     // Closed once the hand is there; held on for as long as the button is.
+    // `true` on the end: in your own hands, on her knees or on all fours she
+    // is hauled in to you (1.587.0, PULL_HAUL in 43-jadrija.js).
+    // And where you are is the walker's eye, not the camera: in the third
+    // person that is a metre or three away, and the hair would be drawn to it.
+    const hairEye = ground.you ? _hairEye.set(ground.you.x, ground.you.y + ground.you.eye, ground.you.z)
+      : camera.position;
     if (hairWant && !hairHeld && hairK > 0.92 && jadrija.hairPull) {
-      hairHeld = !!jadrija.hairPull(true, camera.position);
-    } else if (hairWant && hairHeld) jadrija.hairPull(true, camera.position);
+      hairHeld = !!jadrija.hairPull(true, hairEye, true);
+    } else if (hairWant && hairHeld) jadrija.hairPull(true, hairEye, true);
     if (!hairWant && hairHeld) {
       if (jadrija && jadrija.hairPull) jadrija.hairPull(false);
       hairHeld = false;
+    }
+    // HAULED IN. Misha, 3 Oct 2026: *"when she is in all fours or in kneeling
+    // pose if I grab her by the hair it causes her head to come real close to
+    // me real tight"*. The fist goes to your chest (43-jadrija.js), and you
+    // step in behind her hips and bend at the knees, so the chest it goes to
+    // is down where her head can come — and look down at her.
+    const haulNow = hairHeld && hairNow && hairNow.haul;
+    if (ground.you) {
+      const Y = ground.you;
+      Y.bend = damp(Y.bend || 0, haulNow ? haulNow.bend : 0, haulNow ? 6 : 4, dt);
+      if (Y.bend < 0.002 && !haulNow) Y.bend = 0;
+      if (haulNow && ground.confine) {
+        const mx = haulNow.stand[0] - Y.x, mz = haulNow.stand[1] - Y.z, md = Math.hypot(mx, mz);
+        if (md > 0.01) {
+          const step = Math.min(md, THUMB_WALK * dt);
+          const [nx, nz] = ground.confine(Y.x + (mx / md) * step, Y.z + (mz / md) * step);
+          Y.x = nx; Y.z = nz;
+        }
+        const L = haulNow.look, E = hairEye;
+        const hd = Math.hypot(L[0] - E.x, L[2] - E.z);
+        // Square on to her (`yaw`, her hips to you), not on to her head,
+        // which is nearly under you and would swing the view round it.
+        const wantPitch = Math.atan2(L[1] - E.y, Math.max(hd, 0.05));
+        let dy = haulNow.yaw - Y.yaw;
+        dy = Math.atan2(Math.sin(dy), Math.cos(dy));
+        Y.yaw += dy * (1 - Math.exp(-5 * dt));
+        Y.pitch += (wantPitch - Y.pitch) * (1 - Math.exp(-5 * dt));
+      }
     }
     // Letting go, the hand opens where the fist was and comes away from there.
     if (!hairWant && hairAt && jadrija && jadrija.hairPullAt) {

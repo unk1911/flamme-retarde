@@ -384,6 +384,11 @@ async function buildGround(scene, field) {
     // two rates — so `crouchSolve` in 90-app.js folds her legs in step with
     // the camera coming down, and her head is where the lens is.
     low: 0,
+    // Part of the way down (1.587.0), 0..1 of the crouch, without being in
+    // it: bent at the knees and the hips — her hair hauled in to your chest
+    // on her knees or on all fours (`hairPull` in 90-app.js). The eye and
+    // `low` go to this much of the crouch's; `crouch` wins.
+    bend: 0,
     // The hop, and the ground under it. `y` is where your feet are and it has
     // always been read straight back out of `walkY` every tick, which is what
     // makes this a ground-follower with no way to leave the ground. `gy` is
@@ -1837,15 +1842,17 @@ async function buildGround(scene, field) {
     // height with its head outside.
     // (`eyeBase` is the eye with straight knees — see below.)
     const eyeWas = you.knees ? you.eyeBase : you.eye;
-    you.eye = damp(eyeWas, you.crouch ? Math.min(GROUND.kneel, eyeAt(you.x, you.z, you.y))
-      : eyeAt(you.x, you.z, you.y) + (mount ? mount.eye : 0), you.crouch ? 6 : 9, dt);
+    const eyeUp = eyeAt(you.x, you.z, you.y);
+    you.eye = damp(eyeWas, you.crouch ? Math.min(GROUND.kneel, eyeUp)
+      : you.bend > 0 && !mount ? eyeUp - you.bend * Math.max(0, eyeUp - GROUND.kneel)
+        : eyeUp + (mount ? mount.eye : 0), you.crouch || you.bend > 0 ? 6 : 9, dt);
     // Knees bent on a trampoline bed, pumping it (`bouncer`, 1.558.0): the
     // eye goes down with them, and comes back up as you leave the bed.
     you.knees = ride ? ride.knees || 0 : (you.knees ? damp(you.knees, 0, 8, dt) : 0);
     if (Math.abs(you.knees) < 1e-4) you.knees = 0;
     you.eyeBase = you.eye;
     if (you.knees) you.eye -= you.knees;
-    you.low = damp(you.low, you.crouch ? 1 : 0, you.crouch ? 6 : 9, dt);
+    you.low = damp(you.low, you.crouch ? 1 : mount ? 0 : you.bend, you.crouch || you.bend > 0 ? 6 : 9, dt);
     // No footfalls on a machine, and no bob: the tyres take the ground.
     if (!mount) gait(moved, dt, air);
     else you.bob = damp(you.bob, 0, 7, dt);
