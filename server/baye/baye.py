@@ -67,7 +67,7 @@ from urllib.parse import urlparse
 
 import requests
 
-VERSION = "1.71.0"
+VERSION = "1.72.0"
 
 # ── where things are ─────────────────────────────────────────────────────────
 ABLIT = Path(os.environ.get("ABLIT_ROOT", Path.home() / "ablit-central"))
@@ -4693,6 +4693,18 @@ CHLOE_BEAT = {
                  "a corner with them. A short, teasing line on the way",
     "drag_done": "you have just let go of their hair after walking them round "
                  "the room by it. One short line as you let them go",
+    # 1.72.0 (page 1.586.0, src/49-revpin.js): pinned on the cot. A PIN, a
+    # hold, never sex: you are holding them down, nothing else. Consensual
+    # play between the two of them; the safeword ends it at once.
+    "pin": "you have just pinned them down on the cot and are holding their "
+           "wrists down. A short, in-charge line that tells them to stay put",
+    "pin_hold": "you are holding them pinned down on the cot by their wrists. "
+                "A short teasing or firm line, in your mood",
+    "pin_squirm": "they just tried to wriggle free while you hold them down, "
+                  "and you held their wrists down harder. A short line about "
+                  "staying put",
+    "pin_off": "you are letting go of their wrists and letting them up after "
+               "holding them down. One short line",
 }
 # What they begged for (1.70.0, page 1.583.0): the page's `rev_beg`.
 REV_BEG = {
@@ -4703,6 +4715,8 @@ REV_BEG = {
     "hair": "pull their hair",
     "collar": "pull them by their collar",
     "drag": "drag them round the room by their hair",
+    # 1.72.0 (page 1.586.0).
+    "pin": "pin them down on the cot and hold them there",
 }
 # Her mood (1.70.0, page 1.583.0): the page's `rev_mood`, and the tone it is.
 REV_MOOD = {
@@ -4729,6 +4743,16 @@ REV_HAIR = {
     # 1.71.0 (page 1.584.0): walking them round the room by it.
     "drag": "your fist is in their hair and you are walking them round the "
             "room at your side by it, their head held down toward your hand",
+}
+# Holding them down on the cot (1.72.0, page 1.586.0): the page's `rev_pin`.
+# A hold, never sex — the tone line in `scene_facts` says so.
+REV_PIN = {
+    "astride": "they are lying on their front on the cot and you are kneeling "
+               "astride their back, your knees on the mattress either side of "
+               "them, leaning over them and holding their wrists down by their head",
+    "wrists": "they are lying on their back on the cot and you are kneeling "
+              "beside the cot at their head, holding their wrists down on the "
+              "mattress above their head",
 }
 # A toy Chloe has drawn partway out (1.59.0): the page sends its key.
 TOY_DRAWN = {"plug": "the plug", "lovense": "the Lovense", "wand": "the wand"}
@@ -5331,6 +5355,8 @@ def clean_scene(raw) -> dict:
         "rev_spoon": _enum(g("rev_spoon"), REV_SPOON, 6),
         # And her hand in their hair (1.65.0, page 1.574.0).
         "rev_hair": _enum(g("rev_hair"), REV_HAIR, 8),
+        # And holding them down on the cot (1.72.0, page 1.586.0).
+        "rev_pin": _enum(g("rev_pin"), REV_PIN, 8),
         "remote_level": clamp_num(g("remote_level"), 0, 4),
         # And her mood (1.70.0, page 1.583.0): its name off a table, how
         # stern, how gentle and how excited, 0..1, and what they last begged
@@ -5346,7 +5372,7 @@ def clean_scene(raw) -> dict:
     if not out["roles"]:
         for k in ("rev_order", "rev_obey", "rev_miss", "rev_heat", "rev_care", "remote_level",
                   "rev_spoon", "rev_hair", "rev_mood", "rev_stern", "rev_warm", "rev_excite",
-                  "rev_beg"):
+                  "rev_beg", "rev_pin"):
             out[k] = None
     if out["remote_level"] is not None:
         out["remote_level"] = int(round(out["remote_level"])) or None
@@ -5656,6 +5682,11 @@ def chloe_scene_lines(s: dict):
     rh = s.get("rev_hair")
     if rh in REV_HAIR:
         facts.append(REV_HAIR[rh])
+    rp = s.get("rev_pin")
+    if rp in REV_PIN:
+        facts.append(REV_PIN[rp])
+        tone.append("This is a pin, a hold: firm, teasing, in charge. Nothing "
+                    "sexual — you are holding them down, nothing more.")
     td = s.get("toy_drawn")
     if td in TOY_DRAWN:
         facts.append(f"your hand is on {TOY_DRAWN[td]} they are wearing and you "

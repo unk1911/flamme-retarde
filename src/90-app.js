@@ -4040,6 +4040,8 @@ const HELP = [
     ['. · ,', 'help.k.revhair'],
     // Walked round the room by it (1.584.0).
     ['SHIFT + . · “drag me”', 'help.k.revdrag'],
+    // Pinned on the cot (1.586.0).
+    ['SHIFT + , · “pin me down”', 'help.k.revpin'],
     // Begging her, and her mood (1.583.0).
     ['“spank me” · “harder”', 'help.k.revbeg'],
     ['O', 'help.k.pc'],

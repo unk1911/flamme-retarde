@@ -612,6 +612,13 @@ function rvmHold() {
 function rvmBody(dt) {
   const B = rvm.body;
   B.t += dt;
+  // Pinning you on the cot (1.586.0, src/49-revpin.js): astride your back,
+  // her body is that file's from the climb on to her feet again.
+  if (B.mode === 'pin') {
+    const r = typeof rvpBody === 'function' ? rvpBody(dt) : null;
+    if (r) return r;
+    B.mode = 'stand'; B.want = 'stand'; B.t = 9; B.was = null;
+  }
   // Lying behind you (1.573.0): the spoon has her until it puts her back on
   // the edge, sitting — `rvmSpoonTick`. Down on to her side over the swing,
   // and up on to the edge again over the way out.
@@ -872,7 +879,7 @@ function rvmSpankStart(n, why, o = {}) {
   // the whole round was refused for that one draw ('noplace', MEASURED).
   let S = null, P = null, reach = null;
   for (let tries = 0; tries < 4 && !P; tries++) {
-    S = rvmSpankSpot(v);
+    S = o.pin && typeof rvpSpankSpot === 'function' ? rvpSpankSpot() : rvmSpankSpot(v);
     if (!S) continue;
     reach = [{ s: 'R', T: S.T, n: S.n }];
     // Holding you down with her left hand while her right does it.
@@ -889,13 +896,16 @@ function rvmSpankStart(n, why, o = {}) {
     // her up, and then took it back — her knees stayed wanting up, and her
     // palm was 25 cm off your hair for the rest of the hold, MEASURED.
     if (o.stay) { if (here) P = { x: rev.ch.x, z: rev.ch.z, yaw: rev.ch.yaw, mode: rvm.body.mode, bow: rvm.body.bow, w: rvm.body.w, here: true }; continue; }
+    // From on top of you (1.586.0): where she is, always — her trunk turns to it (`rvpSpankReach`).
+    if (o.pin) { P = { x: rev.ch.x, z: rev.ch.z, yaw: rev.ch.yaw, mode: 'pin', bow: 0, w: 0, here: true }; continue; }
     P = here ? { x: rev.ch.x, z: rev.ch.z, yaw: rev.ch.yaw, mode: rvm.body.mode, bow: rvm.body.bow, w: rvm.body.w, here: true }
       : rvmPlan(reach, { prefer: ctx === 'front' ? null : S.n });
   }
   if (!S) { A.mode = null; return 'nospot'; }
   if (o.stay && !P) { A.mode = null; return 'out of reach'; }
   if (!P) { A.mode = null; rvmTrace({ pick: 'spank:noplace', why: ctx }); return 'noplace'; }
-  A.stay = !!o.stay;
+  A.stay = !!o.stay || !!o.pin;
+  A.pin = !!o.pin;
   A.at = S; A.tgt = S.T.clone();
   // On the cot: her side of you, for the spots that follow.
   if (ctx === 'front') {
@@ -923,7 +933,7 @@ function rvmSpankTick(dt) {
   const S = A.at;
   if (A.ph === 'go') {
     if (A.plan.mode === 'kneel' && revAt()) rvmWant('kneel');
-    if (rvmSettled() || A.t > 7) { A.ph = 'ready'; A.t = 0; if (!A.stay) { rvm.body.bowTo = A.plan.bow; rvm.body.wTo = A.plan.w; } }
+    if (A.pin || rvmSettled() || A.t > 7) { A.ph = 'ready'; A.t = 0; if (!A.stay) { rvm.body.bowTo = A.plan.bow; rvm.body.wTo = A.plan.w; } }
     return;
   }
   rvmSpotNow(S);
@@ -950,7 +960,9 @@ function rvmSpankTick(dt) {
     // while her other hand holds your hair (`stay`): the bow carries that
     // shoulder too, and the fist rode 9-10 cm off your hair while it moved
     // (MEASURED, 1.575.0). She is within reach of both already.
-    if (sh && A.stay) A.err = Math.max(0, sh.distanceTo(T) - RVM.reach - 0.05);
+    // From on top of you (1.586.0): her trunk turned and bent to it, closed on her real shoulder.
+    if (sh && A.pin && typeof rvpSpankReach === 'function') A.err = rvpSpankReach(sh, T, dt);
+    else if (sh && A.stay) A.err = Math.max(0, sh.distanceTo(T) - RVM.reach - 0.05);
     else if (sh) {
       const need = sh.distanceTo(T) - RVM.reach;
       rvm.body.bowTo = Math.max(0, Math.min(RVM.bowMax + 0.25, rvm.body.bowTo + need * Math.min(1, dt * 3)));
@@ -963,7 +975,7 @@ function rvmSpankTick(dt) {
     // next spot.
     if (A.t > R.ready + 1.2 && A.err >= 0.03) {
       A.replans = (A.replans || 0) + 1;
-      const P = A.replans <= 2 ? rvmPlan([{ s: 'R', T: S.T, n: S.n }], { prefer: S.floor ? S.n : null }) : null;
+      const P = A.replans <= 2 && !A.pin ? rvmPlan([{ s: 'R', T: S.T, n: S.n }], { prefer: S.floor ? S.n : null }) : null;
       rvmTrace({ pick: 'spank:reach', why: (A.err * 100).toFixed(0) + ' cm short, ' + (P ? 'moving' : 'next spot') });
       if (P) { A.plan = P; rvmGoPlan(P); A.ph = 'go'; A.t = 0; }
       else {
@@ -1028,7 +1040,8 @@ function rvmSpankTick(dt) {
     if (A.t >= R.lift) {
       A.n -= 1;
       if (A.n > 0) {
-        const N = rvmSpankSpot(v);
+        const N = A.pin && typeof rvpSpankSpot === 'function' ? rvpSpankSpot() : rvmSpankSpot(v);
+        if (N && A.pin) { A.at = N; A.tgt = N.T.clone(); A.ph = 'ready'; A.t = R.ready * 0.55; return; }
         if (N) {
           A.at = N; A.tgt = N.T.clone();
           // Still in reach from where she is? Then on; else to a new place.
@@ -1177,6 +1190,13 @@ function rvmStart(id, why = 'mood') {
     rvmTrace({ pick: 'spoon:care', why });
     return true;
   }
+  // The aftercare while she is on top of you (1.586.0): she is getting off
+  // (the safeword did that, `rvpSafe`); the care comes once she is off.
+  if (id === 'care' && typeof rvpOn === 'function' && rvpOn()) {
+    rvp.M.careAfter = true;
+    rvmTrace({ pick: 'pin:care', why });
+    return true;
+  }
   if (rvm.move && id !== 'care') return 'busy';
   if (rev.arm.mode === 'spank' && id !== 'care') return 'busy';
   const v = revView();
@@ -1284,6 +1304,8 @@ function rvmStart(id, why = 'mood') {
 function rvmEnd(why = 'done') {
   const M = rvm.move;
   if (!M) return;
+  // The pin (1.586.0): she lets go and gets off you first; it ends itself.
+  if (M.id === 'pin' && !M.done && typeof rvpRelease === 'function') { rvpRelease(M, why); return; }
   // The spoon (1.573.0): on the cot, she gets up the way she came first and
   // it ends itself (`rvmSpoonDone`); before that, you ease out of the curl.
   if (M.id === 'spoon' && !M.done) {
@@ -1486,6 +1508,8 @@ function rvmMoveTick(dt) {
     rvmSpoonTick(M, dt);
     return;
   }
+  // Pinning you on the cot (1.586.0, src/49-revpin.js) keeps its own count too.
+  if (M.id === 'pin') { if (typeof rvpTick === 'function') rvpTick(M, dt); return; }
   // You moved out of it (a move is about where you are), except the care.
   if (M.id !== 'care' && M.id !== 'hips' && M.ctx && ctx !== M.ctx) { rvmEnd('you moved: ' + (v ? v.phase : '?')); return; }
   const { f, r } = rvmAxes(rev.ch.yaw);
@@ -3137,6 +3161,8 @@ function rvmYourTilt(dt) {
 
 /** The safeword's part: every move ends, her hands come off you. */
 function rvmSafe() {
+  // On top of you (1.586.0): `rvpSafe` has let go and has her getting off.
+  if (typeof rvpOn === 'function' && rvpOn()) { rvm.pend = null; rvm.nape = 0; rvm.chin = 0; return; }
   // Lying with you, she stays: the spoon is the aftercare (1.573.0).
   if (rvmSpoonOn() && rvm.move.ph !== 'up' && rvm.move.ph !== 'stand') {
     const S = rvm.move;
@@ -3154,6 +3180,8 @@ function rvmSafe() {
 
 /** Swapped back or left: everything of hers off. */
 function rvmClear() {
+  // Off you, now (1.586.0).
+  if (typeof rvpClear === 'function') rvpClear();
   // Lying behind you, or you loosened for her: all of it off you (1.573.0).
   const SM = rvm.move && rvm.move.id === 'spoon' ? rvm.move : rvm.spoonFade;
   if (SM) {

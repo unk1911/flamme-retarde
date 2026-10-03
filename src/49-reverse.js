@@ -261,6 +261,8 @@ function revScene() {
   if (typeof rvhScene === 'function') rvhScene(o);
   // Walking you round the room by it (1.584.0): `rev_hair` 'drag'.
   if (typeof rvdScene === 'function') rvdScene(o);
+  // On top of you on the cot, or holding your wrists (1.586.0): `rev_pin`.
+  if (typeof rvpScene === 'function') rvpScene(o);
   // Her mood, and what you last begged for (1.583.0).
   if (typeof rmoodScene === 'function') rmoodScene(o);
   return o;
@@ -449,6 +451,8 @@ function revOff(why = 'asked') {
   // Her fist out of your hair (1.574.0), and the drag (1.584.0).
   if (typeof rvdClear === 'function') rvdClear();
   if (typeof rvhClear === 'function') rvhClear();
+  // Off you on the cot (1.586.0).
+  if (typeof rvpClear === 'function') rvpClear();
   rev.on = false;
   if (jadrija && jadrija.ride) jadrija.ride(null);
   revArmClear();
@@ -492,6 +496,9 @@ function revSafe(who = 'you') {
   if (typeof rvhSafe === 'function') rvhSafe();
   // And walking you by it (1.584.0): let go, and you stop where you are.
   if (typeof rvdSafe === 'function') rvdSafe();
+  // And on top of you (1.586.0): her hands off your wrists this frame, and
+  // off you — off the cot — and then her aftercare.
+  if (typeof rvpSafe === 'function') rvpSafe();
   // And her moves (1.565.0): a hold, a grip, a hand on your chin — all off.
   if (typeof rvmSafe === 'function') rvmSafe();
   // And the toys (1.567.0): a draw stops where it is and goes back to its
@@ -639,6 +646,11 @@ function revAsk(name) {
     revTrace({ pick: 'you:' + name, why: 'after she is up' });
     return true;
   }
+  // On top of you (1.586.0): she lets go and gets off first, the same.
+  if (typeof rvpYourAsk === 'function' && rvpYourAsk(name)) {
+    revTrace({ pick: 'you:' + name, why: 'after she is off you' });
+    return true;
+  }
   // A pose asked while the order is "be still" is a move.
   rev.dom.moved += 1;
   // On her leash (1.564.0): the leash's own poses, and nothing that would
@@ -692,6 +704,13 @@ function revKey(e) {
   if (e.code === 'Period' && e.shiftKey && typeof rmoodBeg === 'function') {
     e.preventDefault();
     const r = rmoodBeg('drag');
+    if (typeof toast === 'function') toast(r.label);
+    return true;
+  }
+  // Shift+, pinned on the cot (1.586.0): a beg.
+  if (e.code === 'Comma' && e.shiftKey && typeof rmoodBeg === 'function') {
+    e.preventDefault();
+    const r = rmoodBeg('pin');
     if (typeof toast === 'function') toast(r.label);
     return true;
   }
@@ -836,6 +855,13 @@ function revDriveChloe(dt) {
   }
   // Lying behind you on the cot (1.573.0): her place and her whole turn are
   // the spoon's (`rvmSpoonDrive`), on Baye's own frame.
+  // On the cot on top of you (1.586.0): her place and turn are the pin's (`rvpDrive`).
+  const pn = typeof rvpDrive === 'function' ? rvpDrive() : null;
+  if (pn) {
+    rev.lastDrive = you.drive({ at: [pn.at.x, pn.at.y, pn.at.z], yaw: C.yaw + Math.PI / 2, quat: pn.quat, pitch: 0,
+      seen: true, wet: false, clip: Bd.clip, fade: Bd.fade, speed: Bd.speed, hat: true });
+    return;
+  }
   const sp = typeof rvmSpoonDrive === 'function' ? rvmSpoonDrive() : null;
   if (sp) {
     rev.lastDrive = you.drive({ at: [sp.at.x, sp.at.y, sp.at.z], yaw: C.yaw + Math.PI / 2, quat: sp.quat, pitch: 0,
@@ -1039,6 +1065,8 @@ function revDecide() {
   if (typeof rvhCands === 'function') for (const c of rvhCands(ctx, D)) cands.push(c);
   // And walking you round the room by it, stern or excited (1.584.0, src/49-revwalk.js).
   if (typeof rvdCands === 'function') for (const c of rvdCands(ctx, D)) cands.push(c);
+  // And holding you down on the cot, stern (1.586.0, src/49-revpin.js).
+  if (typeof rvpCands === 'function') for (const c of rvpCands(ctx, D)) cands.push(c);
   // The remote: since 1.567.0 a move of hers with the phone in her hand
   // (`move:remote`, src/49-revtoys.js, among `rvmCands`); the bare buzz is
   // what is left without that file.
@@ -1079,6 +1107,10 @@ function revDecide() {
   } else if (pick.id.startsWith('move:')) {
     const r = rvmStart(pick.id.slice(5), 'mood | alt: ' + alt);
     if (r !== true) revTrace({ pick: pick.id + ':' + r });
+    D.next = rev.clock + 3;
+  } else if (/^pin/.test(pick.id) && typeof rvpChoose === 'function') {
+    const r = rvpChoose(pick.id, 'mood | alt: ' + alt);
+    if (r !== true) revTrace({ pick: 'pin:' + r });
     D.next = rev.clock + 3;
   } else if (/^drag/.test(pick.id) && typeof rvdChoose === 'function') {
     const r = rvdChoose(pick.id, 'mood | alt: ' + alt);
@@ -1163,7 +1195,10 @@ function revTick(dt) {
     // In a pose: the walker is pinned to her, the mouse only looks. W or S
     // is "get up", once.
     Y.x = r.x; Y.z = r.z; Y.vx = 0; Y.vz = 0;
-    if (typeof keys !== 'undefined' && (keys.has('KeyW') || keys.has('KeyS')) && rev.clock - rev.riseAt > 2.5
+    // Held down on the cot (1.586.0): W or S is a struggle, and she holds on.
+    const pinned = typeof keys !== 'undefined' && (keys.has('KeyW') || keys.has('KeyS'))
+      && typeof rvpStruggle === 'function' && rvpStruggle('you');
+    if (!pinned && typeof keys !== 'undefined' && (keys.has('KeyW') || keys.has('KeyS')) && rev.clock - rev.riseAt > 2.5
       && !rev.care && v.ctx && !(typeof rvkCollarOn === 'function' && rvkCollarOn())) {
       rev.riseAt = rev.clock;
       revAsk('rise');
@@ -1200,6 +1235,8 @@ function revTick(dt) {
     rev.dom.heat += (REV.heatRest - rev.dom.heat) * (1 - Math.exp(-dt / REV.heatTau));
     revOrderTick(dt, v);
   }
+  // Asked to be pinned while you were not lying down: once you are (1.586.0).
+  if (typeof rvpAfterTick === 'function') rvpAfterTick();
   const busy = typeof rvmBusy === 'function' && rvmBusy();
   if (!rev.care && rev.dom.on) {
     if (!rev.dom.order && rev.arm.mode !== 'spank' && !busy && rev.clock >= rev.dom.next) revDecide();
