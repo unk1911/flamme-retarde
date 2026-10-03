@@ -81842,6 +81842,22 @@ async function buildJadrija(scene) {
       return { d: show.curlShift || 0, mark: kit && kit.cotCurl ? curlMark() : null, at: [show.t, show.s] };
     },
     /**
+     * Her body moved `dx`, `dz` m (world, level) where she lies on the cot
+     * (1.587.0: Chloe dragging her down it by an ankle, src/49-revhold.js).
+     * Only while she is lying held on the mattress — the held poses do not
+     * settle to a mark, so where she is moved is where she stays until she
+     * gets up. Off unless asked for. Answers her root, world, or null.
+     */
+    lieNudge: (dx, dz) => {
+      if (!show || !show.onBed || !(show.phase === 'flatheld' || show.phase === 'cradle')) return null;
+      if (dx || dz) {
+        const w = toWorld(show.t, show.s);
+        const ts = local(w[0] + (+dx || 0), w[2] + (+dz || 0));
+        show.t = ts[0]; show.s = ts[1];
+      }
+      return toWorld(show.t, show.s);
+    },
+    /**
      * Where on her back, her bottom or a thigh the crosshair is — the ray from
      * `o` along `d` — while she lies on her front on the cot; or null. See
      * `cotAim`: the press in 90-app.js asks it first.

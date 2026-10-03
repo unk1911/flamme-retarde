@@ -8,6 +8,232 @@ All notable changes to this project. Format loosely follows
 `build/payload/` is committed too, so the game builds without re-running the
 geodata pipeline.
 
+## [1.589.0] — 2026-10-03 (baye 1.74.0)
+
+### Roles reversed: hauled by other holds — ear, arm, ankle, chin, neck
+
+Misha: *"run more interesting scenarios, in the kabine, all sorts of
+intrigues, baye getting pulled around by her hair, by other body parts,
+being used and abused, this is all part of the whole bdsm dynamic ... go all
+out and wild"*. The night loop's item A (plan/night-loop-2026-10-03.md).
+The same two adults and the same consensual kabina play as 1.561.0–1.586.0,
+and the safeword over all of it.
+
+**The line, and how it was kept.** No sex: nothing grinds, thrusts or
+presses a pelvis against anybody, and no face goes near anybody's crotch.
+The neck hold is her hand flat on the NAPE, never the throat. All of it is
+measured on the skin in every hold (below):
+- her pelvis to yours, bone to bone, was ≥ 455 mm in every run;
+- her face to your hips and yours to hers, ≥ 496 mm;
+- for the neck, any of her hand skin in front of the middle of your neck
+  (the throat's side) was ≥ 35 mm from your throat in every phase. While
+  she holds you down it was ≥ 450 mm, so her hand is all on the back.
+
+The new file is `src/49-revhold.js` (names `rvo…`, `__fr.reverse.haul`).
+It has small hooks in:
+- 49-reverse.js: the tow, her selector, Shift+;, the struggle, the camera,
+  the safeword, the scene, and your body laid after her moves;
+- 49-revmood.js: the words, the beg, her mood's weight;
+- 90-app.js: the help line;
+- one addition to 43-jadrija.js, off unless asked for.
+
+**The five holds.** Each is a `rvm.move` of hers.
+- **The ear** (standing). She pinches your ear between finger and thumb and
+  leads you at her side, a little behind. Your head is tipped over to her
+  (a spring of its own: pulled over by the pinch, more as you lag, kicked by
+  a yank) and your back is bent toward her, so you shuffle. Your near hand
+  goes up to her wrist.
+- **The arm** (standing). Your arm is twisted up behind your back, your palm
+  between your shoulder blades. One of her hands is on your wrist and the
+  other on your elbow. You are bent forward at the waist (at the hips and up
+  your back, your legs kept under you) and walked in front of her where she
+  wants you. A yank cranks the arm higher and bends you lower.
+- **The ankle** (lying on the cot, face down or up). She goes to the end of
+  the cot past your feet, takes your ankle in both hands (right on the ankle,
+  left on the shin) and drags you down the mattress toward her in pulls,
+  stepping back with each. A new `jadrija.lieNudge(dx, dz)` moves your body
+  where it lies. She stops before your seat leaves the foam.
+- **The chin** (kneeling, or standing). Her hand is under your jaw and your
+  face is tipped up to hers (your neck back, your back arched a little) and
+  held there while she talks to you. She turns your face one way and the
+  other to look you over, or gives it a little shake.
+- **The neck** (standing). Her hand is flat on the back of your neck, her
+  fingers up toward your head, and you are pushed down. At the cot you are
+  bent right over it with your palms flat on the mattress. Away from it you
+  are bent over your own thighs, braced on them. She steps along beside you
+  as you go down. When stern or wound up she says "stay down", takes her
+  hand off your neck and puts it flat on the small of your back, spanks you
+  where you are bent (1.565.0's round), and takes your neck again.
+
+**Where the walks go.** A path planned to a place she chose: the cot (facing
+it), a corner (facing into it), the door, or the middle of the floor. It is
+straight or has one turn, and the last leg runs in along the way the place
+faces. Every piece is checked clear for her AND you: the walls, the cot, the
+tabouret, the set's stand, the radio's table. For the arm it also checks the
+head you carry out in front of you. Your body is towed after your place off
+her (1.585.0's spring, lag, stumble and turn rate), and:
+- when the arm has you in front of her, she checks her step while you are
+  short of your place;
+- the tow keeps you out of the furniture discs as well as the walls;
+- it never steps your head nearer a wall, and your bend gives way while your
+  head is near one.
+
+**She chains them.** Stern, an ear or arm walk to the cot goes on to the
+neck. "Push me down" asked away from the cot, when she is stern, is marched
+there by the arm first. So: led to the cot → bent over it by the neck →
+spanked → held → let go. The ankle goes on to a round of spanks when she is
+stern or excited and you are face down. A hold asked for during another is
+next.
+
+**Her mood sets it** (`rvoMood`, off 49-revmood.js):
+- **pace**: 0.58 + 0.36·stern + 0.22·excitement − 0.20·warmth (0.44..1.0);
+- **yank**: u 0.45 + 0.55 s + 0.40 e − 0.35 w. She yanks past a lag of
+  0.30 − 0.14 s − 0.05 e + 0.22 w m, and of her own accord at
+  0.26·(s − 0.3) + 0.42·(e − 0.22) a second; excited, the walk comes in
+  spurts;
+- **how long**: × 0.85 + 0.9 s + 0.35 e − 0.45 w;
+- **how hard**: the crank, the bend, the pull, the number of neck rounds
+  (0.3 + 2.4 s + 1.4 e − 1.4 w);
+- **where to**: stern, the cot most often; excited, anywhere; warm, the
+  middle of the floor.
+
+**Asking.** These count as a beg (`rev.beg:<hold>`, `rmoodBeg`). Words are
+matched in a sentence, before the hair drag's "drag me" and the pin's "hold
+me down":
+- "pull my ear", "drag me by the ear", "vuci me za uho", "tire-moi
+  l'oreille";
+- "twist my arm", "arm behind my back", "zavrni mi ruku", "tords-moi le
+  bras", "le bras dans le dos";
+- "drag me by my ankle", "pull my leg", "vuci me za nogu", "tire-moi par la
+  cheville";
+- "grab my chin", "make me look at you", "uhvati me za bradu", "prends-moi
+  le menton";
+- "hold me by the neck", "push me down", "bend me over", "gurni me dolje",
+  "drži me za vrat", "tiens-moi par la nuque", "pousse-moi";
+- or **Shift+;**, the hold that fits where you are.
+
+Not where it fits, she has you there first (on your feet, on your knees, on
+the cot). MEASURED: 23 of 23 matched, and "pull my hair", "drag me", "hold
+me down", "spank me", "bend over", "don't pull my ear" and "did you twist my
+arm" were left as they were. Shift+; standing: the arm, to the cot.
+
+**Her own pick.** When she is stern (over 0.40) or excited (over 0.28):
+- the holds that fit where you are join her candidates: the arm and neck
+  weigh with sternness, the ear and ankle with excitement, the chin with
+  both;
+- not within 26 s of the last, a kind not within 50 s, and not twice in four
+  picks.
+
+MEASURED at stern 0.95: `haul:arm` at her first decision (2.36; neck 2.12,
+spank 1.87), and it went on to the cot and the neck.
+
+**W or S** while she holds you is a struggle she answers. She holds harder;
+stern, she holds longer. A line ("Uh-uh. Stay.", "Did I say move?"). On
+your knees or on the cot it no longer gets you up (MEASURED, chin and ankle:
+you stayed where you were).
+
+**The safeword**: every hold opens on that frame, her arms back to her clip
+at once, and her aftercare begins. MEASURED, all five holds: her palms more
+than 5 cm off where they held 1–2 frames (0.05–0.10 s) after "red".
+
+**Her lines**, in her tone and never one of the last fourteen:
+- new beats `hold_ear`, `hold_arm`, `hold_ankle`, `hold_chin`, `hold_neck`,
+  `hold_yank`, `hold_walk`, `hold_talk` and `hold_done`;
+- about 130 lines in all ("By the ear, then. Since you won't listen.",
+  "You're my prisoner now. Move!", "Gotcha by the foot! Hehe!", "Look at me.
+  Not the floor. Me.", "You don't come up till I say.", "Stay down.");
+- begged-for lines for each hold.
+
+**Her voice** (`server/baye/baye.py` 1.73.0, **needs deploying on mpcn0**):
+- the nine `CHLOE_BEAT`s;
+- `REV_BEG` ear/arm/ankle/chin/neck/haul;
+- the scene key `rev_hold` (ear|arm|ankle|chin|neck), with what she is doing
+  in words and a tone line: *"This is a hold: rough, firm or teasing, in
+  charge. Nothing sexual — your hand on them where it is, nothing more."*
+- dropped unless the roles are reversed.
+
+Undeployed, the page's captions show.
+
+**43-jadrija.js**, off unless asked for: `lieNudge(dx, dz)` moves her root
+where she lies held on the mattress (flatheld, cradle).
+
+**MEASURED** (worktree build, headless, `?jadrija&nointro`, key 8, her
+selector off, the mood set; final build, fifteen holds, one per hold and
+mood, plus the five safeword runs). All distances mm:
+
+| hold | stern | excited | warm |
+|---|---|---|---|
+| ear | to the cot, 4.2 m, 0.73 m/s, 0 yanks | to the cot, 4.2 m, 0.69 m/s, 2 yanks | to the floor, 4.2 m, 0.36 m/s, 0 yanks |
+| arm | to the cot, 6.3 m, 0.57 m/s, 5 yanks, bent 50° | to the cot, 6.1 m, 4 yanks, 43° | to a corner, 6.7 m, 0.40 m/s, 0 yanks, 24° |
+| ankle | dragged 0.40 m in 3 pulls (0.12–0.14 m in 0.25 s), then spanked ×4 | 0.32 m in 3 pulls (0.36 s), spanked ×4 | 0.18 m in one slow 1.6 s draw |
+| chin | held 14.7 s, 1 jerk | held 11.3 s | held 4.5 s |
+| neck (after the arm, at the cot) | held 14–17 s, 2 rounds, 8 spanks | 1 round, 3 spanks | 6 s, no spanks |
+
+- **Her hand on the hold**, the solve's miss (median, p90):
+  - ear 21–39, 36–49;
+  - arm 25–43, 39–157 (the wrist hand loses it in the first second and on
+    turns);
+  - ankle 0.3–11, 7–22;
+  - chin 33–41, 48–57;
+  - neck 37–40, 124–145 (her hand lags your nape on the push down).
+- **Her palm to the point itself** (median): ear 48–69 (a pinch: her palm
+  sits off the ear by design); ankle 46–54 (on top of the joint).
+- **Your hands**: on her wrist 13–14 (p90 22–24); up your back 21–22
+  (p90 24–34); on the mattress 22–89.
+- **Skin to skin, her body (her arms out) against yours**:
+  - ankle +46..+49;
+  - neck +15..+57;
+  - ear +25..+28 stern/excited, −24 (19 vertices) warm — your arm up to her
+    wrist against her side;
+  - arm +6 stern, −34..−35 excited/warm (102–162 vertices) — her shins
+    against your heels as she walks close behind you.
+- **Her arms** (hands out) against you, −15..−47: her forearm against the
+  hand of yours that holds it, against your hair by the ear, against your
+  jaw under the chin. Contact by design.
+- **Walls**: no skin point of either of you past a wall in any final run (it
+  was 10–26 cm, your head, on the arm before the guards).
+- **Furniture**:
+  - 0 for the neck, the chin and the ankle;
+  - ear: your shin 62 mm into the cot's frame line arriving at it (stern);
+  - arm, warm: your legs 195 mm into the set's stand once on a turn.
+- **Your head on the ear**: tipped over to her up to 24–36°.
+- No console errors in any run.
+
+What it took to get there, MEASURED along the way:
+- placed at your flank for the nape with the cot in the way, she had no
+  place, and the neck never started; at the cot she now stands by your hips;
+- the clip's hands hung their fingers 12–18 cm into the mattress; they are
+  laid flat now;
+- straightening between the arm and the neck put your neck back into her
+  waiting hand, 7 cm toward your throat; the bend now carries on;
+- her free hand, hanging while the other spanked, was 9 mm off your throat
+  at bent-over height; it now rests on the small of your back;
+- let go, your neck rose through her hand, 10 mm; you now stay down until
+  her hand is off;
+- bent forward on her arm facing the west wall, your head was 16–26 cm into
+  it. Fixed by the head checks in the plan and the tow, and the bend that
+  gives way.
+
+Debug: `__fr.reverse.haul`:
+- `ask(kind)`, `beg(kind)`, `start(kind, dest)`, `yank()`, `squirm()`,
+  `end()`, `chain(kind, dest)`;
+- `state()`, `cur()`, `last()` (every number above, per hold), `all()`,
+  `dbg()`, `geo()`;
+- `plan(kind, dest, sg)`, `dests(kind)`, `view([az|'away', d, h,
+  'mid'|'you'|'feet'|'nape'])`, `tune(o)`, `measure(on)`, `mood()`,
+  `words(t)`.
+
+**Rough, still:**
+1. **The arm walk**: her shins meet your heels as she walks behind you
+   (excited, warm). Her wrist hand is 10–29 cm off your wrist in the first
+   second of the walk and on sharp turns.
+2. **The arm, warm**: once, your legs went 19.5 cm into the set's stand on a
+   turn, in spite of the guard.
+3. **The neck**: her hand lags your nape by 10–17 cm while you go down. At
+   the cot your palms land 2–9 cm off their spot now the hands lie flat.
+4. **The ear**: your shin touches the cot's frame as you arrive at it.
+5. **First person, bent over the cot**: the view is the mattress.
+
 ## [1.588.0] — 2026-10-03 (baye 1.73.0)
 
 ### Roles reversed: bound and blind

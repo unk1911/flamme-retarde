@@ -265,6 +265,8 @@ function revScene() {
   if (typeof rvpScene === 'function') rvpScene(o);
   // Tied, and blindfolded (1.587.0, src/49-revbind.js): `rev_bound`, `rev_blind`.
   if (typeof rvbScene === 'function') rvbScene(o);
+  // Hauled by another hold — ear, arm, ankle, chin, neck (1.587.0): `rev_hold`.
+  if (typeof rvoScene === 'function') rvoScene(o);
   // Her mood, and what you last begged for (1.583.0).
   if (typeof rmoodScene === 'function') rmoodScene(o);
   return o;
@@ -457,6 +459,8 @@ function revOff(why = 'asked') {
   if (typeof rvpClear === 'function') rvpClear();
   // Untied, the blindfold off, her belt back on her (1.587.0).
   if (typeof rvbClear === 'function') rvbClear();
+  // Her other holds on you (1.587.0).
+  if (typeof rvoClear === 'function') rvoClear();
   rev.on = false;
   if (jadrija && jadrija.ride) jadrija.ride(null);
   revArmClear();
@@ -506,6 +510,8 @@ function revSafe(who = 'you') {
   // And on top of you (1.586.0): her hands off your wrists this frame, and
   // off you — off the cot — and then her aftercare.
   if (typeof rvpSafe === 'function') rvpSafe();
+  // And her other holds — ear, arm, ankle, chin, neck (1.587.0): open, this frame.
+  if (typeof rvoSafe === 'function') rvoSafe();
   // And her moves (1.565.0): a hold, a grip, a hand on your chin — all off.
   if (typeof rvmSafe === 'function') rvmSafe();
   // And the toys (1.567.0): a draw stops where it is and goes back to its
@@ -728,6 +734,13 @@ function revKey(e) {
   if (e.code === 'Comma' && e.shiftKey && typeof rmoodBeg === 'function') {
     e.preventDefault();
     const r = rmoodBeg('pin');
+    if (typeof toast === 'function') toast(r.label);
+    return true;
+  }
+  // Shift+; hauled by whichever other hold fits where you are (1.587.0): a beg.
+  if (e.code === 'Semicolon' && e.shiftKey && typeof rmoodBeg === 'function') {
+    e.preventDefault();
+    const r = rmoodBeg('haul');
     if (typeof toast === 'function') toast(r.label);
     return true;
   }
@@ -1088,6 +1101,8 @@ function revDecide() {
   if (typeof rvpCands === 'function') for (const c of rvpCands(ctx, D)) cands.push(c);
   // And tying you up, stern or excited (1.587.0, src/49-revbind.js).
   if (typeof rvbCands === 'function') for (const c of rvbCands(ctx, D)) cands.push(c);
+  // And her other holds, stern or excited (1.587.0, src/49-revhold.js).
+  if (typeof rvoCands === 'function') for (const c of rvoCands(ctx, D)) cands.push(c);
   // The remote: since 1.567.0 a move of hers with the phone in her hand
   // (`move:remote`, src/49-revtoys.js, among `rvmCands`); the bare buzz is
   // what is left without that file.
@@ -1137,6 +1152,9 @@ function revDecide() {
     // Tied up (1.587.0).
     const r = rvbChoose(pick.id, 'mood | alt: ' + alt);
     if (r !== true) revTrace({ pick: 'bind:' + r });
+  } else if (/^haul/.test(pick.id) && typeof rvoChoose === 'function') {
+    const r = rvoChoose(pick.id, 'mood | alt: ' + alt);
+    if (r !== true) revTrace({ pick: pick.id + ':' + r });
     D.next = rev.clock + 3;
   } else if (/^drag/.test(pick.id) && typeof rvdChoose === 'function') {
     const r = rvdChoose(pick.id, 'mood | alt: ' + alt);
@@ -1198,9 +1216,11 @@ function revTick(dt) {
     const top = typeof keys !== 'undefined' && keys.has('KeyQ') ? 2.3 : 1.45;
     // Her fist in your hair, walking you round the room (1.584.0,
     // src/49-revwalk.js): her pace is yours, and your keys only lean on it.
-    const tow = (typeof rvdTow === 'function' && rev.last && dt > 0 ? rvdTow(dt, Y) : null)
+    let tow = (typeof rvdTow === 'function' && rev.last && dt > 0 ? rvdTow(dt, Y) : null)
       // Tied standing (1.587.0): walked to the hook, and held there; walking is a struggle.
       || (typeof rvbTow === 'function' && rev.last && dt > 0 ? rvbTow(dt, Y) : null);
+    // Or by another hold of hers — the ear, the arm, held still (1.587.0).
+    if (!tow && typeof rvoTow === 'function' && rev.last && dt > 0) tow = rvoTow(dt, Y);
     if (rev.last && dt > 0 && !tow) {
       const mx = Y.x - rev.last[0], mz = Y.z - rev.last[1], md = Math.hypot(mx, mz);
       if (md > top * dt && md < 1) {
@@ -1227,7 +1247,9 @@ function revTick(dt) {
     const pinned = typeof keys !== 'undefined' && (keys.has('KeyW') || keys.has('KeyS'))
       && ((typeof rvpStruggle === 'function' && rvpStruggle('you'))
         // Tied (1.587.0): the same keys pull at the rope.
-        || (typeof rvbStruggle === 'function' && rvbStruggle('you')));
+        || (typeof rvbStruggle === 'function' && rvbStruggle('you'))
+        // (Or held by the chin or the ankle, 1.587.0: a struggle against her hand.)
+        || (typeof rvoPoseStruggle === 'function' && rvoPoseStruggle()));
     if (!pinned && typeof keys !== 'undefined' && (keys.has('KeyW') || keys.has('KeyS')) && rev.clock - rev.riseAt > 2.5
       && !rev.care && v.ctx && !(typeof rvkCollarOn === 'function' && rvkCollarOn())) {
       rev.riseAt = rev.clock;
@@ -1289,8 +1311,12 @@ function revTick(dt) {
   if (typeof rvdTick === 'function') rvdTick(dt);
   // Tied, blindfolded (1.587.0): her hands' asks, your arms, the rope, the band, the dark.
   if (typeof rvbTick === 'function') rvbTick(dt);
+  // Her other holds (1.587.0): before her arms are solved.
+  if (typeof rvoTick === 'function') rvoTick(dt);
   // Her moves, her hands, her look (1.565.0).
   if (typeof rvmTick === 'function') rvmTick(dt);
+  // Your body to her other holds (1.587.0): laid last, a slap's flinch kept in it.
+  if (typeof rvoAfter === 'function') rvoAfter(dt);
   revCamera(dt);
   revHud();
 }
@@ -1370,6 +1396,9 @@ function revCamera(dt) {
   // Walked by your hair (1.584.0): your head held down and over toward her hand.
   const dv = typeof rvdCamTilt === 'function' ? rvdCamTilt() : null;
   if (dv && (Math.abs(dv[0]) > 0.002 || Math.abs(dv[1]) > 0.002)) { camera.rotateX(dv[0]); camera.rotateZ(dv[1]); }
+  // By another hold (1.587.0): your head tipped to her, bent over, jolted.
+  const ov = typeof rvoCamTilt === 'function' ? rvoCamTilt() : null;
+  if (ov) { camera.rotateX(ov[0]); camera.rotateZ(ov[1]); }
   camera.updateMatrixWorld();
 }
 

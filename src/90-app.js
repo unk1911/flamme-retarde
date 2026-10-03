@@ -4045,6 +4045,8 @@ const HELP = [
     ['SHIFT + , · “pin me down”', 'help.k.revpin'],
     // Tied up, and blindfolded (1.587.0).
     ['SHIFT + \\ · SHIFT + = · “tie me up”', 'help.k.revbind'],
+    // Hauled by another hold — ear, arm, ankle, chin, neck (1.587.0).
+    ['SHIFT + ; · “pull my ear”', 'help.k.revhold'],
     // Begging her, and her mood (1.583.0).
     ['“spank me” · “harder”', 'help.k.revbeg'],
     ['O', 'help.k.pc'],
